@@ -1,6 +1,7 @@
 import { BrandBlock } from '@/components/header/BrandBlock';
 import { RunStrip } from '@/components/header/RunStrip';
 import { useVolumeStore } from '@/store/volumeStore';
+import { accentRgba } from '@/constants';
 
 export function Header() {
   const loading = useVolumeStore((s) => s.loading);
@@ -38,7 +39,7 @@ export function Header() {
             width: `${loading.percent}%`,
             background: 'var(--amber)',
             transition: 'width 180ms ease-out',
-            boxShadow: '0 0 6px rgba(255,181,71,0.6)',
+            boxShadow: `0 0 6px ${accentRgba('amber', 0.6)}`,
           }}
         />
       )}

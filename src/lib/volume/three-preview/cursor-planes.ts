@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { ACCENT_HEX_NUM, PLANE_ACCENT_KEY } from '@/constants';
 import type { Vec3, VolumeCursor } from '@/types';
 
 /**
@@ -7,9 +8,9 @@ import type { Vec3, VolumeCursor } from '@/types';
  *   Sagittal (fixed X, spans Y/Z) → violet
  *   Axial    (fixed Z, spans X/Y) → azure
  */
-const CORONAL = 0xffb547;
-const SAGITTAL = 0xb59dd1;
-const AXIAL = 0x82a8d4;
+const CORONAL = ACCENT_HEX_NUM[PLANE_ACCENT_KEY.coronal];
+const SAGITTAL = ACCENT_HEX_NUM[PLANE_ACCENT_KEY.sagittal];
+const AXIAL = ACCENT_HEX_NUM[PLANE_ACCENT_KEY.axial];
 
 interface AxisPlane {
   fill: THREE.Mesh;

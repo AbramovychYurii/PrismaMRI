@@ -7,13 +7,10 @@ import {
   type CSSProperties,
   type PointerEvent as RPointerEvent,
 } from 'react';
+import { PLANE_ACCENT, accentRgba } from '@/constants';
 import type { SlicePlane } from '@/types';
 
-const ACCENT: Record<SlicePlane, string> = {
-  coronal: 'var(--amber)',
-  sagittal: 'var(--violet)',
-  axial: 'var(--azure)',
-};
+const ACCENT = PLANE_ACCENT;
 
 const PLANE_NAME: Record<SlicePlane, string> = {
   coronal: 'Coronal',
@@ -400,7 +397,7 @@ export function SliceScrubberToggle({
         flexShrink: 0,
         borderRadius: 3,
         border: `1px solid ${border}`,
-        background: active ? 'rgba(255,181,71,0.08)' : 'transparent',
+        background: active ? accentRgba('amber', 0.08) : 'transparent',
         color,
         display: 'flex',
         alignItems: 'center',

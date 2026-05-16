@@ -2,16 +2,19 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useVolumeStore } from '@/store/volumeStore';
 import { useSliceImage } from '@/hooks/useSliceImage';
 import { useSliceScroll } from '@/hooks/useSliceScroll';
-import { PLANE_FOOTER, PLANE_GLYPH, PLANE_LABEL } from '@/constants';
+import {
+  ACCENT_VAR,
+  AXIS_ACCENT,
+  type Axis,
+  accentRgba,
+  PLANE_ACCENT,
+  PLANE_FOOTER,
+  PLANE_GLYPH,
+  PLANE_LABEL,
+} from '@/constants';
 import { clamp } from '@/lib/volume/math';
 import { SliceScrubber, SliceScrubberToggle } from '@/components/rail/SliceScrubber';
 import type { SlicePlane, VolumeCursor } from '@/types';
-
-const ACCENT_VAR: Record<SlicePlane, string> = {
-  coronal: 'var(--amber)',
-  sagittal: 'var(--violet)',
-  axial: 'var(--azure)',
-};
 
 function sliceIndexInfo(
   plane: SlicePlane,
@@ -43,6 +46,20 @@ function crosshairFrac(
   return { fx: c.x / Math.max(1, w - 1), fy: c.y / Math.max(1, h - 1) };
 }
 
+const axisColor = (a: Axis) => ACCENT_VAR[AXIS_ACCENT[a]];
+const axisGlow = (a: Axis) => accentRgba(AXIS_ACCENT[a], 0.45);
+
+/**
+ * Which axis each crosshair line represents on a panel — the vertical line
+ * carries the `fx` coordinate, the horizontal line the `fy`. Each panel shows
+ * the two axes orthogonal to its own, tinted with their system colors.
+ */
+function crosshairAxes(plane: SlicePlane): { v: Axis; h: Axis } {
+  if (plane === 'coronal') return { v: 'y', h: 'z' };
+  if (plane === 'sagittal') return { v: 'x', h: 'z' };
+  return { v: 'x', h: 'y' };
+}
+
 export function SlicePanel({ plane }: { plane: SlicePlane }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const offscreen = useRef<HTMLCanvasElement | null>(null);
@@ -65,6 +82,8 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
     if (!dims || !cursor) return null;
     return crosshairFrac(plane, dims, cursor);
   }, [plane, dims, cursor]);
+
+  const axes = crosshairAxes(plane);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -154,9 +173,9 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
               right: 0,
               top: `${cross.fy * 100}%`,
               height: 1,
-              background: 'var(--teal)',
-              opacity: 0.55,
-              boxShadow: '0 0 4px rgba(127,209,197,0.4)',
+              background: axisColor(axes.h),
+              opacity: 0.7,
+              boxShadow: `0 0 4px ${axisGlow(axes.h)}`,
             }}
           />
           <div
@@ -166,9 +185,9 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
               bottom: 0,
               left: `${cross.fx * 100}%`,
               width: 1,
-              background: 'var(--teal)',
-              opacity: 0.55,
-              boxShadow: '0 0 4px rgba(127,209,197,0.4)',
+              background: axisColor(axes.v),
+              opacity: 0.7,
+              boxShadow: `0 0 4px ${axisGlow(axes.v)}`,
             }}
           />
           <div
@@ -217,7 +236,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
             fontSize: 18,
             lineHeight: 1,
             fontWeight: 500,
-            color: ACCENT_VAR[plane],
+            color: PLANE_ACCENT[plane],
           }}
         >
           {PLANE_GLYPH[plane]}
@@ -236,7 +255,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
             minWidth: 0,
           }}
         >
-          <b style={{ fontWeight: 600, color: ACCENT_VAR[plane] }}>
+          <b style={{ fontWeight: 600, color: PLANE_ACCENT[plane] }}>
             {PLANE_LABEL[plane].split(' · ')[0]}
           </b>
           {` · ${PLANE_LABEL[plane].split(' · ')[1]}`}
@@ -298,7 +317,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
             zIndex: 5,
             border: '1.5px solid var(--amber)',
             pointerEvents: 'none',
-            boxShadow: 'inset 0 0 0 1px rgba(255, 181, 71, 0.15)',
+            boxShadow: `inset 0 0 0 1px ${accentRgba('amber', 0.15)}`,
           }}
         />
       )}

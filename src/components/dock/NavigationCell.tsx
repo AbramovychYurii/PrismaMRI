@@ -1,4 +1,5 @@
 import { useVolumeStore } from '@/store/volumeStore';
+import { ACCENT_VAR, AXIS_ACCENT, type Axis } from '@/constants';
 
 const axisStyle = (color: string): React.CSSProperties => ({
   color,
@@ -13,6 +14,8 @@ const iStyle = (color: string): React.CSSProperties => ({
   color,
   marginRight: 1,
 });
+
+const AXES: Axis[] = ['x', 'y', 'z'];
 
 export function NavigationCell() {
   const cursor = useVolumeStore((s) => s.cursor);
@@ -42,18 +45,15 @@ export function NavigationCell() {
             gap: 14,
           }}
         >
-          <span style={axisStyle('var(--amber)')}>
-            <i style={iStyle('var(--amber)')}>x</i>
-            {cursor ? cursor.x : '—'}
-          </span>
-          <span style={axisStyle('var(--violet)')}>
-            <i style={iStyle('var(--violet)')}>y</i>
-            {cursor ? cursor.y : '—'}
-          </span>
-          <span style={axisStyle('var(--azure)')}>
-            <i style={iStyle('var(--azure)')}>z</i>
-            {cursor ? cursor.z : '—'}
-          </span>
+          {AXES.map((a) => {
+            const c = ACCENT_VAR[AXIS_ACCENT[a]];
+            return (
+              <span key={a} style={axisStyle(c)}>
+                <i style={iStyle(c)}>{a}</i>
+                {cursor ? cursor[a] : '—'}
+              </span>
+            );
+          })}
         </span>
       </div>
       <div style={{ fontSize: 11.5, color: 'var(--ink-3)', lineHeight: 1.45 }}>

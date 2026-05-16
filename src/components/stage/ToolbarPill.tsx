@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { useVolumeStore } from '@/store/volumeStore';
+import { accentRgba } from '@/constants';
 import type { ToolbarState } from '@/types';
 
 interface ToolbarButton {
@@ -62,7 +63,7 @@ function ToolButton({ btn }: { btn: ToolbarButton }) {
       onMouseLeave={() => setHover(false)}
       style={{
         background: on
-          ? 'rgba(255,181,71,0.08)'
+          ? accentRgba('amber', 0.08)
           : hover
             ? 'rgba(28,24,18,0.92)'
             : 'rgba(20,18,14,0.85)',
