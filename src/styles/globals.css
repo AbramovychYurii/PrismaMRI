@@ -1,0 +1,137 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-bg: #0c0b09;
+  --color-panel: #15130e;
+  --color-panel-2: #1c1a14;
+  --color-rule: #2a261d;
+  --color-rule-2: #3a3527;
+  --color-ink: #ece6d8;
+  --color-ink-2: #b6ad99;
+  --color-ink-3: #847b66;
+  --color-ink-4: #534b3a;
+  --color-amber: #ffb547;
+  --color-amber-dim: #b67e2c;
+  --color-teal: #7fd1c5;
+  --color-teal-dim: #4d8a83;
+  --color-violet: #b59dd1;
+  --color-azure: #82a8d4;
+  --color-rose: #d97a6b;
+
+  --font-serif: 'IBM Plex Serif', Georgia, serif;
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+}
+
+:root {
+  --bg: #0c0b09;
+  --panel: #15130e;
+  --panel-2: #1c1a14;
+  --rule: #2a261d;
+  --rule-2: #3a3527;
+  --ink: #ece6d8;
+  --ink-2: #b6ad99;
+  --ink-3: #847b66;
+  --ink-4: #534b3a;
+  --amber: #ffb547;
+  --amber-dim: #b67e2c;
+  --teal: #7fd1c5;
+  --teal-dim: #4d8a83;
+  --violet: #b59dd1;
+  --azure: #82a8d4;
+  --rose: #d97a6b;
+  --serif: 'IBM Plex Serif', Georgia, serif;
+  --sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+/* paper grain background — exact from prototype */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(1200px 700px at 20% -10%, rgba(255, 181, 71, 0.04), transparent 60%),
+    radial-gradient(900px 600px at 110% 110%, rgba(127, 209, 197, 0.03), transparent 60%);
+}
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.6;
+  background-image: repeating-linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0.012) 0,
+    rgba(255, 255, 255, 0.012) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+button { font: inherit; color: inherit; }
+input, button, select, textarea { outline: none; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--rule-2); border-radius: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+.font-serif { font-family: var(--serif); }
+.font-sans { font-family: var(--sans); }
+.font-mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* === W/L sliders (Display cell) === */
+.wl-slider {
+  --accent: var(--amber);
+  --fill: 0%;
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 99px;
+  background: linear-gradient(
+    to right,
+    var(--accent) 0%,
+    var(--accent) var(--fill),
+    var(--rule) var(--fill),
+    var(--rule) 100%
+  );
+  cursor: ew-resize;
+  outline: none;
+}
+.wl-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 99px;
+  background: var(--accent);
+  border: 2px solid var(--panel);
+  box-shadow: 0 0 0 1px var(--accent), 0 0 6px color-mix(in srgb, var(--accent) 50%, transparent);
+  cursor: ew-resize;
+}
+.wl-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 99px;
+  background: var(--accent);
+  border: 2px solid var(--panel);
+  cursor: ew-resize;
+}
+.wl-slider:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent);
+}
