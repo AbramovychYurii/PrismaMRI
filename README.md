@@ -2,9 +2,11 @@
 
 A browser-based viewer for volumetric MRI (and compatible studies). All data stays on your device — no cloud, no server upload.
 
+**Live demo:** [https://abramovychyurii.github.io/PrismaMRI/](https://abramovychyurii.github.io/PrismaMRI/)
+
 ## Why this project exists
 
-After receiving my own MRI results, I only had a letter with a brief description of my condition and the findings. That was valuable for clinicians, but it did not fully satisfy my curiosity about *what was actually shown on the scans*.
+After receiving my own MRI results, I only had a letter with a brief description of my condition and the findings. That was valuable for clinicians, but it did not fully satisfy my curiosity about _what was actually shown on the scans_.
 
 I ran into a situation many patients know well:
 
@@ -26,21 +28,21 @@ So I built a **simpler way to review results for personal use**: three orthogona
 
 ## Supported formats
 
-| Format | Extensions / notes |
-|--------|---------------------|
-| DICOM | Folder of `.dcm` files (slice series) |
-| NIfTI | `.nii`, `.nii.gz` |
-| MetaImage | `.mha`, `.mhd` |
-| NRRD | `.nrrd`, `.nhdr` |
-| ZIP | Archive containing any of the formats above |
+| Format    | Extensions / notes                          |
+| --------- | ------------------------------------------- |
+| DICOM     | Folder of `.dcm` files (slice series)       |
+| NIfTI     | `.nii`, `.nii.gz`                           |
+| MetaImage | `.mha`, `.mhd`                              |
+| NRRD      | `.nrrd`, `.nhdr`                            |
+| ZIP       | Archive containing any of the formats above |
 
 ## Example data
 
 Sample volumes are included so you can try the viewer without your own files:
 
-| File | Description | Source |
-|------|-------------|-------------|
-| [`examples/maxillofacial_CBCT.nrrd`](examples/maxillofacial_CBCT.nrrd) | Maxillofacial CBCT | **[Tamas Bistey](https://www.embodi3d.com/)** — [CT scan](https://www.embodi3d.com/files/file/61544-ct-scan/) |
+| File                                                                                                 | Description                         | Source                                                                                                                     |
+| ---------------------------------------------------------------------------------------------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| [`examples/maxillofacial_CBCT.nrrd`](examples/maxillofacial_CBCT.nrrd)                               | Maxillofacial CBCT                  | **[Tamas Bistey](https://www.embodi3d.com/)** — [CT scan](https://www.embodi3d.com/files/file/61544-ct-scan/)              |
 | [`examples/dog_frontal_thorax_injured_paw_CT.nrrd`](examples/dog_frontal_thorax_injured_paw_CT.nrrd) | Dog frontal thorax CT (injured paw) | **[Gagghi](https://www.embodi3d.com/profile/27661-gagghi/)** — [gomito](https://www.embodi3d.com/files/file/60671-gomito/) |
 
 After `npm run dev`, drag a file onto the import screen or use **Open file**. See [`examples/README.md`](examples/README.md) for details.
