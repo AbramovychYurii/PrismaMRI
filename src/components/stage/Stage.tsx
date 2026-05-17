@@ -1,9 +1,94 @@
-import { useRef } from 'react';
-import { useThreePreview } from '@/hooks/useThreePreview';
-import { useVolumeStore } from '@/store/volumeStore';
-import { RegistrationMarks } from '@/components/stage/RegistrationMarks';
-import { ToolbarPill } from '@/components/stage/ToolbarPill';
-import { TickScale } from '@/components/stage/TickScale';
+import { useRef } from "react";
+import styled, { css } from "styled-components";
+import { useThreePreview } from "@/hooks/useThreePreview";
+import { useVolumeStore } from "@/store/volumeStore";
+import { RegistrationMarks } from "@/components/stage/RegistrationMarks";
+import { ToolbarPill } from "@/components/stage/ToolbarPill";
+import { TickScale } from "@/components/stage/TickScale";
+
+// ── Styled components ──────────────────────────────────────────────────────
+
+const focusedStyles = css`
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: radial-gradient(
+    ellipse at 50% 55%,
+    rgba(28, 26, 20, 0.7) 0%,
+    rgba(8, 7, 5, 0.97) 80%
+  );
+  overflow: hidden;
+`;
+
+const normalStyles = css`
+  grid-area: stage;
+  position: relative;
+  background: radial-gradient(
+    ellipse at 50% 55%,
+    rgba(28, 26, 20, 0.7) 0%,
+    rgba(8, 7, 5, 0.97) 80%
+  );
+  overflow: hidden;
+  border-right: 1px solid var(--rule);
+`;
+
+const StageSection = styled.section<{ $focus: boolean }>`
+  ${({ $focus }) => ($focus ? focusedStyles : normalStyles)}
+`;
+
+const StageCanvas = styled.canvas`
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+`;
+
+const NoVolumePlaceholder = styled.div`
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-4);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  pointer-events: none;
+`;
+
+const TitleGroup = styled.div`
+  position: absolute;
+  top: 22px;
+  left: 30px;
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  max-width: calc(100% - 420px);
+  min-width: 0;
+`;
+
+const VolumeTitle = styled.div`
+  font-family: var(--serif);
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 400;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
+const VolumeSubLabel = styled.div`
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding-bottom: 4px;
+`;
+
+// ── Component ──────────────────────────────────────────────────────────────
 
 export function Stage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -12,92 +97,18 @@ export function Stage() {
   const hasVolume = useVolumeStore((s) => s.prepared3D !== null);
 
   return (
-    <section
-      style={
-        focus
-          ? {
-              position: 'fixed',
-              inset: 0,
-              zIndex: 40,
-              background:
-                'radial-gradient(ellipse at 50% 55%, rgba(28,26,20,0.7) 0%, rgba(8,7,5,0.97) 80%)',
-              overflow: 'hidden',
-            }
-          : {
-              gridArea: 'stage',
-              position: 'relative',
-              background:
-                'radial-gradient(ellipse at 50% 55%, rgba(28,26,20,0.7) 0%, rgba(8,7,5,0.97) 80%)',
-              overflow: 'hidden',
-              borderRight: '1px solid var(--rule)',
-            }
-      }
-    >
-      <canvas
-        ref={canvasRef}
-        style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
-      />
+    <StageSection $focus={focus}>
+      <StageCanvas ref={canvasRef} />
       {!hasVolume && (
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--ink-4)',
-            fontFamily: 'var(--mono)',
-            fontSize: 11,
-            letterSpacing: '0.16em',
-            textTransform: 'uppercase',
-            pointerEvents: 'none',
-          }}
-        >
-          No volume loaded
-        </div>
+        <NoVolumePlaceholder>No volume loaded</NoVolumePlaceholder>
       )}
       <RegistrationMarks />
-      <div
-        style={{
-          position: 'absolute',
-          top: 22,
-          left: 30,
-          display: 'flex',
-          alignItems: 'flex-end',
-          gap: 16,
-          maxWidth: 'calc(100% - 420px)',
-          minWidth: 0,
-        }}
-      >
-        <div
-          style={{
-            fontFamily: 'var(--serif)',
-            fontSize: 22,
-            lineHeight: 1,
-            fontWeight: 400,
-            letterSpacing: '-0.005em',
-            whiteSpace: 'nowrap',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-          }}
-        >
-          Main volume
-        </div>
-        <div
-          style={{
-            fontFamily: 'var(--mono)',
-            fontSize: 10.5,
-            color: 'var(--ink-3)',
-            letterSpacing: '0.14em',
-            textTransform: 'uppercase',
-            paddingBottom: 4,
-          }}
-        >
-          Ray-cast · native res
-        </div>
-      </div>
+      <TitleGroup>
+        <VolumeTitle>Main volume</VolumeTitle>
+        <VolumeSubLabel>Ray-cast · native res</VolumeSubLabel>
+      </TitleGroup>
       <ToolbarPill />
       <TickScale />
-    </section>
+    </StageSection>
   );
 }

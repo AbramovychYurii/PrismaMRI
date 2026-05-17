@@ -1,25 +1,30 @@
-import { useVolumeStore } from '@/store/volumeStore';
-import { SlicePanel } from '@/components/rail/SlicePanel';
-import type { SlicePlane } from '@/types';
+import styled from "styled-components";
+import { useVolumeStore } from "@/store/volumeStore";
+import { SlicePanel } from "@/components/rail/SlicePanel";
+import type { SlicePlane } from "@/types";
 
-const PLANES: SlicePlane[] = ['coronal', 'sagittal', 'axial'];
+// ── Styled components ──────────────────────────────────────────────────────
+
+const RailAside = styled.aside`
+  grid-area: rail;
+  background: var(--panel);
+  border-bottom: 1px solid var(--rule);
+  display: flex;
+  flex-direction: column;
+`;
+
+// ── Constants ──────────────────────────────────────────────────────────────
+
+const PLANES: SlicePlane[] = ["coronal", "sagittal", "axial"];
 
 export function Rail() {
   const railOpen = useVolumeStore((s) => s.toolbar.rail);
   if (!railOpen) return null;
   return (
-    <aside
-      style={{
-        gridArea: 'rail',
-        background: 'var(--panel)',
-        borderBottom: '1px solid var(--rule)',
-        display: 'flex',
-        flexDirection: 'column',
-      }}
-    >
+    <RailAside>
       {PLANES.map((p) => (
         <SlicePanel key={p} plane={p} />
       ))}
-    </aside>
+    </RailAside>
   );
 }

@@ -1,3 +1,20 @@
+import styled from "styled-components";
+
+// ── Styled components ──────────────────────────────────────────────────────
+
+const TickScaleWrap = styled.div`
+  position: absolute;
+  left: 60px;
+  right: 60px;
+  bottom: 26px;
+  height: 18px;
+  display: flex;
+  align-items: flex-end;
+  pointer-events: none;
+`;
+
+// ── Component ──────────────────────────────────────────────────────────────
+
 export function TickScale() {
   const ticks: { x: number; major: boolean }[] = [];
   for (let i = 0; i <= 50; i++) {
@@ -5,22 +22,12 @@ export function TickScale() {
   }
 
   return (
-    <div
-      style={{
-        position: 'absolute',
-        left: 60,
-        right: 60,
-        bottom: 26,
-        height: 18,
-        display: 'flex',
-        alignItems: 'flex-end',
-        pointerEvents: 'none',
-      }}
-    >
+    <TickScaleWrap>
+      {/* Keep the SVG as-is — it's a data visualization, not a UI icon */}
       <svg
         viewBox="0 0 1000 18"
         preserveAspectRatio="none"
-        style={{ width: '100%', height: '100%', color: 'var(--ink-4)' }}
+        style={{ width: "100%", height: "100%", color: "var(--ink-4)" }}
       >
         <g stroke="currentColor" strokeWidth={1} fill="none">
           <line x1={0} y1={0} x2={1000} y2={0} opacity={0.5} />
@@ -44,13 +51,23 @@ export function TickScale() {
           fontSize={8}
           opacity={0.7}
         >
-          <text x={0} y={17}>−255</text>
-          <text x={245} y={17}>−128</text>
-          <text x={495} y={17}>0</text>
-          <text x={735} y={17}>+128</text>
-          <text x={965} y={17}>+255</text>
+          <text x={0} y={17}>
+            −255
+          </text>
+          <text x={245} y={17}>
+            −128
+          </text>
+          <text x={495} y={17}>
+            0
+          </text>
+          <text x={735} y={17}>
+            +128
+          </text>
+          <text x={965} y={17}>
+            +255
+          </text>
         </g>
       </svg>
-    </div>
+    </TickScaleWrap>
   );
 }

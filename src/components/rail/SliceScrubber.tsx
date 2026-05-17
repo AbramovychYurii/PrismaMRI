@@ -4,18 +4,21 @@ import {
   useLayoutEffect,
   useRef,
   useState,
-  type CSSProperties,
   type PointerEvent as RPointerEvent,
-} from 'react';
-import { PLANE_ACCENT, accentRgba } from '@/constants';
-import type { SlicePlane } from '@/types';
+} from "react";
+import styled from "styled-components";
+import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
+import { PLANE_ACCENT, accentRgba } from "@/constants";
+import type { SlicePlane } from "@/types";
+
+// ── Constants ──────────────────────────────────────────────────────────────
 
 const ACCENT = PLANE_ACCENT;
 
 const PLANE_NAME: Record<SlicePlane, string> = {
-  coronal: 'Coronal',
-  sagittal: 'Sagittal',
-  axial: 'Axial',
+  coronal: "Coronal",
+  sagittal: "Sagittal",
+  axial: "Axial",
 };
 
 const HOLD_DELAY_MS = 350;
@@ -24,10 +27,149 @@ const INSET = 4;
 
 function prefersReducedMotion(): boolean {
   return (
-    typeof window !== 'undefined' &&
-    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    typeof window !== "undefined" &&
+    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
   );
 }
+
+// ── Styled components ──────────────────────────────────────────────────────
+
+const ChevronBtn = styled.button<{
+  $hover: boolean;
+  $pressed: boolean;
+  $reduced: boolean;
+}>`
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 3px;
+  border: 1px solid
+    ${({ $hover }) => ($hover ? "var(--ink-4)" : "var(--rule-2)")};
+  background: ${({ $hover }) =>
+    $hover ? "rgba(28,24,18,0.95)" : "rgba(15,13,10,0.85)"};
+  color: ${({ $hover }) => ($hover ? "var(--ink)" : "var(--ink-2)")};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transform: ${({ $pressed }) => ($pressed ? "scale(0.94)" : "none")};
+  transition: ${({ $reduced }) => ($reduced ? "none" : "transform 80ms ease")};
+`;
+
+const ScrubberContainer = styled.div<{ $visible: boolean; $reduced: boolean }>`
+  position: absolute;
+  top: 32px;
+  right: 0;
+  bottom: 0;
+  width: 38px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 6px 8px 4px;
+  background: linear-gradient(to left, rgba(10, 8, 5, 0.85), transparent 70%);
+  opacity: ${({ $visible }) => ($visible ? 1 : 0)};
+  transform: ${({ $visible }) =>
+    $visible ? "translateX(0)" : "translateX(8px)"};
+  pointer-events: ${({ $visible }) => ($visible ? "auto" : "none")};
+  transition: ${({ $reduced }) =>
+    $reduced ? "none" : "opacity 160ms ease, transform 160ms ease"};
+`;
+
+const TickSheet = styled.div`
+  position: absolute;
+  left: 50%;
+  top: ${INSET}px;
+  bottom: ${INSET}px;
+  width: 12px;
+  transform: translateX(-50%);
+  opacity: 0.5;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--rule) 0,
+    var(--rule) 1px,
+    transparent 1px,
+    transparent 6px
+  );
+`;
+
+const RailLine = styled.div`
+  position: absolute;
+  left: 50%;
+  top: ${INSET}px;
+  bottom: ${INSET}px;
+  width: 2px;
+  transform: translateX(-50%);
+  background: var(--rule);
+  border-radius: 999px;
+`;
+
+const FillBar = styled.div<{ $height: number; $accent: string }>`
+  position: absolute;
+  left: 50%;
+  bottom: ${INSET}px;
+  width: 2px;
+  height: ${({ $height }) => $height}px;
+  transform: translateX(-50%);
+  background: ${({ $accent }) => $accent};
+  border-radius: 999px;
+`;
+
+const ThumbPill = styled.div<{ $top: number; $accent: string }>`
+  position: absolute;
+  left: 50%;
+  top: ${({ $top }) => $top}px;
+  width: 26px;
+  height: 16px;
+  transform: translate(-50%, -50%);
+  border-radius: 3px;
+  background: rgba(28, 24, 18, 0.95);
+  border: 1px solid ${({ $accent }) => $accent};
+  color: ${({ $accent }) => $accent};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+`;
+
+const ThumbLine = styled.span`
+  position: absolute;
+  left: -3px;
+  right: -3px;
+  top: 50%;
+  border-top: 1px solid currentColor;
+  opacity: 0.6;
+`;
+
+const ToggleButton = styled.button<{
+  $active: boolean;
+  $hover: boolean;
+  $border: string;
+  $color: string;
+}>`
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 3px;
+  border: 1px solid ${({ $border }) => $border};
+  background: ${({ $active }) =>
+    $active ? accentRgba("amber", 0.08) : "transparent"};
+  color: ${({ $color }) => $color};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+`;
+
+// ── Types ──────────────────────────────────────────────────────────────────
 
 export interface SliceScrubberProps {
   axis: SlicePlane;
@@ -37,16 +179,20 @@ export interface SliceScrubberProps {
   onChange: (next: number) => void;
 }
 
+// ── Helpers ────────────────────────────────────────────────────────────────
+
 function clampSlice(n: number, total: number): number {
   return n < 1 ? 1 : n > total ? total : n;
 }
+
+// ── ChevronButton ──────────────────────────────────────────────────────────
 
 function ChevronButton({
   dir,
   label,
   onStep,
 }: {
-  dir: 'up' | 'down';
+  dir: "up" | "down";
   label: string;
   onStep: (delta: number) => void;
 }) {
@@ -54,7 +200,8 @@ function ChevronButton({
   const [pressed, setPressed] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const interval = useRef<ReturnType<typeof setInterval> | null>(null);
-  const delta = dir === 'up' ? 1 : -1;
+  const delta = dir === "up" ? 1 : -1;
+  const reduced = prefersReducedMotion();
 
   const stopRepeat = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
@@ -76,52 +223,36 @@ function ChevronButton({
     }, HOLD_DELAY_MS);
   }
 
+  const handlePointerUp = (e: RPointerEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    stopRepeat();
+  };
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) =>
+    e.stopPropagation();
+  const handleMouseEnter = () => setHover(true);
+  const handleMouseLeave = () => setHover(false);
+
   return (
-    <button
+    <ChevronBtn
       type="button"
       aria-label={label}
       onPointerDown={handleDown}
-      onPointerUp={(e) => {
-        e.stopPropagation();
-        stopRepeat();
-      }}
+      onPointerUp={handlePointerUp}
       onPointerLeave={stopRepeat}
       onPointerCancel={stopRepeat}
-      onClick={(e) => e.stopPropagation()}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        width: 22,
-        height: 22,
-        flexShrink: 0,
-        borderRadius: 3,
-        border: `1px solid ${hover ? 'var(--ink-4)' : 'var(--rule-2)'}`,
-        background: hover ? 'rgba(28,24,18,0.95)' : 'rgba(15,13,10,0.85)',
-        color: hover ? 'var(--ink)' : 'var(--ink-2)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        cursor: 'pointer',
-        padding: 0,
-        transform: pressed ? 'scale(0.94)' : 'none',
-        transition: prefersReducedMotion() ? 'none' : 'transform 80ms ease',
-      }}
+      onClick={handleClick}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      $hover={hover}
+      $pressed={pressed}
+      $reduced={reduced}
     >
-      <svg
-        width={10}
-        height={10}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        {dir === 'up' ? <path d="M6 15l6-6 6 6" /> : <path d="M6 9l6 6 6-6" />}
-      </svg>
-    </button>
+      {dir === "up" ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+    </ChevronBtn>
   );
 }
+
+// ── SliceScrubber ──────────────────────────────────────────────────────────
 
 export function SliceScrubber({
   axis,
@@ -205,12 +336,12 @@ export function SliceScrubber({
 
   function handleKey(e: React.KeyboardEvent) {
     let next: number | null = null;
-    if (e.key === 'ArrowUp') next = slice + 1;
-    else if (e.key === 'ArrowDown') next = slice - 1;
-    else if (e.key === 'PageUp') next = slice + 10;
-    else if (e.key === 'PageDown') next = slice - 10;
-    else if (e.key === 'Home') next = total;
-    else if (e.key === 'End') next = 1;
+    if (e.key === "ArrowUp") next = slice + 1;
+    else if (e.key === "ArrowDown") next = slice - 1;
+    else if (e.key === "PageUp") next = slice + 10;
+    else if (e.key === "PageDown") next = slice - 10;
+    else if (e.key === "Home") next = total;
+    else if (e.key === "End") next = 1;
     if (next !== null) {
       e.preventDefault();
       e.stopPropagation();
@@ -223,33 +354,17 @@ export function SliceScrubber({
   const thumbY = INSET + (1 - pct) * usable;
   const fillHeight = pct * usable;
 
-  const containerStyle: CSSProperties = {
-    position: 'absolute',
-    top: 32,
-    right: 0,
-    bottom: 0,
-    width: 38,
-    zIndex: 5,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: 4,
-    padding: '8px 6px 8px 4px',
-    background:
-      'linear-gradient(to left, rgba(10,8,5,0.85), transparent 70%)',
-    opacity: visible ? 1 : 0,
-    transform: visible ? 'translateX(0)' : 'translateX(8px)',
-    pointerEvents: visible ? 'auto' : 'none',
-    transition: reduced
-      ? 'none'
-      : 'opacity 160ms ease, transform 160ms ease',
-  };
+  const handleContainerPointerDown = (e: RPointerEvent<HTMLDivElement>) =>
+    e.stopPropagation();
+  const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) =>
+    e.stopPropagation();
 
   return (
-    <div
-      style={containerStyle}
-      onPointerDown={(e) => e.stopPropagation()}
-      onClick={(e) => e.stopPropagation()}
+    <ScrubberContainer
+      $visible={visible}
+      $reduced={reduced}
+      onPointerDown={handleContainerPointerDown}
+      onClick={handleContainerClick}
     >
       <ChevronButton dir="up" label="Next slice" onStep={step} />
 
@@ -270,100 +385,33 @@ export function SliceScrubber({
         onKeyDown={handleKey}
         style={{
           flex: 1,
-          width: '100%',
-          position: 'relative',
-          cursor: 'ns-resize',
+          width: "100%",
+          position: "relative",
+          cursor: "ns-resize",
           padding: `${INSET}px 0`,
-          outline: 'none',
-          touchAction: 'none',
+          outline: "none",
+          touchAction: "none",
         }}
       >
-        {/* c. TICK SHEET */}
-        <div
-          aria-hidden
-          style={{
-            position: 'absolute',
-            left: '50%',
-            top: INSET,
-            bottom: INSET,
-            width: 12,
-            transform: 'translateX(-50%)',
-            opacity: 0.5,
-            pointerEvents: 'none',
-            backgroundImage:
-              'repeating-linear-gradient(to bottom, var(--rule) 0, var(--rule) 1px, transparent 1px, transparent 6px)',
-          }}
-        />
-        {/* a. RAIL */}
-        <div
-          aria-hidden
-          style={{
-            position: 'absolute',
-            left: '50%',
-            top: INSET,
-            bottom: INSET,
-            width: 2,
-            transform: 'translateX(-50%)',
-            background: 'var(--rule)',
-            borderRadius: 999,
-          }}
-        />
-        {/* b. FILL */}
-        <div
-          aria-hidden
-          style={{
-            position: 'absolute',
-            left: '50%',
-            bottom: INSET,
-            width: 2,
-            height: fillHeight,
-            transform: 'translateX(-50%)',
-            background: accent,
-            borderRadius: 999,
-          }}
-        />
-        {/* d. THUMB */}
-        <div
-          aria-hidden
-          style={{
-            position: 'absolute',
-            left: '50%',
-            top: thumbY,
-            width: 26,
-            height: 16,
-            transform: 'translate(-50%, -50%)',
-            borderRadius: 3,
-            background: 'rgba(28,24,18,0.95)',
-            border: `1px solid ${accent}`,
-            color: accent,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontFamily: 'var(--mono)',
-            fontSize: 9,
-            fontWeight: 600,
-            fontVariantNumeric: 'tabular-nums',
-            boxShadow: '0 1px 4px rgba(0,0,0,0.6)',
-          }}
-        >
-          <span
-            style={{
-              position: 'absolute',
-              left: -3,
-              right: -3,
-              top: '50%',
-              borderTop: '1px solid currentColor',
-              opacity: 0.6,
-            }}
-          />
+        {/* TICK SHEET */}
+        <TickSheet aria-hidden />
+        {/* RAIL */}
+        <RailLine aria-hidden />
+        {/* FILL */}
+        <FillBar aria-hidden $height={fillHeight} $accent={accent} />
+        {/* THUMB */}
+        <ThumbPill aria-hidden $top={thumbY} $accent={accent}>
+          <ThumbLine />
           {slice}
-        </div>
+        </ThumbPill>
       </div>
 
       <ChevronButton dir="down" label="Previous slice" onStep={step} />
-    </div>
+    </ScrubberContainer>
   );
 }
+
+// ── SliceScrubberToggle ────────────────────────────────────────────────────
 
 export function SliceScrubberToggle({
   active,
@@ -374,51 +422,36 @@ export function SliceScrubberToggle({
 }) {
   const [hover, setHover] = useState(false);
   const border = active
-    ? 'var(--amber-dim)'
+    ? "var(--amber-dim)"
     : hover
-      ? 'var(--rule-2)'
-      : 'var(--rule)';
-  const color = active ? 'var(--amber)' : hover ? 'var(--ink)' : 'var(--ink-3)';
+      ? "var(--rule-2)"
+      : "var(--rule)";
+  const color = active ? "var(--amber)" : hover ? "var(--ink)" : "var(--ink-3)";
+
+  const handleMouseEnter = () => setHover(true);
+  const handleMouseLeave = () => setHover(false);
+  const handlePointerDown = (e: RPointerEvent<HTMLButtonElement>) =>
+    e.stopPropagation();
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    onToggle();
+  };
+
   return (
-    <button
+    <ToggleButton
       type="button"
       aria-label="Toggle slice scrubber"
       aria-pressed={active}
-      onPointerDown={(e) => e.stopPropagation()}
-      onClick={(e) => {
-        e.stopPropagation();
-        onToggle();
-      }}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        width: 22,
-        height: 22,
-        flexShrink: 0,
-        borderRadius: 3,
-        border: `1px solid ${border}`,
-        background: active ? accentRgba('amber', 0.08) : 'transparent',
-        color,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        cursor: 'pointer',
-        padding: 0,
-      }}
+      onPointerDown={handlePointerDown}
+      onClick={handleClick}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      $active={active}
+      $hover={hover}
+      $border={border}
+      $color={color}
     >
-      <svg
-        width={11}
-        height={11}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M8 9l4-4 4 4" />
-        <path d="M8 15l4 4 4-4" />
-      </svg>
-    </button>
+      <ChevronsUpDown size={11} />
+    </ToggleButton>
   );
 }
