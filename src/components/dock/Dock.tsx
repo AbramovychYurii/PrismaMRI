@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import styled, { css } from "styled-components";
+import styled from "styled-components";
 import { ChevronDown } from "lucide-react";
 import { useVolumeStore } from "@/store/volumeStore";
 import { DisplayCell } from "@/components/dock/DisplayCell";

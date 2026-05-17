@@ -19,6 +19,13 @@ import {
   SliceScrubberToggle,
 } from "@/components/rail/SliceScrubber";
 import type { SlicePlane, VolumeCursor } from "@/types";
+import { MeasureMenu } from "@/components/rail/MeasureMenu";
+import { useMeasurementInteraction } from "@/hooks/useMeasurementInteraction";
+
+// ── Tuning knobs ──────────────────────────────────────────────────────────
+
+/** Fixed pixel size of measurement dots on 2-D slice panels. */
+const MEASURE_DOT_PX = 8;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -221,6 +228,22 @@ const ActiveBorder = styled.div`
   box-shadow: inset 0 0 0 1px ${accentRgba("amber", 0.15)};
 `;
 
+const MeasureDot = styled.div<{ $fx: number; $fy: number; $size: number }>`
+  position: absolute;
+  left: ${({ $fx }) => $fx * 100}%;
+  top: ${({ $fy }) => $fy * 100}%;
+  width: ${({ $size }) => $size}px;
+  height: ${({ $size }) => $size}px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: #ff4500;
+  box-shadow:
+    0 0 ${({ $size }) => $size * 0.7}px #ff4500,
+    0 0 ${({ $size }) => $size * 1.6}px rgba(255, 69, 0, 0.45);
+  pointer-events: none;
+  z-index: 6;
+`;
+
 // ── Component ──────────────────────────────────────────────────────────────
 
 export function SlicePanel({ plane }: { plane: SlicePlane }) {
@@ -233,6 +256,17 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
   const cursor = useVolumeStore((s) => s.cursor);
   const scrubVisible = useVolumeStore((s) => s.scrubVisible[plane]);
   const setScrubVisible = useVolumeStore((s) => s.setScrubVisible);
+  const {
+    measurement,
+    measureDots,
+    menu,
+    openMenu,
+    closeMenu,
+    onMeasureFrom,
+    onMeasureTo,
+    onClear,
+  } = useMeasurementInteraction(plane, dims, cursor);
+
   const image = useSliceImage(plane);
   const onWheel = useSliceScroll(plane);
 
@@ -316,11 +350,22 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
 
   const handleScrubToggle = () => setScrubVisible(plane, !scrubVisible);
 
+  function handleContextMenu(e: React.MouseEvent) {
+    e.preventDefault();
+    setActivePlane(plane);
+    if (canvasRef.current) openMenu(e, canvasRef.current);
+  }
+
   const accentColor = PLANE_ACCENT[plane];
   const [labelPrimary, labelSecondary] = PLANE_LABEL[plane].split(" · ");
 
   return (
-    <PanelWrap onClick={handleClick} onWheel={onWheel} $isLast={isLast}>
+    <PanelWrap
+      onClick={handleClick}
+      onContextMenu={handleContextMenu}
+      onWheel={onWheel}
+      $isLast={isLast}
+    >
       <StyledCanvas ref={canvasRef} />
       {cross && (
         <CrosshairOverlay>
@@ -371,7 +416,22 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
         <span>{footer.hint}</span>
         <span>{footer.code}</span>
       </PanelFooter>
+      {measureDots.map((dot, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: stable index for static measurement dots
+        <MeasureDot key={i} $fx={dot.fx} $fy={dot.fy} $size={MEASURE_DOT_PX} />
+      ))}
       {isActive && <ActiveBorder />}
+      {menu && (
+        <MeasureMenu
+          x={menu.screenX}
+          y={menu.screenY}
+          hasMeasurementFrom={measurement !== null}
+          onMeasureFrom={onMeasureFrom}
+          onMeasureTo={onMeasureTo}
+          onClear={onClear}
+          onClose={closeMenu}
+        />
+      )}
     </PanelWrap>
   );
 }
