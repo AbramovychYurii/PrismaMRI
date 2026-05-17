@@ -215,9 +215,9 @@ export function ExamplesSection() {
     <div
       style={{
         width: "100%",
-        marginTop: 48,
+        marginTop: 20,
         borderTop: "1px solid var(--rule)",
-        paddingTop: 28,
+        paddingTop: 14,
       }}
     >
       {/* Section header */}

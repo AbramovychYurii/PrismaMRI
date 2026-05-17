@@ -91,8 +91,8 @@ export function ImportOverlay() {
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        justifyContent: "flex-start",
-        padding: "48px 40px 60px",
+        justifyContent: "center",
+        padding: "24px 40px 24px",
         overflow: "auto",
       }}
     >
@@ -233,7 +233,7 @@ export function ImportOverlay() {
               onDrop={handleDrop}
               style={{
                 position: "relative",
-                aspectRatio: "1",
+                minHeight: 280,
                 background: hover ? "var(--panel-2)" : "var(--panel)",
                 border: `1px dashed ${hover ? "var(--amber)" : "var(--rule-2)"}`,
                 borderRadius: 4,
