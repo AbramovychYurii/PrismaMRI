@@ -82,7 +82,8 @@ export function ImportOverlay() {
   }
 
   return (
-    <div
+    <main
+      aria-label="PrismaMRI — import a medical volume"
       style={{
         position: "fixed",
         inset: 0,
@@ -96,20 +97,16 @@ export function ImportOverlay() {
         overflow: "auto",
       }}
     >
-      <div
-        style={{
-          width: 1080,
-          maxWidth: "100%",
-        }}
-      >
+      <div style={{ width: 1080, maxWidth: "100%" }}>
         <div
           style={{
             display: "grid",
             gridTemplateColumns: "1.3fr 1fr",
-            gap: 64,
+            gap: 40,
             alignItems: "center",
           }}
         >
+          {/* ── Left column: branding + description ── */}
           <div style={{ borderLeft: "1px solid var(--rule)", paddingLeft: 40 }}>
             <div
               style={{
@@ -118,7 +115,7 @@ export function ImportOverlay() {
                 color: "var(--amber)",
                 letterSpacing: "0.2em",
                 textTransform: "uppercase",
-                marginBottom: 18,
+                marginBottom: 10,
                 display: "flex",
                 alignItems: "center",
                 gap: 10,
@@ -126,6 +123,7 @@ export function ImportOverlay() {
             >
               <span>{APP_NAME}</span>
               <span
+                aria-hidden="true"
                 style={{
                   flex: 1,
                   height: 1,
@@ -134,6 +132,7 @@ export function ImportOverlay() {
                 }}
               />
             </div>
+
             <h1
               style={{
                 fontFamily: "var(--serif)",
@@ -141,7 +140,7 @@ export function ImportOverlay() {
                 lineHeight: 1.05,
                 fontWeight: 400,
                 letterSpacing: "-0.01em",
-                margin: "0 0 18px",
+                margin: "0 0 10px",
               }}
             >
               A volumetric reader
@@ -152,29 +151,35 @@ export function ImportOverlay() {
               </em>{" "}
               on your device.
             </h1>
+
             <p
               style={{
                 fontSize: 14,
                 color: "var(--ink-3)",
                 lineHeight: 1.5,
                 maxWidth: 460,
-                marginBottom: 32,
+                marginBottom: 16,
               }}
             >
               Drop a DICOM folder, NIfTI bundle, MHA stack, NRRD, or compressed
               archive. Parsing runs in workers; the volume is held in memory
               only for the duration of this session.
             </p>
-            <div
+
+            <ul
+              aria-label="Supported formats"
               style={{
+                listStyle: "none",
+                margin: 0,
+                padding: 0,
                 display: "flex",
                 flexWrap: "wrap",
                 gap: 6,
-                marginBottom: 18,
+                marginBottom: 10,
               }}
             >
               {FORMATS.map((f) => (
-                <span
+                <li
                   key={f.token}
                   style={{
                     fontFamily: "var(--mono)",
@@ -190,39 +195,48 @@ export function ImportOverlay() {
                     {f.token}
                   </b>
                   {f.rest}
-                </span>
+                </li>
               ))}
-            </div>
+            </ul>
+
             {error ? (
-              <div
+              <p
+                role="alert"
                 style={{
                   fontFamily: "var(--mono)",
                   fontSize: 11,
                   color: "var(--rose)",
                   lineHeight: 1.5,
                   letterSpacing: "0.02em",
-                  marginBottom: 8,
+                  margin: "0 0 8px",
                 }}
               >
                 {error}
-              </div>
+              </p>
             ) : null}
-            <div
+
+            {/* ink-3 = 4.7:1 on --bg → passes WCAG AA */}
+            <p
               style={{
                 fontFamily: "var(--mono)",
                 fontSize: 10.5,
-                color: "var(--ink-4)",
+                color: "var(--ink-3)",
                 lineHeight: 1.5,
                 letterSpacing: "0.04em",
+                margin: 0,
               }}
             >
               For research and educational use only — not a medical device.
               <br />
               No upload, no cloud, no telemetry. Data never leaves the browser.
-            </div>
+            </p>
           </div>
+
+          {/* ── Right column: drop zone ── */}
           <div>
             <div
+              role="region"
+              aria-label="Drag-and-drop target — drop a volume file here to open it"
               onMouseEnter={() => setHover(true)}
               onMouseLeave={() => setHover(false)}
               onDragOver={(e) => {
@@ -246,7 +260,9 @@ export function ImportOverlay() {
                 overflow: "hidden",
               }}
             >
+              {/* Decorative corner accents */}
               <span
+                aria-hidden="true"
                 style={{
                   position: "absolute",
                   top: 8,
@@ -259,6 +275,7 @@ export function ImportOverlay() {
                 }}
               />
               <span
+                aria-hidden="true"
                 style={{
                   position: "absolute",
                   bottom: 8,
@@ -270,7 +287,10 @@ export function ImportOverlay() {
                   borderTop: "none",
                 }}
               />
+
               <svg
+                aria-hidden="true"
+                focusable="false"
                 width={64}
                 height={64}
                 viewBox="0 0 64 64"
@@ -284,7 +304,11 @@ export function ImportOverlay() {
                 <path d="M22 14V8h20v6" />
                 <path d="M32 32v12M27 39l5 5 5-5" strokeLinecap="round" />
               </svg>
+
+              {/* Loading status announced to screen readers */}
               <div
+                aria-live="polite"
+                aria-atomic="true"
                 style={{
                   fontFamily: "var(--serif)",
                   fontSize: 18,
@@ -298,7 +322,9 @@ export function ImportOverlay() {
                   ? loading.message || "Loading…"
                   : "Drop volume to begin"}
               </div>
+
               <div
+                aria-hidden="true"
                 style={{
                   fontFamily: "var(--mono)",
                   fontSize: 11,
@@ -312,10 +338,12 @@ export function ImportOverlay() {
                   ? `${loading.percent}%`
                   : "DICOM · NIfTI · MHA · NRRD · ZIP"}
               </div>
+
               <div style={{ display: "flex", gap: 8 }}>
                 <button
                   type="button"
                   onClick={openFile}
+                  aria-label="Open file — browse for a DICOM, NIfTI, MHA, NRRD or ZIP file"
                   style={{
                     padding: "9px 16px",
                     border: "1px solid var(--amber)",
@@ -333,6 +361,7 @@ export function ImportOverlay() {
                 <button
                   type="button"
                   onClick={openFolder}
+                  aria-label="Open folder — browse for a DICOM series folder"
                   style={{
                     padding: "9px 16px",
                     border: "1px solid var(--rule-2)",
@@ -350,8 +379,9 @@ export function ImportOverlay() {
             </div>
           </div>
         </div>
+
         <ExamplesSection />
       </div>
-    </div>
+    </main>
   );
 }

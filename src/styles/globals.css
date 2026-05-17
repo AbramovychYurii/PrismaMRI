@@ -85,7 +85,14 @@ body::after {
 }
 
 button { font: inherit; color: inherit; }
-input, button, select, textarea { outline: none; }
+input, select, textarea { outline: none; }
+
+/* WCAG 2.2 § 2.4.11 — visible focus for keyboard users */
+:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--rule-2); border-radius: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
