@@ -1,6 +1,6 @@
 import styled from "styled-components";
 import { ChevronLeft } from "lucide-react";
-import { useVolumeStore } from "@/store/volumeStore";
+import { useVolumeStore } from "@/store";
 
 // ── Styled components ──────────────────────────────────────────────────────
 

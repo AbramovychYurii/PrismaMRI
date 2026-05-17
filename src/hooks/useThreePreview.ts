@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { ThreePreview } from "@/lib/volume/three-preview";
-import { useVolumeStore } from "@/store/volumeStore";
+import { useVolumeStore } from "@/store";
 
 /** Binds a ThreePreview instance to a canvas and syncs it with the store. */
 export function useThreePreview(

@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import styled, { css } from "styled-components";
-import { useThreePreview } from "@/hooks/useThreePreview";
-import { useVolumeStore } from "@/store/volumeStore";
+import { useThreePreview } from "@/hooks";
+import { useVolumeStore } from "@/store";
 import { RegistrationMarks } from "@/components/stage/RegistrationMarks";
 import { ToolbarPill } from "@/components/stage/ToolbarPill";
 import { TickScale } from "@/components/stage/TickScale";

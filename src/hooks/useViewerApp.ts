@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from "react";
-import { useVolumeStore } from "@/store/volumeStore";
+import { useVolumeStore } from "@/store";
 import { fetchBlobWithProgress } from "@/lib/fetch-with-progress";
 import { loadVolumeInWorker } from "@/lib/import/volume-client";
 import { fromDirectoryHandle, fromFileList } from "@/lib/import/scan-folder";

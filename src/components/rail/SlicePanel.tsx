@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useRef } from "react";
 import styled from "styled-components";
-import { useVolumeStore } from "@/store/volumeStore";
-import { useSliceImage } from "@/hooks/useSliceImage";
-import { useSliceScroll } from "@/hooks/useSliceScroll";
+import { useVolumeStore } from "@/store";
+import {
+  useSliceImage,
+  useSliceScroll,
+  useMeasurementInteraction,
+} from "@/hooks";
 import {
   ACCENT_VAR,
   AXIS_ACCENT,
@@ -20,7 +23,6 @@ import {
 } from "@/components/rail/SliceScrubber";
 import type { SlicePlane, VolumeCursor } from "@/types";
 import { MeasureMenu } from "@/components/rail/MeasureMenu";
-import { useMeasurementInteraction } from "@/hooks/useMeasurementInteraction";
 
 // ── Tuning knobs ──────────────────────────────────────────────────────────
 

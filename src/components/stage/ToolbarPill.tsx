@@ -1,7 +1,7 @@
 import { useState } from "react";
 import styled from "styled-components";
 import { Layers, Maximize2, PanelRight } from "lucide-react";
-import { useVolumeStore } from "@/store/volumeStore";
+import { useVolumeStore } from "@/store";
 import { accentRgba } from "@/constants";
 import type { ToolbarState } from "@/types";
 

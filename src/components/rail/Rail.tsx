@@ -1,5 +1,5 @@
 import styled from "styled-components";
-import { useVolumeStore } from "@/store/volumeStore";
+import { useVolumeStore } from "@/store";
 import { SlicePanel } from "@/components/rail/SlicePanel";
 import type { SlicePlane } from "@/types";
 

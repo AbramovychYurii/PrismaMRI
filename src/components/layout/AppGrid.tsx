@@ -1,5 +1,5 @@
 import styled from "styled-components";
-import { useVolumeStore } from "@/store/volumeStore";
+import { useVolumeStore } from "@/store";
 import { Header } from "@/components/header/Header";
 import { Stage } from "@/components/stage/Stage";
 import { Rail } from "@/components/rail/Rail";

@@ -1,7 +1,7 @@
 import styled from "styled-components";
 import { BrandBlock } from "@/components/header/BrandBlock";
 import { RunStrip } from "@/components/header/RunStrip";
-import { useVolumeStore } from "@/store/volumeStore";
+import { useVolumeStore } from "@/store";
 import { accentRgba } from "@/constants";
 
 // ── Styled components ──────────────────────────────────────────────────────

@@ -1,8 +1,8 @@
 import { useState } from "react";
 import styled from "styled-components";
 import { FolderOpen } from "lucide-react";
-import { useVolumeStore } from "@/store/volumeStore";
-import { useViewerActions } from "@/hooks/ViewerActionsContext";
+import { useVolumeStore } from "@/store";
+import { useViewerActions } from "@/hooks";
 import { APP_NAME } from "@/constants";
 import { ExamplesSection } from "@/components/layout/ExamplesSection";
 

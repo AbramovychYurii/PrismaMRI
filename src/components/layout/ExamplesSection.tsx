@@ -1,7 +1,7 @@
 import { useState } from "react";
 import styled from "styled-components";
-import { useViewerActions } from "@/hooks/ViewerActionsContext";
-import { useVolumeStore } from "@/store/volumeStore";
+import { useViewerActions } from "@/hooks";
+import { useVolumeStore } from "@/store";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 

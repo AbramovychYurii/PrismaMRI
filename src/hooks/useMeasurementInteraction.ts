@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { useVolumeStore } from "@/store/volumeStore";
+import { useVolumeStore } from "@/store";
 import { clamp } from "@/lib/volume/math";
 import type {
   ActiveMeasurement,
