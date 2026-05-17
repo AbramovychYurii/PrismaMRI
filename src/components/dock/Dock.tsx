@@ -1,4 +1,6 @@
 import { useState, type ReactNode } from "react";
+import styled, { css } from "styled-components";
+import { ChevronDown } from "lucide-react";
 import { useVolumeStore } from "@/store/volumeStore";
 import { DisplayCell } from "@/components/dock/DisplayCell";
 import { StudyCell } from "@/components/dock/StudyCell";
@@ -14,29 +16,101 @@ function prefersReduced() {
   );
 }
 
+// ── Styled components ──────────────────────────────────────────────────────
+
+const HeadLine = styled.span`
+  flex: 1;
+  height: 1px;
+  background: var(--rule);
+`;
+
+const HeadTitle = styled.span`
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 15px;
+  color: var(--ink);
+  letter-spacing: 0.005em;
+`;
+
+const StyledCellHead = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+`;
+
+const StyledDockCell = styled.div<{ $last?: boolean }>`
+  padding: 14px 22px 16px;
+  border-right: ${({ $last }) => ($last ? "none" : "1px solid var(--rule)")};
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+`;
+
+const ToggleButton = styled.button<{
+  $open: boolean;
+  $hover: boolean;
+  $reduced: boolean;
+}>`
+  position: fixed;
+  bottom: ${({ $open }) => ($open ? DOCK_H + 10 : 10)}px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  transition: ${({ $reduced }) =>
+    $reduced
+      ? "none"
+      : "bottom 260ms ease, background 100ms, border-color 100ms"};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: ${({ $hover }) =>
+    $hover ? "rgba(28,22,14,0.97)" : "rgba(15,12,8,0.88)"};
+  border: 1px solid
+    ${({ $hover }) => ($hover ? "var(--amber)" : "var(--amber-dim)")};
+  border-radius: 50%;
+  color: ${({ $hover }) => ($hover ? "var(--amber)" : "var(--ink-3)")};
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+`;
+
+const ChevronWrap = styled.span<{ $open: boolean; $reduced: boolean }>`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: ${({ $open }) => ($open ? "rotate(0deg)" : "rotate(180deg)")};
+  transition: ${({ $reduced }) => ($reduced ? "none" : "transform 260ms ease")};
+`;
+
+const DockPanel = styled.div<{ $open: boolean; $reduced: boolean }>`
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: ${DOCK_H}px;
+  transform: ${({ $open }) =>
+    $open ? "translateY(0)" : `translateY(${DOCK_H}px)`};
+  transition: ${({ $reduced }) => ($reduced ? "none" : "transform 260ms ease")};
+  z-index: 15;
+  background: var(--panel);
+  border-top: 1px solid var(--rule);
+  display: grid;
+  grid-template-columns: 1.1fr 1.4fr 1fr 0.9fr;
+  align-items: stretch;
+  padding-bottom: 12px;
+`;
+
+// ── Sub-components ─────────────────────────────────────────────────────────
+
 function CellHead({ title }: { title: string }) {
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        marginBottom: 12,
-      }}
-    >
-      <span
-        style={{
-          fontFamily: "var(--serif)",
-          fontStyle: "italic",
-          fontSize: 15,
-          color: "var(--ink)",
-          letterSpacing: "0.005em",
-        }}
-      >
-        {title}
-      </span>
-      <span style={{ flex: 1, height: 1, background: "var(--rule)" }} />
-    </div>
+    <StyledCellHead>
+      <HeadTitle>{title}</HeadTitle>
+      <HeadLine />
+    </StyledCellHead>
   );
 }
 
@@ -50,18 +124,10 @@ function DockCell({
   last?: boolean;
 }) {
   return (
-    <div
-      style={{
-        padding: "14px 22px 16px",
-        borderRight: last ? "none" : "1px solid var(--rule)",
-        display: "flex",
-        flexDirection: "column",
-        minWidth: 0,
-      }}
-    >
+    <StyledDockCell $last={last}>
       <CellHead title={title} />
       {children}
-    </div>
+    </StyledDockCell>
   );
 }
 
@@ -75,55 +141,25 @@ function PanelsToggle({
   const [hover, setHover] = useState(false);
   const reduced = prefersReduced();
 
+  const handleMouseEnter = () => setHover(true);
+  const handleMouseLeave = () => setHover(false);
+
   return (
-    <button
+    <ToggleButton
       type="button"
       aria-label={open ? "Hide control panels" : "Show control panels"}
       aria-expanded={open}
       onClick={onToggle}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        position: "fixed",
-        bottom: open ? DOCK_H + 10 : 10,
-        left: "50%",
-        transform: "translateX(-50%)",
-        zIndex: 20,
-        transition: reduced
-          ? "none"
-          : "bottom 260ms ease, background 100ms, border-color 100ms",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: 32,
-        height: 32,
-        background: hover ? "rgba(28,22,14,0.97)" : "rgba(15,12,8,0.88)",
-        border: `1px solid ${hover ? "var(--amber)" : "var(--amber-dim)"}`,
-        borderRadius: "50%",
-        color: hover ? "var(--amber)" : "var(--ink-3)",
-        cursor: "pointer",
-        boxShadow: "0 2px 10px rgba(0,0,0,0.55)",
-        backdropFilter: "blur(8px)",
-      }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      $open={open}
+      $hover={hover}
+      $reduced={reduced}
     >
-      <svg
-        width={12}
-        height={12}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2.5}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        aria-hidden="true"
-        style={{
-          transform: open ? "rotate(0deg)" : "rotate(180deg)",
-          transition: reduced ? "none" : "transform 260ms ease",
-        }}
-      >
-        <path d="M6 9l6 6 6-6" />
-      </svg>
-    </button>
+      <ChevronWrap $open={open} $reduced={reduced}>
+        <ChevronDown size={12} aria-hidden="true" />
+      </ChevronWrap>
+    </ToggleButton>
   );
 }
 
@@ -133,31 +169,16 @@ export function Dock() {
   const view = useVolumeStore((s) => s.view);
   const reduced = prefersReduced();
 
+  const handleToggle = () => toggleToolbar("dock");
+
   if (view !== "viewer") return null;
 
   return (
     <>
-      <PanelsToggle open={dockOpen} onToggle={() => toggleToolbar("dock")} />
+      <PanelsToggle open={dockOpen} onToggle={handleToggle} />
 
       {/* Fixed panel — slides over the stage, never resizes it */}
-      <div
-        style={{
-          position: "fixed",
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: DOCK_H,
-          transform: dockOpen ? "translateY(0)" : `translateY(${DOCK_H}px)`,
-          transition: reduced ? "none" : "transform 260ms ease",
-          zIndex: 15,
-          background: "var(--panel)",
-          borderTop: "1px solid var(--rule)",
-          display: "grid",
-          gridTemplateColumns: "1.1fr 1.4fr 1fr 0.9fr",
-          alignItems: "stretch",
-          paddingBottom: "12px",
-        }}
-      >
+      <DockPanel $open={dockOpen} $reduced={reduced}>
         <DockCell title="Display">
           <DisplayCell />
         </DockCell>
@@ -170,7 +191,7 @@ export function Dock() {
         <DockCell title="Session" last>
           <SessionCell />
         </DockCell>
-      </div>
+      </DockPanel>
     </>
   );
 }

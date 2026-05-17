@@ -1,6 +1,9 @@
 import { useState } from "react";
+import styled from "styled-components";
 import { useViewerActions } from "@/hooks/ViewerActionsContext";
 import { useVolumeStore } from "@/store/volumeStore";
+
+// ── Types ──────────────────────────────────────────────────────────────────
 
 interface ExampleMeta {
   id: string;
@@ -14,6 +17,8 @@ interface ExampleMeta {
   tag: string;
   thumbnail: string;
 }
+
+// ── Constants ──────────────────────────────────────────────────────────────
 
 const BASE = import.meta.env.BASE_URL;
 
@@ -62,6 +67,164 @@ const EXAMPLES: ExampleMeta[] = [
   },
 ];
 
+// ── Styled components ──────────────────────────────────────────────────────
+
+const ExamplesSectionWrap = styled.section`
+  width: 100%;
+  margin-top: 48px;
+  border-top: 1px solid var(--rule);
+  padding-top: 24px;
+`;
+
+const SectionHeader = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+`;
+
+const SectionTitle = styled.h2`
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--ink);
+  margin: 0;
+`;
+
+const SectionLabel = styled.span`
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--ink-3);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+`;
+
+const CardList = styled.ul`
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+`;
+
+const CardButton = styled.button<{ $disabled: boolean; $hover: boolean }>`
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: ${({ $hover }) => ($hover ? "var(--panel-2)" : "var(--panel)")};
+  border: 1px solid ${({ $hover }) => ($hover ? "var(--amber)" : "var(--rule)")};
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: ${({ $disabled }) => ($disabled ? "not-allowed" : "pointer")};
+  text-align: left;
+  padding: 0;
+  opacity: ${({ $disabled }) => ($disabled ? 0.45 : 1)};
+  transition:
+    border-color 150ms,
+    background 150ms,
+    opacity 150ms;
+  box-shadow: ${({ $hover }) =>
+    $hover ? "0 0 0 1px rgba(255,181,71,0.08)" : "none"};
+`;
+
+const CornerTL = styled.span<{ $hover: boolean }>`
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 14px;
+  height: 14px;
+  border-top: 1px solid var(--amber);
+  border-left: 1px solid var(--amber);
+  opacity: ${({ $hover }) => ($hover ? 1 : 0.5)};
+  transition: opacity 150ms;
+  z-index: 2;
+  pointer-events: none;
+`;
+
+const CornerTR = styled.span`
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 14px;
+  height: 14px;
+  border-top: 1px solid var(--rule-2);
+  border-right: 1px solid var(--rule-2);
+  z-index: 2;
+  pointer-events: none;
+`;
+
+const ModalityBadge = styled.span`
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--ink-2);
+  background: rgba(12, 11, 9, 0.8);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 2px 5px;
+  z-index: 3;
+`;
+
+const ThumbnailWrap = styled.div`
+  width: 100%;
+  aspect-ratio: 1;
+  background: #0a0907;
+  overflow: hidden;
+  flex-shrink: 0;
+`;
+
+const ThumbnailImg = styled.img<{ $hover: boolean }>`
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  filter: ${({ $hover }) =>
+    $hover ? "brightness(1.1) contrast(1.05)" : "brightness(0.95)"};
+  transition: filter 150ms;
+`;
+
+const CardMeta = styled.div`
+  padding: 10px 12px 12px;
+`;
+
+const CardTitle = styled.div`
+  font-family: var(--serif);
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--ink);
+  margin-bottom: 1px;
+`;
+
+const CardSubtitle = styled.em`
+  font-style: italic;
+  color: var(--ink-3);
+  margin-left: 6px;
+  font-size: 13px;
+`;
+
+const CardDims = styled.div`
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-3);
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+`;
+
+const CardDesc = styled.div`
+  font-family: var(--sans);
+  font-size: 11px;
+  color: var(--ink-3);
+  line-height: 1.4;
+`;
+
+// ── Sub-components ─────────────────────────────────────────────────────────
+
 function ExampleCard({
   example,
   onLoad,
@@ -75,158 +238,52 @@ function ExampleCard({
   const interactive = !disabled;
   const showHover = interactive && hover;
 
+  const handleMouseEnter = () => interactive && setHover(true);
+  const handleMouseLeave = () => setHover(false);
+
   return (
-    <button
+    <CardButton
       type="button"
       disabled={disabled}
       onClick={onLoad}
-      onMouseEnter={() => interactive && setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       aria-label={`Load ${example.title} (${example.subtitle}) — ${example.dims} · ${example.spacing} · ${example.size}`}
-      style={{
-        position: "relative",
-        width: "100%",
-        display: "flex",
-        flexDirection: "column",
-        background: showHover ? "var(--panel-2)" : "var(--panel)",
-        border: `1px solid ${showHover ? "var(--amber)" : "var(--rule)"}`,
-        borderRadius: 4,
-        overflow: "hidden",
-        cursor: disabled ? "not-allowed" : "pointer",
-        textAlign: "left",
-        padding: 0,
-        opacity: disabled ? 0.45 : 1,
-        transition: "border-color 150ms, background 150ms, opacity 150ms",
-        boxShadow: showHover ? "0 0 0 1px rgba(255,181,71,0.08)" : "none",
-      }}
+      $disabled={disabled}
+      $hover={showHover}
     >
       {/* Decorative corner brackets */}
-      <span
-        aria-hidden="true"
-        style={{
-          position: "absolute",
-          top: 8,
-          left: 8,
-          width: 14,
-          height: 14,
-          borderTop: "1px solid var(--amber)",
-          borderLeft: "1px solid var(--amber)",
-          opacity: showHover ? 1 : 0.5,
-          transition: "opacity 150ms",
-          zIndex: 2,
-          pointerEvents: "none",
-        }}
-      />
-      <span
-        aria-hidden="true"
-        style={{
-          position: "absolute",
-          top: 8,
-          right: 8,
-          width: 14,
-          height: 14,
-          borderTop: "1px solid var(--rule-2)",
-          borderRight: "1px solid var(--rule-2)",
-          zIndex: 2,
-          pointerEvents: "none",
-        }}
-      />
+      <CornerTL aria-hidden="true" $hover={showHover} />
+      <CornerTR aria-hidden="true" />
 
       {/* Modality badge — ink-2 = 8.9:1 contrast on dark overlay → passes WCAG AA */}
-      <span
-        aria-label={`Modality: ${example.tag}`}
-        style={{
-          position: "absolute",
-          top: 10,
-          right: 10,
-          fontFamily: "var(--mono)",
-          fontSize: 9,
-          letterSpacing: "0.12em",
-          color: "var(--ink-2)",
-          background: "rgba(12,11,9,0.80)",
-          border: "1px solid var(--rule)",
-          borderRadius: 2,
-          padding: "2px 5px",
-          zIndex: 3,
-        }}
-      >
+      <ModalityBadge aria-label={`Modality: ${example.tag}`}>
         {example.tag}
-      </span>
+      </ModalityBadge>
 
       {/* Thumbnail — fixed height, no aspect-ratio stretch */}
-      <div
-        style={{
-          width: "100%",
-          aspectRatio: "1",
-          background: "#0a0907",
-          overflow: "hidden",
-          flexShrink: 0,
-        }}
-      >
-        <img
+      <ThumbnailWrap>
+        <ThumbnailImg
           src={example.thumbnail}
           alt=""
           aria-hidden="true"
-          style={{
-            width: "100%",
-            height: "100%",
-            objectFit: "cover",
-            display: "block",
-            filter: showHover
-              ? "brightness(1.1) contrast(1.05)"
-              : "brightness(0.95)",
-            transition: "filter 150ms",
-          }}
+          $hover={showHover}
         />
-      </div>
+      </ThumbnailWrap>
 
       {/* Meta — visible text, aria-label on button provides full context */}
-      <div aria-hidden="true" style={{ padding: "10px 12px 12px" }}>
-        <div
-          style={{
-            fontFamily: "var(--serif)",
-            fontSize: 14,
-            fontWeight: 400,
-            color: "var(--ink)",
-            marginBottom: 1,
-          }}
-        >
+      <CardMeta aria-hidden="true">
+        <CardTitle>
           {example.title}
-          <em
-            style={{
-              fontStyle: "italic",
-              color: "var(--ink-3)",
-              marginLeft: 6,
-              fontSize: 13,
-            }}
-          >
-            · {example.subtitle}
-          </em>
-        </div>
+          <CardSubtitle>· {example.subtitle}</CardSubtitle>
+        </CardTitle>
         {/* ink-3 = 4.7:1 on --panel → passes WCAG AA */}
-        <div
-          style={{
-            fontFamily: "var(--mono)",
-            fontSize: 10,
-            color: "var(--ink-3)",
-            letterSpacing: "0.04em",
-            marginBottom: 4,
-          }}
-        >
+        <CardDims>
           {example.dims} · {example.spacing} · {example.size}
-        </div>
-        <div
-          style={{
-            fontFamily: "var(--sans)",
-            fontSize: 11,
-            color: "var(--ink-3)",
-            lineHeight: 1.4,
-          }}
-        >
-          {example.description}
-        </div>
-      </div>
-    </button>
+        </CardDims>
+        <CardDesc>{example.description}</CardDesc>
+      </CardMeta>
+    </CardButton>
   );
 }
 
@@ -234,75 +291,31 @@ export function ExamplesSection() {
   const { loadFromUrl } = useViewerActions();
   const examplesDisabled = useVolumeStore((s) => s.loading.active);
 
+  const handleLoad = (ex: ExampleMeta) => () =>
+    loadFromUrl(`${NRRD_BASE}/examples/${ex.file}`, ex.file);
+
   return (
-    <section
-      aria-label="Example CT datasets"
-      style={{
-        width: "100%",
-        marginTop: 48,
-        borderTop: "1px solid var(--rule)",
-        paddingTop: 24,
-      }}
-    >
+    <ExamplesSectionWrap aria-label="Example CT datasets">
       {/* Section header */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 16,
-        }}
-      >
-        <h2
-          style={{
-            fontFamily: "var(--serif)",
-            fontStyle: "italic",
-            fontSize: 15,
-            fontWeight: 400,
-            color: "var(--ink)",
-            margin: 0,
-          }}
-        >
-          Examples
-        </h2>
-        <span
-          aria-hidden="true"
-          style={{
-            fontFamily: "var(--mono)",
-            fontSize: 9.5,
-            color: "var(--ink-3)",
-            letterSpacing: "0.12em",
-            textTransform: "uppercase",
-          }}
-        >
+      <SectionHeader>
+        <SectionTitle>Examples</SectionTitle>
+        <SectionLabel aria-hidden="true">
           {examplesDisabled ? "Loading…" : "Pre-loaded · Click to open"}
-        </span>
-      </div>
+        </SectionLabel>
+      </SectionHeader>
 
       {/* Cards */}
-      <ul
-        role="list"
-        style={{
-          listStyle: "none",
-          margin: 0,
-          padding: 0,
-          display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
-          gap: 12,
-        }}
-      >
+      <CardList role="list">
         {EXAMPLES.map((ex) => (
           <li key={ex.id}>
             <ExampleCard
               example={ex}
               disabled={examplesDisabled}
-              onLoad={() =>
-                loadFromUrl(`${NRRD_BASE}/examples/${ex.file}`, ex.file)
-              }
+              onLoad={handleLoad(ex)}
             />
           </li>
         ))}
-      </ul>
-    </section>
+      </CardList>
+    </ExamplesSectionWrap>
   );
 }

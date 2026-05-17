@@ -1,31 +1,34 @@
-import { useVolumeStore } from '@/store/volumeStore';
-import { Header } from '@/components/header/Header';
-import { Stage } from '@/components/stage/Stage';
-import { Rail } from '@/components/rail/Rail';
-import { Dock } from '@/components/dock/Dock';
+import styled from "styled-components";
+import { useVolumeStore } from "@/store/volumeStore";
+import { Header } from "@/components/header/Header";
+import { Stage } from "@/components/stage/Stage";
+import { Rail } from "@/components/rail/Rail";
+import { Dock } from "@/components/dock/Dock";
+
+// ── Styled components ──────────────────────────────────────────────────────
+
+const GridRoot = styled.div<{ $railOpen: boolean }>`
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: ${({ $railOpen }) =>
+    $railOpen ? "1fr 360px" : "1fr 0px"};
+  grid-template-rows: 56px 1fr;
+  grid-template-areas: "header header" "stage rail";
+  height: 100vh;
+  width: 100vw;
+  gap: 0;
+`;
 
 export function AppGrid() {
   const railOpen = useVolumeStore((s) => s.toolbar.rail);
 
   return (
-    <div
-      className="console"
-      style={{
-        position: 'relative',
-        zIndex: 1,
-        display: 'grid',
-        gridTemplateColumns: railOpen ? '1fr 360px' : '1fr 0px',
-        gridTemplateRows: '56px 1fr',
-        gridTemplateAreas: '"header header" "stage rail"',
-        height: '100vh',
-        width: '100vw',
-        gap: 0,
-      }}
-    >
+    <GridRoot className="console" $railOpen={railOpen}>
       <Header />
       <Stage />
       <Rail />
       <Dock />
-    </div>
+    </GridRoot>
   );
 }

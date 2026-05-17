@@ -1,75 +1,101 @@
-import { useVolumeStore } from '@/store/volumeStore';
-import { ACCENT_VAR, AXIS_ACCENT, type Axis } from '@/constants';
+import styled from "styled-components";
+import { useVolumeStore } from "@/store/volumeStore";
+import { ACCENT_VAR, AXIS_ACCENT, type Axis } from "@/constants";
 
-const axisStyle = (color: string): React.CSSProperties => ({
-  color,
-  display: 'flex',
-  gap: 4,
-  alignItems: 'baseline',
-});
-const iStyle = (color: string): React.CSSProperties => ({
-  fontStyle: 'italic',
-  fontFamily: 'var(--serif)',
-  fontSize: 13,
-  color,
-  marginRight: 1,
-});
+// ── Styled components ──────────────────────────────────────────────────────
 
-const AXES: Axis[] = ['x', 'y', 'z'];
+const CursorSection = styled.div`
+  font-family: var(--mono);
+  margin-bottom: 12px;
+  line-height: 1.3;
+`;
+
+const CursorLabel = styled.span`
+  font-size: 10px;
+  color: var(--ink-4);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  display: block;
+`;
+
+const CursorValues = styled.span`
+  font-size: 16px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  display: flex;
+  gap: 14px;
+`;
+
+const AxisSpan = styled.span<{ $color: string }>`
+  color: ${({ $color }) => $color};
+  display: flex;
+  gap: 4px;
+  align-items: baseline;
+`;
+
+const AxisLabel = styled.i<{ $color: string }>`
+  font-style: italic;
+  font-family: var(--serif);
+  font-size: 13px;
+  color: ${({ $color }) => $color};
+  margin-right: 1px;
+`;
+
+const TipsSection = styled.div`
+  font-size: 11.5px;
+  color: var(--ink-3);
+  line-height: 1.45;
+`;
+
+const TipRow = styled.div`
+  margin-bottom: 6px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+`;
+
+const TipKey = styled.b`
+  color: var(--ink-2);
+  font-weight: 500;
+`;
+
+// ── Constants ──────────────────────────────────────────────────────────────
+
+const AXES: Axis[] = ["x", "y", "z"];
 
 export function NavigationCell() {
   const cursor = useVolumeStore((s) => s.cursor);
 
   return (
     <>
-      <div style={{ fontFamily: 'var(--mono)', marginBottom: 12, lineHeight: 1.3 }}>
-        <span
-          style={{
-            fontSize: 10,
-            color: 'var(--ink-4)',
-            letterSpacing: '0.14em',
-            textTransform: 'uppercase',
-            marginBottom: 4,
-            display: 'block',
-          }}
-        >
-          Cursor · voxel
-        </span>
-        <span
-          style={{
-            fontSize: 16,
-            color: 'var(--ink)',
-            fontVariantNumeric: 'tabular-nums',
-            fontWeight: 500,
-            display: 'flex',
-            gap: 14,
-          }}
-        >
+      <CursorSection>
+        <CursorLabel>Cursor · voxel</CursorLabel>
+        <CursorValues>
           {AXES.map((a) => {
             const c = ACCENT_VAR[AXIS_ACCENT[a]];
             return (
-              <span key={a} style={axisStyle(c)}>
-                <i style={iStyle(c)}>{a}</i>
-                {cursor ? cursor[a] : '—'}
-              </span>
+              <AxisSpan key={a} $color={c}>
+                <AxisLabel $color={c}>{a}</AxisLabel>
+                {cursor ? cursor[a] : "—"}
+              </AxisSpan>
             );
           })}
-        </span>
-      </div>
-      <div style={{ fontSize: 11.5, color: 'var(--ink-3)', lineHeight: 1.45 }}>
-        <div style={{ marginBottom: 6 }}>
-          <b style={{ color: 'var(--ink-2)', fontWeight: 500 }}>Drag</b> any plane to scrub linked
-          slices.
-        </div>
-        <div style={{ marginBottom: 6 }}>
-          <b style={{ color: 'var(--ink-2)', fontWeight: 500 }}>Wheel</b> to zoom ·{' '}
-          <b style={{ color: 'var(--ink-2)', fontWeight: 500 }}>Shift+drag</b> to pan.
-        </div>
-        <div>
-          <b style={{ color: 'var(--ink-2)', fontWeight: 500 }}>↑ ↓</b> step the active plane by 1
-          slice.
-        </div>
-      </div>
+        </CursorValues>
+      </CursorSection>
+      <TipsSection>
+        <TipRow>
+          <TipKey>Drag</TipKey> any plane to scrub linked slices.
+        </TipRow>
+        <TipRow>
+          <TipKey>Wheel</TipKey> to zoom · <TipKey>Shift+drag</TipKey> to pan.
+        </TipRow>
+        <TipRow>
+          <TipKey>↑ ↓</TipKey> step the active plane by 1 slice.
+        </TipRow>
+      </TipsSection>
     </>
   );
 }

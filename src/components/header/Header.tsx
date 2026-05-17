@@ -1,48 +1,49 @@
-import { BrandBlock } from '@/components/header/BrandBlock';
-import { RunStrip } from '@/components/header/RunStrip';
-import { useVolumeStore } from '@/store/volumeStore';
-import { accentRgba } from '@/constants';
+import styled from "styled-components";
+import { BrandBlock } from "@/components/header/BrandBlock";
+import { RunStrip } from "@/components/header/RunStrip";
+import { useVolumeStore } from "@/store/volumeStore";
+import { accentRgba } from "@/constants";
+
+// ── Styled components ──────────────────────────────────────────────────────
+
+const StyledHeader = styled.header`
+  grid-area: header;
+  border-bottom: 1px solid var(--rule);
+  background: var(--panel);
+  display: grid;
+  grid-template-columns: 280px 1fr auto;
+  align-items: stretch;
+  position: relative;
+`;
+
+const HeaderRight = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 0 22px;
+  border-left: 1px solid var(--rule);
+`;
+
+const LoadingBar = styled.div<{ $width: number }>`
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  width: ${({ $width }) => $width}%;
+  background: var(--amber);
+  transition: width 180ms ease-out;
+  box-shadow: 0 0 6px ${accentRgba("amber", 0.6)};
+`;
 
 export function Header() {
   const loading = useVolumeStore((s) => s.loading);
 
   return (
-    <header
-      style={{
-        gridArea: 'header',
-        borderBottom: '1px solid var(--rule)',
-        background: 'var(--panel)',
-        display: 'grid',
-        gridTemplateColumns: '280px 1fr auto',
-        alignItems: 'stretch',
-        position: 'relative',
-      }}
-    >
+    <StyledHeader>
       <BrandBlock />
       <RunStrip />
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 18,
-          padding: '0 22px',
-          borderLeft: '1px solid var(--rule)',
-        }}
-      />
-      {loading.active && (
-        <div
-          style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            height: 2,
-            width: `${loading.percent}%`,
-            background: 'var(--amber)',
-            transition: 'width 180ms ease-out',
-            boxShadow: `0 0 6px ${accentRgba('amber', 0.6)}`,
-          }}
-        />
-      )}
-    </header>
+      <HeaderRight />
+      {loading.active && <LoadingBar $width={loading.percent} />}
+    </StyledHeader>
   );
 }

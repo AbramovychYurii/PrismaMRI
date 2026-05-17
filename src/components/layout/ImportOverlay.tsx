@@ -1,8 +1,12 @@
 import { useState } from "react";
+import styled from "styled-components";
+import { FolderOpen } from "lucide-react";
 import { useVolumeStore } from "@/store/volumeStore";
 import { useViewerActions } from "@/hooks/ViewerActionsContext";
 import { APP_NAME } from "@/constants";
 import { ExamplesSection } from "@/components/layout/ExamplesSection";
+
+// ── Types ──────────────────────────────────────────────────────────────────
 
 const FORMATS = [
   { token: "DCM", rest: " series" },
@@ -20,6 +24,8 @@ interface FsEntry {
     readEntries: (cb: (entries: FsEntry[]) => void) => void;
   };
 }
+
+// ── Helpers ────────────────────────────────────────────────────────────────
 
 async function collectFromEntry(
   entry: FsEntry,
@@ -55,6 +61,208 @@ async function collectFromEntry(
   }
 }
 
+// ── Styled components ──────────────────────────────────────────────────────
+
+const ImportMain = styled.main`
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 40px 24px;
+  overflow: auto;
+`;
+
+const ContentWrap = styled.div`
+  width: 1080px;
+  max-width: 100%;
+`;
+
+const TwoColGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 40px;
+  align-items: center;
+`;
+
+const LeftCol = styled.div`
+  border-left: 1px solid var(--rule);
+  padding-left: 40px;
+`;
+
+const TagLine = styled.div`
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--amber);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+`;
+
+const TagRule = styled.span`
+  flex: 1;
+  height: 1px;
+  background: var(--rule);
+  max-width: 60px;
+`;
+
+const MainTitle = styled.h1`
+  font-family: var(--serif);
+  font-size: 44px;
+  line-height: 1.05;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  margin: 0 0 10px;
+`;
+
+const TitleAccent = styled.em`
+  font-style: italic;
+  color: var(--amber);
+`;
+
+const DescParagraph = styled.p`
+  font-size: 14px;
+  color: var(--ink-3);
+  line-height: 1.5;
+  max-width: 460px;
+  margin-bottom: 16px;
+`;
+
+const FormatList = styled.ul`
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+`;
+
+const FormatItem = styled.li`
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-2);
+  padding: 4px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  letter-spacing: 0.1em;
+`;
+
+const FormatToken = styled.b`
+  color: var(--amber);
+  font-weight: 500;
+`;
+
+const ErrorMsg = styled.p`
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--rose);
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  margin: 0 0 8px;
+`;
+
+const DisclaimerText = styled.p`
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--ink-3);
+  line-height: 1.5;
+  letter-spacing: 0.04em;
+  margin: 0;
+`;
+
+const DropZone = styled.div<{ $hover: boolean }>`
+  position: relative;
+  min-height: 280px;
+  background: ${({ $hover }) => ($hover ? "var(--panel-2)" : "var(--panel)")};
+  border: 1px dashed
+    ${({ $hover }) => ($hover ? "var(--amber)" : "var(--rule-2)")};
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  transition: 200ms;
+  overflow: hidden;
+`;
+
+const CornerAccentTL = styled.span`
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--amber);
+  border-right: none;
+  border-bottom: none;
+`;
+
+const CornerAccentBR = styled.span`
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--amber);
+  border-left: none;
+  border-top: none;
+`;
+
+const LoadingTitle = styled.div`
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 400;
+  margin-bottom: 4px;
+  text-align: center;
+  line-height: 1.3;
+`;
+
+const LoadingSubText = styled.div`
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-3);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 24px;
+`;
+
+const ButtonsRow = styled.div`
+  display: flex;
+  gap: 8px;
+`;
+
+const PrimaryButton = styled.button`
+  padding: 9px 16px;
+  border: 1px solid var(--amber);
+  border-radius: 4px;
+  background: var(--amber);
+  color: #1a140a;
+  font-weight: 600;
+  font-family: var(--sans);
+  font-size: 12.5px;
+  cursor: pointer;
+`;
+
+const SecondaryButton = styled.button`
+  padding: 9px 16px;
+  border: 1px solid var(--rule-2);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 12.5px;
+  cursor: pointer;
+`;
+
+// ── Component ──────────────────────────────────────────────────────────────
+
 export function ImportOverlay() {
   const [hover, setHover] = useState(false);
   const error = useVolumeStore((s) => s.error);
@@ -81,307 +289,114 @@ export function ImportOverlay() {
     if (e.dataTransfer.files.length > 0) openFiles(e.dataTransfer.files);
   }
 
-  return (
-    <main
-      aria-label="PrismaMRI — import a medical volume"
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 50,
-        background: "var(--bg)",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "24px 40px 24px",
-        overflow: "auto",
-      }}
-    >
-      <div style={{ width: 1080, maxWidth: "100%" }}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1.3fr 1fr",
-            gap: 40,
-            alignItems: "center",
-          }}
-        >
-          {/* ── Left column: branding + description ── */}
-          <div style={{ borderLeft: "1px solid var(--rule)", paddingLeft: 40 }}>
-            <div
-              style={{
-                fontFamily: "var(--mono)",
-                fontSize: 10.5,
-                color: "var(--amber)",
-                letterSpacing: "0.2em",
-                textTransform: "uppercase",
-                marginBottom: 10,
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-              }}
-            >
-              <span>{APP_NAME}</span>
-              <span
-                aria-hidden="true"
-                style={{
-                  flex: 1,
-                  height: 1,
-                  background: "var(--rule)",
-                  maxWidth: 60,
-                }}
-              />
-            </div>
+  const handleMouseEnter = () => setHover(true);
+  const handleMouseLeave = () => setHover(false);
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setHover(true);
+  };
+  const handleDragLeave = () => setHover(false);
 
-            <h1
-              style={{
-                fontFamily: "var(--serif)",
-                fontSize: 44,
-                lineHeight: 1.05,
-                fontWeight: 400,
-                letterSpacing: "-0.01em",
-                margin: "0 0 10px",
-              }}
-            >
+  return (
+    <ImportMain aria-label="PrismaMRI — import a medical volume">
+      <ContentWrap>
+        <TwoColGrid>
+          {/* ── Left column: branding + description ── */}
+          <LeftCol>
+            <TagLine>
+              <span>{APP_NAME}</span>
+              <TagRule aria-hidden="true" />
+            </TagLine>
+
+            <MainTitle>
               A volumetric reader
               <br />
-              that{" "}
-              <em style={{ fontStyle: "italic", color: "var(--amber)" }}>
-                stays
-              </em>{" "}
-              on your device.
-            </h1>
+              that <TitleAccent>stays</TitleAccent> on your device.
+            </MainTitle>
 
-            <p
-              style={{
-                fontSize: 14,
-                color: "var(--ink-3)",
-                lineHeight: 1.5,
-                maxWidth: 460,
-                marginBottom: 16,
-              }}
-            >
+            <DescParagraph>
               Drop a DICOM folder, NIfTI bundle, MHA stack, NRRD, or compressed
               archive. Parsing runs in workers; the volume is held in memory
               only for the duration of this session.
-            </p>
+            </DescParagraph>
 
-            <ul
-              aria-label="Supported formats"
-              style={{
-                listStyle: "none",
-                margin: 0,
-                padding: 0,
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 6,
-                marginBottom: 10,
-              }}
-            >
+            <FormatList aria-label="Supported formats">
               {FORMATS.map((f) => (
-                <li
-                  key={f.token}
-                  style={{
-                    fontFamily: "var(--mono)",
-                    fontSize: 10.5,
-                    color: "var(--ink-2)",
-                    padding: "4px 10px",
-                    border: "1px solid var(--rule)",
-                    borderRadius: 2,
-                    letterSpacing: "0.1em",
-                  }}
-                >
-                  <b style={{ color: "var(--amber)", fontWeight: 500 }}>
-                    {f.token}
-                  </b>
+                <FormatItem key={f.token}>
+                  <FormatToken>{f.token}</FormatToken>
                   {f.rest}
-                </li>
+                </FormatItem>
               ))}
-            </ul>
+            </FormatList>
 
-            {error ? (
-              <p
-                role="alert"
-                style={{
-                  fontFamily: "var(--mono)",
-                  fontSize: 11,
-                  color: "var(--rose)",
-                  lineHeight: 1.5,
-                  letterSpacing: "0.02em",
-                  margin: "0 0 8px",
-                }}
-              >
-                {error}
-              </p>
-            ) : null}
+            {error ? <ErrorMsg role="alert">{error}</ErrorMsg> : null}
 
             {/* ink-3 = 4.7:1 on --bg → passes WCAG AA */}
-            <p
-              style={{
-                fontFamily: "var(--mono)",
-                fontSize: 10.5,
-                color: "var(--ink-3)",
-                lineHeight: 1.5,
-                letterSpacing: "0.04em",
-                margin: 0,
-              }}
-            >
+            <DisclaimerText>
               For research and educational use only — not a medical device.
               <br />
               No upload, no cloud, no telemetry. Data never leaves the browser.
-            </p>
-          </div>
+            </DisclaimerText>
+          </LeftCol>
 
           {/* ── Right column: drop zone ── */}
           <div>
-            <div
+            <DropZone
               role="region"
               aria-label="Drag-and-drop target — drop a volume file here to open it"
-              onMouseEnter={() => setHover(true)}
-              onMouseLeave={() => setHover(false)}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setHover(true);
-              }}
-              onDragLeave={() => setHover(false)}
+              onMouseEnter={handleMouseEnter}
+              onMouseLeave={handleMouseLeave}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              style={{
-                position: "relative",
-                minHeight: 280,
-                background: hover ? "var(--panel-2)" : "var(--panel)",
-                border: `1px dashed ${hover ? "var(--amber)" : "var(--rule-2)"}`,
-                borderRadius: 4,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: 32,
-                transition: "200ms",
-                overflow: "hidden",
-              }}
+              $hover={hover}
             >
               {/* Decorative corner accents */}
-              <span
-                aria-hidden="true"
-                style={{
-                  position: "absolute",
-                  top: 8,
-                  left: 8,
-                  width: 18,
-                  height: 18,
-                  border: "1px solid var(--amber)",
-                  borderRight: "none",
-                  borderBottom: "none",
-                }}
-              />
-              <span
-                aria-hidden="true"
-                style={{
-                  position: "absolute",
-                  bottom: 8,
-                  right: 8,
-                  width: 18,
-                  height: 18,
-                  border: "1px solid var(--amber)",
-                  borderLeft: "none",
-                  borderTop: "none",
-                }}
-              />
+              <CornerAccentTL aria-hidden="true" />
+              <CornerAccentBR aria-hidden="true" />
 
-              <svg
+              <FolderOpen
                 aria-hidden="true"
-                focusable="false"
-                width={64}
-                height={64}
-                viewBox="0 0 64 64"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth={1.4}
+                focusable={false}
+                size={64}
                 style={{ color: "var(--amber)", marginBottom: 22 }}
-              >
-                <rect x={10} y={14} width={44} height={36} rx={2} />
-                <path d="M10 24h44" />
-                <path d="M22 14V8h20v6" />
-                <path d="M32 32v12M27 39l5 5 5-5" strokeLinecap="round" />
-              </svg>
+              />
 
               {/* Loading status announced to screen readers */}
-              <div
-                aria-live="polite"
-                aria-atomic="true"
-                style={{
-                  fontFamily: "var(--serif)",
-                  fontSize: 18,
-                  fontWeight: 400,
-                  marginBottom: 4,
-                  textAlign: "center",
-                  lineHeight: 1.3,
-                }}
-              >
+              <LoadingTitle aria-live="polite" aria-atomic="true">
                 {loading.active
                   ? loading.message || "Loading…"
                   : "Drop volume to begin"}
-              </div>
+              </LoadingTitle>
 
-              <div
-                aria-hidden="true"
-                style={{
-                  fontFamily: "var(--mono)",
-                  fontSize: 11,
-                  color: "var(--ink-3)",
-                  letterSpacing: "0.1em",
-                  textTransform: "uppercase",
-                  marginBottom: 24,
-                }}
-              >
+              <LoadingSubText aria-hidden="true">
                 {loading.active
                   ? `${loading.percent}%`
                   : "DICOM · NIfTI · MHA · NRRD · ZIP"}
-              </div>
+              </LoadingSubText>
 
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
+              <ButtonsRow>
+                <PrimaryButton
                   type="button"
                   onClick={openFile}
                   aria-label="Open file — browse for a DICOM, NIfTI, MHA, NRRD or ZIP file"
-                  style={{
-                    padding: "9px 16px",
-                    border: "1px solid var(--amber)",
-                    borderRadius: 4,
-                    background: "var(--amber)",
-                    color: "#1a140a",
-                    fontWeight: 600,
-                    fontFamily: "var(--sans)",
-                    fontSize: 12.5,
-                    cursor: "pointer",
-                  }}
                 >
                   Open file
-                </button>
-                <button
+                </PrimaryButton>
+                <SecondaryButton
                   type="button"
                   onClick={openFolder}
                   aria-label="Open folder — browse for a DICOM series folder"
-                  style={{
-                    padding: "9px 16px",
-                    border: "1px solid var(--rule-2)",
-                    borderRadius: 4,
-                    background: "transparent",
-                    color: "var(--ink)",
-                    fontFamily: "var(--sans)",
-                    fontSize: 12.5,
-                    cursor: "pointer",
-                  }}
                 >
                   Open folder
-                </button>
-              </div>
-            </div>
+                </SecondaryButton>
+              </ButtonsRow>
+            </DropZone>
           </div>
-        </div>
+        </TwoColGrid>
 
         <ExamplesSection />
-      </div>
-    </main>
+      </ContentWrap>
+    </ImportMain>
   );
 }

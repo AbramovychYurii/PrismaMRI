@@ -1,4 +1,49 @@
-import { useVolumeStore } from '@/store/volumeStore';
+import styled from "styled-components";
+import { useVolumeStore } from "@/store/volumeStore";
+
+// ── Styled components ──────────────────────────────────────────────────────
+
+const StripGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  align-items: center;
+`;
+
+const RunCellWrap = styled.div<{ $last?: boolean }>`
+  padding: 6px 18px;
+  border-right: ${({ $last }) => ($last ? "none" : "1px solid var(--rule)")};
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+`;
+
+const RunKey = styled.div`
+  font-family: var(--mono);
+  font-size: 9.5px;
+  color: var(--ink-4);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-bottom: 3px;
+`;
+
+const RunVal = styled.div`
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`;
+
+const RunDim = styled.span`
+  color: var(--ink-3);
+`;
+
+// ── Sub-components ─────────────────────────────────────────────────────────
 
 function RunCell({
   k,
@@ -12,45 +57,13 @@ function RunCell({
   last?: boolean;
 }) {
   return (
-    <div
-      style={{
-        padding: '6px 18px',
-        borderRight: last ? 'none' : '1px solid var(--rule)',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        minWidth: 0,
-      }}
-    >
-      <div
-        style={{
-          fontFamily: 'var(--mono)',
-          fontSize: 9.5,
-          color: 'var(--ink-4)',
-          letterSpacing: '0.18em',
-          textTransform: 'uppercase',
-          marginBottom: 3,
-        }}
-      >
-        {k}
-      </div>
-      <div
-        style={{
-          fontFamily: 'var(--mono)',
-          fontSize: 12.5,
-          color: 'var(--ink)',
-          fontVariantNumeric: 'tabular-nums',
-          letterSpacing: '0.02em',
-          whiteSpace: 'nowrap',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-        }}
-      >
+    <RunCellWrap $last={last}>
+      <RunKey>{k}</RunKey>
+      <RunVal>
         {v}
-        {dim && <span style={{ color: 'var(--ink-3)' }}>{` ${dim}`}</span>}
-      </div>
-    </div>
+        {dim && <RunDim>{` ${dim}`}</RunDim>}
+      </RunVal>
+    </RunCellWrap>
   );
 }
 
@@ -61,30 +74,26 @@ export function RunStrip() {
   const spacing = meta?.spacing;
 
   return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
-        alignItems: 'center',
-      }}
-    >
-      <RunCell k="Scanner" v={meta?.scanner ?? '—'} />
+    <StripGrid>
+      <RunCell k="Scanner" v={meta?.scanner ?? "—"} />
       <RunCell
         k="Volume"
-        v={dims ? `${dims[0]} × ${dims[1]} × ${dims[2]}` : '—'}
-        dim={dims ? 'vox' : undefined}
+        v={dims ? `${dims[0]} × ${dims[1]} × ${dims[2]}` : "—"}
+        dim={dims ? "vox" : undefined}
       />
       <RunCell
         k="Spacing"
-        v={spacing ? spacing.map((s) => s.toFixed(2)).join(' × ') : '—'}
-        dim={spacing ? 'mm' : undefined}
+        v={spacing ? spacing.map((s) => s.toFixed(2)).join(" × ") : "—"}
+        dim={spacing ? "mm" : undefined}
       />
       <RunCell
         k="Modality"
-        v={meta?.modality ?? '—'}
-        dim={meta?.bitsAllocated ? `· ${meta.bitsAllocated}-bit · HU` : undefined}
+        v={meta?.modality ?? "—"}
+        dim={
+          meta?.bitsAllocated ? `· ${meta.bitsAllocated}-bit · HU` : undefined
+        }
         last
       />
-    </div>
+    </StripGrid>
   );
 }
