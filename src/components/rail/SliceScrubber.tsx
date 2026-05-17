@@ -54,7 +54,7 @@ function ChevronButton({
   const [pressed, setPressed] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const interval = useRef<ReturnType<typeof setInterval> | null>(null);
-  const delta = dir === 'up' ? -1 : 1;
+  const delta = dir === 'up' ? 1 : -1;
 
   const stopRepeat = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
@@ -166,7 +166,7 @@ export function SliceScrubber({
       const usable = Math.max(1, rect.height - INSET * 2);
       const y = clientY - rect.top - INSET;
       const pct = Math.max(0, Math.min(1, y / usable));
-      const next = Math.round(pct * (total - 1)) + 1;
+      const next = Math.round((1 - pct) * (total - 1)) + 1;
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = requestAnimationFrame(() =>
         onChange(clampSlice(next, total)),
@@ -205,12 +205,12 @@ export function SliceScrubber({
 
   function handleKey(e: React.KeyboardEvent) {
     let next: number | null = null;
-    if (e.key === 'ArrowUp') next = slice - 1;
-    else if (e.key === 'ArrowDown') next = slice + 1;
-    else if (e.key === 'PageUp') next = slice - 10;
-    else if (e.key === 'PageDown') next = slice + 10;
-    else if (e.key === 'Home') next = 1;
-    else if (e.key === 'End') next = total;
+    if (e.key === 'ArrowUp') next = slice + 1;
+    else if (e.key === 'ArrowDown') next = slice - 1;
+    else if (e.key === 'PageUp') next = slice + 10;
+    else if (e.key === 'PageDown') next = slice - 10;
+    else if (e.key === 'Home') next = total;
+    else if (e.key === 'End') next = 1;
     if (next !== null) {
       e.preventDefault();
       e.stopPropagation();
@@ -220,7 +220,7 @@ export function SliceScrubber({
 
   const usable = Math.max(0, trackH - INSET * 2);
   const pct = total > 1 ? (slice - 1) / (total - 1) : 0;
-  const thumbY = INSET + pct * usable;
+  const thumbY = INSET + (1 - pct) * usable;
   const fillHeight = pct * usable;
 
   const containerStyle: CSSProperties = {
@@ -251,7 +251,7 @@ export function SliceScrubber({
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
-      <ChevronButton dir="up" label="Previous slice" onStep={step} />
+      <ChevronButton dir="up" label="Next slice" onStep={step} />
 
       {/* TRACK */}
       <div
@@ -314,7 +314,7 @@ export function SliceScrubber({
           style={{
             position: 'absolute',
             left: '50%',
-            top: INSET,
+            bottom: INSET,
             width: 2,
             height: fillHeight,
             transform: 'translateX(-50%)',
@@ -360,7 +360,7 @@ export function SliceScrubber({
         </div>
       </div>
 
-      <ChevronButton dir="down" label="Next slice" onStep={step} />
+      <ChevronButton dir="down" label="Previous slice" onStep={step} />
     </div>
   );
 }
