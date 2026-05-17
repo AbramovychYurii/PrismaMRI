@@ -95,6 +95,25 @@ export function useViewerApp() {
     input.click();
   }, [openFiles]);
 
+  const loadFromUrl = useCallback(
+    async (url: string, filename: string) => {
+      setError(null);
+      setLoading({ active: true, percent: 0, stage: 'scanning', message: 'Fetching…' });
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const blob = await response.blob();
+        const file = new File([blob], filename);
+        openFiles([file]);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to fetch example.';
+        setError(message);
+        setLoading({ active: false, percent: 0, stage: 'error', message });
+      }
+    },
+    [openFiles, setError, setLoading],
+  );
+
   // Global shortcuts: Esc → import, ⌘/Ctrl+O → open folder
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -109,5 +128,5 @@ export function useViewerApp() {
     return () => window.removeEventListener('keydown', onKey);
   }, [openFolder, setView]);
 
-  return { loadFromSource, openFiles, openFolder, openFile };
+  return { loadFromSource, openFiles, openFolder, openFile, loadFromUrl };
 }
