@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import styled from "styled-components";
 import { useVolumeStore } from "@/store";
 import {
@@ -22,12 +22,48 @@ import {
   SliceScrubberToggle,
 } from "@/components/rail/SliceScrubber";
 import type { SlicePlane, VolumeCursor } from "@/types";
+import type { DrawFracs } from "@/hooks/useMeasurementInteraction";
 import { MeasureMenu } from "@/components/rail/MeasureMenu";
 
 // ── Tuning knobs ──────────────────────────────────────────────────────────
 
 /** Fixed pixel size of measurement dots on 2-D slice panels. */
 const MEASURE_DOT_PX = 8;
+
+// ── Physical aspect helpers ────────────────────────────────────────────────
+
+function physicalAspect(
+  plane: SlicePlane,
+  dims: readonly [number, number, number],
+  spacing: readonly [number, number, number],
+): number {
+  const [sx, sy, sz] = spacing;
+  const [w, h, d] = dims;
+  if (plane === "coronal") return (w * sx) / (d * sz);
+  if (plane === "sagittal") return (h * sy) / (d * sz);
+  return (w * sx) / (h * sy);
+}
+
+/** Returns the letterboxed image rect as panel-space fractions. */
+function computeDrawFracs(physAspect: number, cw: number, ch: number): DrawFracs {
+  if (physAspect >= cw / ch) {
+    const drawH = cw / physAspect;
+    return { xF: 0, yF: (ch - drawH) / 2 / ch, wF: 1, hF: drawH / ch };
+  }
+  const drawW = ch * physAspect;
+  return { xF: (cw - drawW) / 2 / cw, yF: 0, wF: drawW / cw, hF: 1 };
+}
+
+function imageToPanel(imgFx: number, imgFy: number, df: DrawFracs) {
+  return { fx: df.xF + imgFx * df.wF, fy: df.yF + imgFy * df.hF };
+}
+
+function panelToImage(panelFx: number, panelFy: number, df: DrawFracs) {
+  return {
+    fx: clamp((panelFx - df.xF) / df.wF, 0, 1),
+    fy: clamp((panelFy - df.yF) / df.hF, 0, 1),
+  };
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -255,7 +291,25 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
   const setActivePlane = useVolumeStore((s) => s.setActivePlane);
   const setCursor = useVolumeStore((s) => s.setCursor);
   const dims = useVolumeStore((s) => s.volume?.meta.dims);
+  const spacing = useVolumeStore((s) => s.volume?.meta.spacing);
   const cursor = useVolumeStore((s) => s.cursor);
+  const [canvasSize, setCanvasSize] = useState({ w: 1, h: 1 });
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ro = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      setCanvasSize({ w: Math.max(1, width), h: Math.max(1, height) });
+    });
+    ro.observe(canvas);
+    return () => ro.disconnect();
+  }, []);
+
+  const drawFracs = useMemo<DrawFracs | null>(() => {
+    if (!dims || !spacing) return null;
+    return computeDrawFracs(physicalAspect(plane, dims, spacing), canvasSize.w, canvasSize.h);
+  }, [plane, dims, spacing, canvasSize]);
   const scrubVisible = useVolumeStore((s) => s.scrubVisible[plane]);
   const setScrubVisible = useVolumeStore((s) => s.setScrubVisible);
   const {
@@ -279,8 +333,18 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
 
   const cross = useMemo(() => {
     if (!dims || !cursor) return null;
-    return crosshairFrac(plane, dims, cursor);
-  }, [plane, dims, cursor]);
+    const imgFrac = crosshairFrac(plane, dims, cursor);
+    if (!drawFracs) return imgFrac;
+    return imageToPanel(imgFrac.fx, imgFrac.fy, drawFracs);
+  }, [plane, dims, cursor, drawFracs]);
+
+  const adjustedDots = useMemo(
+    () =>
+      drawFracs
+        ? measureDots.map((d) => imageToPanel(d.fx, d.fy, drawFracs))
+        : measureDots,
+    [measureDots, drawFracs],
+  );
 
   const axes = crosshairAxes(plane);
 
@@ -288,9 +352,8 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    const cw = Math.max(1, Math.floor(rect.width * dpr));
-    const ch = Math.max(1, Math.floor(rect.height * dpr));
+    const cw = Math.max(1, Math.floor(canvasSize.w * dpr));
+    const ch = Math.max(1, Math.floor(canvasSize.h * dpr));
     if (canvas.width !== cw) canvas.width = cw;
     if (canvas.height !== ch) canvas.height = ch;
     const ctx = canvas.getContext("2d");
@@ -317,16 +380,23 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
     );
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
-    ctx.drawImage(off, 0, 0, cw, ch);
-  }, [image]);
+    if (drawFracs) {
+      ctx.drawImage(off, drawFracs.xF * cw, drawFracs.yF * ch, drawFracs.wF * cw, drawFracs.hF * ch);
+    } else {
+      ctx.drawImage(off, 0, 0, cw, ch);
+    }
+  }, [image, drawFracs, canvasSize]);
 
   function handleClick(e: React.MouseEvent) {
     setActivePlane(plane);
     const canvas = canvasRef.current;
     if (!canvas || !dims || !cursor) return;
     const rect = canvas.getBoundingClientRect();
-    const fx = clamp((e.clientX - rect.left) / rect.width, 0, 1);
-    const fy = clamp((e.clientY - rect.top) / rect.height, 0, 1);
+    const panelFx = clamp((e.clientX - rect.left) / rect.width, 0, 1);
+    const panelFy = clamp((e.clientY - rect.top) / rect.height, 0, 1);
+    const { fx, fy } = drawFracs
+      ? panelToImage(panelFx, panelFy, drawFracs)
+      : { fx: panelFx, fy: panelFy };
     const [w, h, d] = dims;
     const next: VolumeCursor = { ...cursor };
     if (plane === "coronal") {
@@ -355,7 +425,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
   function handleContextMenu(e: React.MouseEvent) {
     e.preventDefault();
     setActivePlane(plane);
-    if (canvasRef.current) openMenu(e, canvasRef.current);
+    if (canvasRef.current) openMenu(e, canvasRef.current, drawFracs);
   }
 
   const accentColor = PLANE_ACCENT[plane];
@@ -418,7 +488,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
         <span>{footer.hint}</span>
         <span>{footer.code}</span>
       </PanelFooter>
-      {measureDots.map((dot, i) => (
+      {adjustedDots.map((dot, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: stable index for static measurement dots
         <MeasureDot key={i} $fx={dot.fx} $fy={dot.fy} $size={MEASURE_DOT_PX} />
       ))}

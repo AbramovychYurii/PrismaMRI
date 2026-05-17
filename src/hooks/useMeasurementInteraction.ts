@@ -8,6 +8,16 @@ import type {
   VolumeCursor,
 } from "@/types";
 
+// ── Types ──────────────────────────────────────────────────────────────────
+
+/** Letterboxed image rect as fractions of the panel [0..1]. */
+export interface DrawFracs {
+  xF: number;
+  yF: number;
+  wF: number;
+  hF: number;
+}
+
 // ── Pure helpers ───────────────────────────────────────────────────────────
 
 function measureDotFrac(
@@ -58,10 +68,15 @@ function screenToVoxel(
   cursor: VolumeCursor,
   canvas: HTMLCanvasElement,
   e: React.MouseEvent,
+  drawFracs?: DrawFracs | null,
 ): MeasurementPoint {
   const rect = canvas.getBoundingClientRect();
-  const fx = clamp((e.clientX - rect.left) / rect.width, 0, 1);
-  const fy = clamp((e.clientY - rect.top) / rect.height, 0, 1);
+  let fx = clamp((e.clientX - rect.left) / rect.width, 0, 1);
+  let fy = clamp((e.clientY - rect.top) / rect.height, 0, 1);
+  if (drawFracs) {
+    fx = clamp((fx - drawFracs.xF) / drawFracs.wF, 0, 1);
+    fy = clamp((fy - drawFracs.yF) / drawFracs.hF, 0, 1);
+  }
   const [w, h, d] = dims;
   const voxel: MeasurementPoint = { ...cursor };
   if (plane === "coronal") {
@@ -103,12 +118,12 @@ export function useMeasurementInteraction(
   );
 
   const openMenu = useCallback(
-    (e: React.MouseEvent, canvas: HTMLCanvasElement) => {
+    (e: React.MouseEvent, canvas: HTMLCanvasElement, drawFracs?: DrawFracs | null) => {
       if (!dims || !cursor) return;
       setMenu({
         screenX: e.clientX,
         screenY: e.clientY,
-        voxel: screenToVoxel(plane, dims, cursor, canvas, e),
+        voxel: screenToVoxel(plane, dims, cursor, canvas, e, drawFracs),
       });
     },
     [plane, dims, cursor],
