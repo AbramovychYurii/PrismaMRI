@@ -108,4 +108,5 @@ export interface ToolbarState {
   planes: boolean;
   rail: boolean;
   focus: boolean;
+  dock: boolean;
 }

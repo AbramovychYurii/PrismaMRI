@@ -54,7 +54,7 @@ const initialState: VolumeState = {
     message: '',
   },
   error: null,
-  toolbar: { planes: true, rail: true, focus: false },
+  toolbar: { planes: true, rail: true, focus: false, dock: true },
   wl: { window: 3200, level: 1600 },
   wlDraft: { window: 3200, level: 1600 },
   scrubVisible: { coronal: true, sagittal: true, axial: true },

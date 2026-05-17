@@ -31,33 +31,23 @@ export function SessionCell() {
 
   return (
     <>
+      <button type="button" onClick={() => setView('import')} style={btnBase} disabled={!volume}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+          <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path d="m15 18-6-6 6-6" />
+          </svg>
+          Back to import
+        </span>
+        <span style={kbdBase}>Esc</span>
+      </button>
       <div
         style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 8,
-          flex: 1,
-          justifyContent: 'flex-start',
-        }}
-      >
-        <button type="button" onClick={() => setView('import')} style={btnBase} disabled={!volume}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path d="m15 18-6-6 6-6" />
-            </svg>
-            Back to import
-          </span>
-          <span style={kbdBase}>Esc</span>
-        </button>
-      </div>
-      <div
-        style={{
-          marginTop: 12,
+          marginTop: 10,
           fontFamily: 'var(--sans)',
           fontSize: 10.5,
           color: 'var(--ink-3)',
           lineHeight: 1.4,
-          paddingTop: 10,
+          paddingTop: 8,
           borderTop: '1px dashed var(--rule)',
         }}
       >
