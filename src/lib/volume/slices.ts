@@ -1,11 +1,14 @@
 import type { LoadedVolume, SliceImage, SlicePlane, SliceWindowLevel } from '@/types';
-import { mapIntensityToGray, grayToRgba } from '@/lib/volume/math';
+import { mapIntensityToGray, grayToRgba, buildInt16WLLut } from '@/lib/volume/math';
 
 const MAX_CACHE = 64;
 
 interface CacheEntry {
   order: string[];
   map: Map<string, SliceImage>;
+  lut: Uint8Array | null;
+  lutWindow: number;
+  lutLevel: number;
 }
 
 const cache = new WeakMap<LoadedVolume, CacheEntry>();
@@ -17,10 +20,21 @@ function cacheKey(plane: SlicePlane, index: number, wl: SliceWindowLevel): strin
 function getEntry(volume: LoadedVolume): CacheEntry {
   let e = cache.get(volume);
   if (!e) {
-    e = { order: [], map: new Map() };
+    e = { order: [], map: new Map(), lut: null, lutWindow: NaN, lutLevel: NaN };
     cache.set(volume, e);
   }
   return e;
+}
+
+/** Returns a cached Int16 LUT for this volume+WL, rebuilding only when WL changes. */
+function getLut(volume: LoadedVolume, wl: SliceWindowLevel): Uint8Array | null {
+  if (!(volume.voxels instanceof Int16Array)) return null;
+  const e = getEntry(volume);
+  if (e.lut && e.lutWindow === wl.window && e.lutLevel === wl.level) return e.lut;
+  e.lut = buildInt16WLLut(wl);
+  e.lutWindow = wl.window;
+  e.lutLevel = wl.level;
+  return e.lut;
 }
 
 function store(volume: LoadedVolume, key: string, img: SliceImage): SliceImage {
@@ -44,10 +58,17 @@ export function extractAxialImage(
   const data = new Uint8ClampedArray(w * h * 4);
   const base = w * h * z;
   const vox = volume.voxels;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const g = mapIntensityToGray(vox[base + x + w * y], wl);
-      grayToRgba(g, data, (x + w * y) * 4);
+  const lut = getLut(volume, wl);
+  const total = w * h;
+  if (lut) {
+    for (let i = 0; i < total; i++) {
+      const g = lut[(vox[base + i] as number) + 32768];
+      const o = i * 4;
+      data[o] = data[o + 1] = data[o + 2] = g; data[o + 3] = 255;
+    }
+  } else {
+    for (let i = 0; i < total; i++) {
+      grayToRgba(mapIntensityToGray(vox[base + i], wl), data, i * 4);
     }
   }
   return { width: w, height: h, data };
@@ -65,12 +86,20 @@ export function extractCoronalImage(
   const [w, h, d] = volume.meta.dims;
   const data = new Uint8ClampedArray(w * d * 4);
   const vox = volume.voxels;
+  const lut = getLut(volume, wl);
   for (let row = 0; row < d; row++) {
-    const z = d - 1 - row;
-    const base = w * (y + h * z);
-    for (let x = 0; x < w; x++) {
-      const g = mapIntensityToGray(vox[base + x], wl);
-      grayToRgba(g, data, (x + w * row) * 4);
+    const base = w * (y + h * (d - 1 - row));
+    const dstRow = w * row;
+    if (lut) {
+      for (let x = 0; x < w; x++) {
+        const g = lut[(vox[base + x] as number) + 32768];
+        const o = (dstRow + x) * 4;
+        data[o] = data[o + 1] = data[o + 2] = g; data[o + 3] = 255;
+      }
+    } else {
+      for (let x = 0; x < w; x++) {
+        grayToRgba(mapIntensityToGray(vox[base + x], wl), data, (dstRow + x) * 4);
+      }
     }
   }
   return { width: w, height: d, data };
@@ -88,11 +117,20 @@ export function extractSagittalImage(
   const [w, h, d] = volume.meta.dims;
   const data = new Uint8ClampedArray(h * d * 4);
   const vox = volume.voxels;
+  const lut = getLut(volume, wl);
   for (let row = 0; row < d; row++) {
-    const z = d - 1 - row;
-    for (let y = 0; y < h; y++) {
-      const g = mapIntensityToGray(vox[x + w * (y + h * z)], wl);
-      grayToRgba(g, data, (y + h * row) * 4);
+    const zBase = w * h * (d - 1 - row);
+    const dstRow = h * row;
+    if (lut) {
+      for (let y = 0; y < h; y++) {
+        const g = lut[(vox[x + w * y + zBase] as number) + 32768];
+        const o = (dstRow + y) * 4;
+        data[o] = data[o + 1] = data[o + 2] = g; data[o + 3] = 255;
+      }
+    } else {
+      for (let y = 0; y < h; y++) {
+        grayToRgba(mapIntensityToGray(vox[x + w * y + zBase], wl), data, (dstRow + y) * 4);
+      }
     }
   }
   return { width: h, height: d, data };

@@ -26,6 +26,7 @@ export class ThreePreview {
   private sceneSize = 200;
   private raf = 0;
   private disposed = false;
+  private dirty = true;
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({
@@ -75,11 +76,14 @@ export class ThreePreview {
 
     this.controls?.dispose();
     this.controls = buildControls(this.camera, this.canvas, center);
+    this.controls.addEventListener("change", () => { this.dirty = true; });
+    this.dirty = true;
     this.resize();
   }
 
   setCursor(cursor: VolumeCursor): void {
     this.cursorPlanes.update(cursor);
+    this.dirty = true;
   }
 
   /**
@@ -96,6 +100,7 @@ export class ThreePreview {
       Math.max(0, Math.min(1, lo)),
       Math.max(0, Math.min(1, hi === lo ? lo + 0.001 : hi)),
     );
+    this.dirty = true;
   }
 
   setMeasurement(
@@ -104,6 +109,7 @@ export class ThreePreview {
   ): void {
     if (!m) {
       this.measurementLine.clear();
+      this.dirty = true;
       return;
     }
     const [sx, sy, sz] = spacing;
@@ -114,14 +120,17 @@ export class ThreePreview {
     );
     if (!m.to || m.distanceMm === null) {
       this.measurementLine.setFrom(fromW, this.sceneSize);
+      this.dirty = true;
       return;
     }
     const toW = new THREE.Vector3(m.to.x * sx, m.to.y * sy, m.to.z * sz);
     this.measurementLine.setBoth(fromW, toW, m.distanceMm, this.sceneSize);
+    this.dirty = true;
   }
 
   setPlanesVisible(visible: boolean): void {
     this.cursorPlanes.setVisible(visible);
+    this.dirty = true;
   }
 
   resize(): void {
@@ -135,13 +144,16 @@ export class ThreePreview {
     this.camera.right = top * aspect;
     this.camera.updateProjectionMatrix();
     this.controls?.handleResize();
+    this.dirty = true;
   }
 
   private loop = (): void => {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.loop);
     this.controls?.update();
+    if (!this.dirty) return;
     this.renderer.render(this.scene, this.camera);
+    this.dirty = false;
   };
 
   dispose(): void {

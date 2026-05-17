@@ -12,6 +12,25 @@ export function mapIntensityToGray(value: number, wl: SliceWindowLevel): number 
   return clamp(Math.round(t * 255), 0, 255);
 }
 
+/**
+ * Precompute a W/L → gray lookup table for Int16 voxels (65 536 entries).
+ * Hot-path usage: lut[rawInt16 + 32768] — one addition, zero division.
+ */
+export function buildInt16WLLut(wl: SliceWindowLevel): Uint8Array {
+  const lut = new Uint8Array(65536);
+  const lower = wl.level - wl.window / 2;
+  if (wl.window <= 0) {
+    for (let i = 0; i < 65536; i++) lut[i] = i - 32768 <= lower ? 0 : 255;
+  } else {
+    const invW = 255 / wl.window;
+    for (let i = 0; i < 65536; i++) {
+      const t = (i - 32768 - lower) * invW;
+      lut[i] = t <= 0 ? 0 : t >= 255 ? 255 : (t + 0.5) | 0;
+    }
+  }
+  return lut;
+}
+
 /** Write an RGBA pixel (opaque gray) into `out` at byte offset `o`. */
 export function grayToRgba(gray: number, out: Uint8ClampedArray, o: number): void {
   out[o] = gray;
