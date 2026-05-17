@@ -1,10 +1,11 @@
-import { useCallback, useEffect } from 'react';
-import { useVolumeStore } from '@/store/volumeStore';
-import { loadVolumeInWorker } from '@/lib/import/volume-client';
-import { fromDirectoryHandle, fromFileList } from '@/lib/import/scan-folder';
-import type { ImportSource } from '@/lib/import/types';
-import { useWindowLevel } from '@/hooks/useWindowLevel';
-import { useActivePlaneKeys } from '@/hooks/useSliceScroll';
+import { useCallback, useEffect } from "react";
+import { useVolumeStore } from "@/store/volumeStore";
+import { fetchBlobWithProgress } from "@/lib/fetch-with-progress";
+import { loadVolumeInWorker } from "@/lib/import/volume-client";
+import { fromDirectoryHandle, fromFileList } from "@/lib/import/scan-folder";
+import type { ImportSource } from "@/lib/import/types";
+import { useWindowLevel } from "@/hooks/useWindowLevel";
+import { useActivePlaneKeys } from "@/hooks/useSliceScroll";
 
 interface DirPickerWindow {
   showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>;
@@ -27,24 +28,38 @@ export function useViewerApp() {
   const loadFromSource = useCallback(
     async (source: ImportSource) => {
       setError(null);
-      setLoading({ active: true, percent: 0, stage: 'scanning', message: 'Reading…' });
+      setLoading({
+        active: true,
+        percent: 0,
+        stage: "scanning",
+        message: "Reading…",
+      });
       try {
-        const { volume, prepared3D } = await loadVolumeInWorker(source, (p, percent) => {
-          setLoading({
-            active: true,
-            percent,
-            stage: p.stage,
-            current: p.current,
-            total: p.total,
-            message: p.message,
-          });
-        });
+        const { volume, prepared3D } = await loadVolumeInWorker(
+          source,
+          (p, percent) => {
+            setLoading({
+              active: true,
+              percent,
+              stage: p.stage,
+              current: p.current,
+              total: p.total,
+              message: p.message,
+            });
+          },
+        );
         setVolume(volume, prepared3D);
-        setLoading({ active: false, percent: 100, stage: 'done', message: 'Ready' });
+        setLoading({
+          active: false,
+          percent: 100,
+          stage: "done",
+          message: "Ready",
+        });
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to load volume.';
+        const message =
+          err instanceof Error ? err.message : "Failed to load volume.";
         setError(message);
-        setLoading({ active: false, percent: 0, stage: 'error', message });
+        setLoading({ active: false, percent: 0, stage: "error", message });
       }
     },
     [setError, setLoading, setVolume],
@@ -67,15 +82,15 @@ export function useViewerApp() {
         const source = await fromDirectoryHandle(handle);
         await loadFromSource(source);
       } catch (err) {
-        if ((err as DOMException)?.name !== 'AbortError') {
-          setError(err instanceof Error ? err.message : 'Folder pick failed.');
+        if ((err as DOMException)?.name !== "AbortError") {
+          setError(err instanceof Error ? err.message : "Folder pick failed.");
         }
       }
       return;
     }
     // Fallback: hidden webkitdirectory input
-    const input = document.createElement('input');
-    input.type = 'file';
+    const input = document.createElement("input");
+    input.type = "file";
     input.webkitdirectory = true;
     input.multiple = true;
     input.onchange = () => {
@@ -85,9 +100,9 @@ export function useViewerApp() {
   }, [loadFromSource, openFiles, setError]);
 
   const openFile = useCallback(() => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.dcm,.nii,.gz,.nrrd,.nhdr,.mha,.mhd,.zip';
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".dcm,.nii,.gz,.nrrd,.nhdr,.mha,.mhd,.zip";
     input.multiple = true;
     input.onchange = () => {
       if (input.files) openFiles(input.files);
@@ -98,17 +113,30 @@ export function useViewerApp() {
   const loadFromUrl = useCallback(
     async (url: string, filename: string) => {
       setError(null);
-      setLoading({ active: true, percent: 0, stage: 'scanning', message: 'Fetching…' });
+      // setLoading({
+      //   active: true,
+      //   percent: 0,
+      //   stage: "scanning",
+      //   message: "Fetching…",
+      // });
       try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const blob = await response.blob();
+        const blob = await fetchBlobWithProgress(url, (loaded, total) => {
+          const percent =
+            total > 0 ? Math.min(99, Math.round((loaded / total) * 100)) : 0;
+          setLoading({
+            active: true,
+            percent,
+            stage: "scanning",
+            message: "Fetching…",
+          });
+        });
         const file = new File([blob], filename);
         openFiles([file]);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Failed to fetch example.';
+        const message =
+          err instanceof Error ? err.message : "Failed to fetch example.";
         setError(message);
-        setLoading({ active: false, percent: 0, stage: 'error', message });
+        setLoading({ active: false, percent: 0, stage: "error", message });
       }
     },
     [openFiles, setError, setLoading],
@@ -117,15 +145,15 @@ export function useViewerApp() {
   // Global shortcuts: Esc → import, ⌘/Ctrl+O → open folder
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setView('import');
-      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'o') {
+      if (e.key === "Escape") {
+        setView("import");
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "o") {
         e.preventDefault();
         void openFolder();
       }
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, [openFolder, setView]);
 
   return { loadFromSource, openFiles, openFolder, openFile, loadFromUrl };

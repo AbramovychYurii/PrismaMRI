@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useViewerActions } from "@/hooks/ViewerActionsContext";
+import { useVolumeStore } from "@/store/volumeStore";
 
 interface ExampleMeta {
   id: string;
@@ -64,17 +65,22 @@ const EXAMPLES: ExampleMeta[] = [
 function ExampleCard({
   example,
   onLoad,
+  disabled,
 }: {
   example: ExampleMeta;
   onLoad: () => void;
+  disabled: boolean;
 }) {
   const [hover, setHover] = useState(false);
+  const interactive = !disabled;
+  const showHover = interactive && hover;
 
   return (
     <button
       type="button"
+      disabled={disabled}
       onClick={onLoad}
-      onMouseEnter={() => setHover(true)}
+      onMouseEnter={() => interactive && setHover(true)}
       onMouseLeave={() => setHover(false)}
       aria-label={`Load ${example.title} (${example.subtitle}) — ${example.dims} · ${example.spacing} · ${example.size}`}
       style={{
@@ -82,15 +88,16 @@ function ExampleCard({
         width: "100%",
         display: "flex",
         flexDirection: "column",
-        background: hover ? "var(--panel-2)" : "var(--panel)",
-        border: `1px solid ${hover ? "var(--amber)" : "var(--rule)"}`,
+        background: showHover ? "var(--panel-2)" : "var(--panel)",
+        border: `1px solid ${showHover ? "var(--amber)" : "var(--rule)"}`,
         borderRadius: 4,
         overflow: "hidden",
-        cursor: "pointer",
+        cursor: disabled ? "not-allowed" : "pointer",
         textAlign: "left",
         padding: 0,
-        transition: "border-color 150ms, background 150ms",
-        boxShadow: hover ? "0 0 0 1px rgba(255,181,71,0.08)" : "none",
+        opacity: disabled ? 0.45 : 1,
+        transition: "border-color 150ms, background 150ms, opacity 150ms",
+        boxShadow: showHover ? "0 0 0 1px rgba(255,181,71,0.08)" : "none",
       }}
     >
       {/* Decorative corner brackets */}
@@ -104,7 +111,7 @@ function ExampleCard({
           height: 14,
           borderTop: "1px solid var(--amber)",
           borderLeft: "1px solid var(--amber)",
-          opacity: hover ? 1 : 0.5,
+          opacity: showHover ? 1 : 0.5,
           transition: "opacity 150ms",
           zIndex: 2,
           pointerEvents: "none",
@@ -165,7 +172,7 @@ function ExampleCard({
             height: "100%",
             objectFit: "cover",
             display: "block",
-            filter: hover
+            filter: showHover
               ? "brightness(1.1) contrast(1.05)"
               : "brightness(0.95)",
             transition: "filter 150ms",
@@ -225,6 +232,7 @@ function ExampleCard({
 
 export function ExamplesSection() {
   const { loadFromUrl } = useViewerActions();
+  const examplesDisabled = useVolumeStore((s) => s.loading.active);
 
   return (
     <section
@@ -257,7 +265,6 @@ export function ExamplesSection() {
         >
           Examples
         </h2>
-        {/* ink-3 = 4.7:1 → passes WCAG AA */}
         <span
           aria-hidden="true"
           style={{
@@ -268,7 +275,7 @@ export function ExamplesSection() {
             textTransform: "uppercase",
           }}
         >
-          Pre-loaded · Click to open
+          {examplesDisabled ? "Loading…" : "Pre-loaded · Click to open"}
         </span>
       </div>
 
@@ -288,6 +295,7 @@ export function ExamplesSection() {
           <li key={ex.id}>
             <ExampleCard
               example={ex}
+              disabled={examplesDisabled}
               onLoad={() =>
                 loadFromUrl(`${NRRD_BASE}/examples/${ex.file}`, ex.file)
               }
