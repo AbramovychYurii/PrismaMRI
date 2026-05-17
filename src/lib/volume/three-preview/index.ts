@@ -40,13 +40,19 @@ export class ThreePreview {
     this.scene.add(vol.mesh);
 
     const dims = prepared.dims;
+    const [sx, sy, sz] = prepared.spacing;
     this.cursorPlanes.setDims(dims, prepared.sourceDims);
+    // Cursor planes are computed in voxel space; scale the group to physical
+    // mm so they align with the spacing-scaled volume mesh.
+    this.cursorPlanes.group.scale.set(sx, sy, sz);
+
+    // Frame the camera in physical world-space (mm), not voxel counts.
     const center = new THREE.Vector3(
-      dims[0] / 2 - 0.5,
-      dims[1] / 2 - 0.5,
-      dims[2] / 2 - 0.5,
+      (dims[0] / 2 - 0.5) * sx,
+      (dims[1] / 2 - 0.5) * sy,
+      (dims[2] / 2 - 0.5) * sz,
     );
-    const maxEdge = Math.max(dims[0], dims[1], dims[2]);
+    const maxEdge = Math.max(dims[0] * sx, dims[1] * sy, dims[2] * sz);
 
     const rect = this.canvas.getBoundingClientRect();
     const aspect = rect.height > 0 ? rect.width / rect.height : 1;
