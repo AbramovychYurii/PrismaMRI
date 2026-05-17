@@ -11,8 +11,16 @@ interface ExampleMeta {
   size: string;
   description: string;
   tag: string;
-  thumbnailPath: string;
+  thumbnail: string;
 }
+
+const BASE = import.meta.env.BASE_URL;
+
+// In dev the Vite plugin serves /examples/*.nrrd locally.
+// On GitHub Pages, LFS files must be fetched from GitHub's media CDN.
+const NRRD_BASE = import.meta.env.DEV
+  ? ""
+  : "https://media.githubusercontent.com/media/AbramovychYurii/PrismaMRI/main";
 
 const EXAMPLES: ExampleMeta[] = [
   {
@@ -25,7 +33,7 @@ const EXAMPLES: ExampleMeta[] = [
     size: "32 MB",
     description: "Upper jaw — high-resolution dental CT.",
     tag: "CT",
-    thumbnailPath: "/examples/thumbnails/maxillofacial_CBCT.jpg",
+    thumbnail: `${BASE}examples/thumbnails/maxillofacial_CBCT.jpg`,
   },
   {
     id: "dog_frontal_thorax_injured_paw_CT",
@@ -37,7 +45,7 @@ const EXAMPLES: ExampleMeta[] = [
     size: "131 MB",
     description: "Canine forequarters with injured front paw.",
     tag: "CT",
-    thumbnailPath: "/examples/thumbnails/dog_frontal_thorax_injured_paw.jpg",
+    thumbnail: `${BASE}examples/thumbnails/dog_frontal_thorax_injured_paw.jpg`,
   },
   {
     id: "full_body",
@@ -49,7 +57,7 @@ const EXAMPLES: ExampleMeta[] = [
     size: "290 MB",
     description: "Whole-body scan — sagittal view.",
     tag: "CT",
-    thumbnailPath: "/examples/thumbnails/full_body.png",
+    thumbnail: `${BASE}examples/thumbnails/full_body.png`,
   },
 ];
 
@@ -137,14 +145,14 @@ function ExampleCard({
       <div
         style={{
           width: "100%",
-          aspectRatio: "1",
+          height: 150,
           background: "#0a0907",
           overflow: "hidden",
           flexShrink: 0,
         }}
       >
         <img
-          src={example.thumbnailPath}
+          src={example.thumbnail}
           alt={`${example.title} preview`}
           style={{
             width: "100%",
@@ -266,7 +274,9 @@ export function ExamplesSection() {
           <ExampleCard
             key={ex.id}
             example={ex}
-            onLoad={() => loadFromUrl(`/examples/${ex.file}`, ex.file)}
+            onLoad={() =>
+              loadFromUrl(`${NRRD_BASE}/examples/${ex.file}`, ex.file)
+            }
           />
         ))}
       </div>
