@@ -5,7 +5,7 @@ import { useVolumeStore } from "@/store/volumeStore";
 
 const StripGrid = styled.div`
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   align-items: center;
 `;
 
@@ -43,6 +43,11 @@ const RunDim = styled.span`
   color: var(--ink-3);
 `;
 
+const MeasureVal = styled(RunVal)`
+  font-size: 13px;
+  font-weight: 700;
+`;
+
 // ── Sub-components ─────────────────────────────────────────────────────────
 
 function RunCell({
@@ -69,9 +74,21 @@ function RunCell({
 
 export function RunStrip() {
   const volume = useVolumeStore((s) => s.volume);
+  const measurement = useVolumeStore((s) => s.measurement);
   const meta = volume?.meta;
   const dims = meta?.dims;
   const spacing = meta?.spacing;
+
+  let measureValue: string;
+  let measureDim: string | undefined;
+  if (!measurement) {
+    measureValue = "—";
+  } else if (measurement.distanceMm !== null) {
+    measureValue = measurement.distanceMm.toFixed(1);
+    measureDim = "mm";
+  } else {
+    measureValue = "Set endpoint";
+  }
 
   return (
     <StripGrid>
@@ -92,8 +109,18 @@ export function RunStrip() {
         dim={
           meta?.bitsAllocated ? `· ${meta.bitsAllocated}-bit · HU` : undefined
         }
-        last
       />
+      <RunCellWrap $last>
+        <RunKey>Measure</RunKey>
+        {measurement?.distanceMm !== null && measurement !== null ? (
+          <MeasureVal>
+            {measureValue}
+            {measureDim && <>{` ${measureDim}`}</>}
+          </MeasureVal>
+        ) : (
+          <RunVal>{measureValue}</RunVal>
+        )}
+      </RunCellWrap>
     </StripGrid>
   );
 }

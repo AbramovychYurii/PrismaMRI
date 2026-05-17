@@ -1,9 +1,19 @@
-import * as THREE from 'three';
-import type { TrackballControls } from 'three/examples/jsm/controls/TrackballControls.js';
-import type { PreparedVolumeFor3D, VolumeCursor } from '@/types';
-import { buildCamera, buildControls, frameCamera } from '@/lib/volume/three-preview/camera';
-import { CursorPlanes } from '@/lib/volume/three-preview/cursor-planes';
-import { buildVolumeMesh, disposeVolumeObject, type VolumeObject } from '@/lib/volume/three-preview/volume-object';
+import * as THREE from "three";
+import type { TrackballControls } from "three/examples/jsm/controls/TrackballControls.js";
+import type { PreparedVolumeFor3D, VolumeCursor } from "@/types";
+import {
+  buildCamera,
+  buildControls,
+  frameCamera,
+} from "@/lib/volume/three-preview/camera";
+import { CursorPlanes } from "@/lib/volume/three-preview/cursor-planes";
+import { MeasurementLine } from "@/lib/volume/three-preview/measurement-line";
+import {
+  buildVolumeMesh,
+  disposeVolumeObject,
+  type VolumeObject,
+} from "@/lib/volume/three-preview/volume-object";
+import type { ActiveMeasurement } from "@/types";
 
 export class ThreePreview {
   private readonly renderer: THREE.WebGLRenderer;
@@ -12,6 +22,8 @@ export class ThreePreview {
   private controls: TrackballControls | null = null;
   private volume: VolumeObject | null = null;
   private readonly cursorPlanes = new CursorPlanes();
+  private readonly measurementLine = new MeasurementLine();
+  private sceneSize = 200;
   private raf = 0;
   private disposed = false;
 
@@ -20,10 +32,11 @@ export class ThreePreview {
       canvas,
       antialias: true,
       alpha: true,
-      powerPreference: 'high-performance',
+      powerPreference: "high-performance",
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.scene.add(this.cursorPlanes.group);
+    this.scene.add(this.measurementLine.group);
     this.camera = buildCamera(1, 256);
     this.resize();
     this.loop();
@@ -53,6 +66,7 @@ export class ThreePreview {
       (dims[2] / 2 - 0.5) * sz,
     );
     const maxEdge = Math.max(dims[0] * sx, dims[1] * sy, dims[2] * sz);
+    this.sceneSize = maxEdge;
 
     const rect = this.canvas.getBoundingClientRect();
     const aspect = rect.height > 0 ? rect.width / rect.height : 1;
@@ -82,6 +96,28 @@ export class ThreePreview {
       Math.max(0, Math.min(1, lo)),
       Math.max(0, Math.min(1, hi === lo ? lo + 0.001 : hi)),
     );
+  }
+
+  setMeasurement(
+    m: ActiveMeasurement | null,
+    spacing: [number, number, number],
+  ): void {
+    if (!m) {
+      this.measurementLine.clear();
+      return;
+    }
+    const [sx, sy, sz] = spacing;
+    const fromW = new THREE.Vector3(
+      m.from.x * sx,
+      m.from.y * sy,
+      m.from.z * sz,
+    );
+    if (!m.to || m.distanceMm === null) {
+      this.measurementLine.setFrom(fromW, this.sceneSize);
+      return;
+    }
+    const toW = new THREE.Vector3(m.to.x * sx, m.to.y * sy, m.to.z * sz);
+    this.measurementLine.setBoth(fromW, toW, m.distanceMm, this.sceneSize);
   }
 
   setPlanesVisible(visible: boolean): void {
@@ -114,6 +150,7 @@ export class ThreePreview {
     this.controls?.dispose();
     if (this.volume) disposeVolumeObject(this.volume);
     this.cursorPlanes.dispose();
+    this.measurementLine.dispose();
     this.renderer.dispose();
   }
 }

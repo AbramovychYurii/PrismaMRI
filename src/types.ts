@@ -1,7 +1,7 @@
 export type Vec3 = [number, number, number];
 
-export type VolumeAxis = 'x' | 'y' | 'z';
-export type SlicePlane = 'coronal' | 'sagittal' | 'axial';
+export type VolumeAxis = "x" | "y" | "z";
+export type SlicePlane = "coronal" | "sagittal" | "axial";
 
 export interface SliceWindowLevel {
   window: number;
@@ -38,7 +38,7 @@ export interface LoadedVolume {
   scalarMax: number;
   /** Default W/L resolved at parse time. */
   windowLevel: SliceWindowLevel;
-  formatId: 'dicom' | 'galileos' | 'onevolume' | 'nifti' | 'mha' | 'nrrd';
+  formatId: "dicom" | "galileos" | "onevolume" | "nifti" | "mha" | "nrrd";
 }
 
 export interface PreparedVolumeFor3D {
@@ -77,14 +77,14 @@ export interface ViewerSlices {
 }
 
 export type ImportStage =
-  | 'idle'
-  | 'scanning'
-  | 'parsing-headers'
-  | 'reading-files'
-  | 'assembling'
-  | 'preparing-3d'
-  | 'done'
-  | 'error';
+  | "idle"
+  | "scanning"
+  | "parsing-headers"
+  | "reading-files"
+  | "assembling"
+  | "preparing-3d"
+  | "done"
+  | "error";
 
 export interface ImportProgress {
   stage: ImportStage;
@@ -109,4 +109,16 @@ export interface ToolbarState {
   rail: boolean;
   focus: boolean;
   dock: boolean;
+}
+
+export interface MeasurementPoint {
+  x: number;
+  y: number;
+  z: number;
+}
+
+export interface ActiveMeasurement {
+  from: MeasurementPoint;
+  to: MeasurementPoint | null;
+  distanceMm: number | null;
 }

@@ -1,15 +1,19 @@
-import { useEffect, useRef } from 'react';
-import { ThreePreview } from '@/lib/volume/three-preview';
-import { useVolumeStore } from '@/store/volumeStore';
+import { useEffect, useRef } from "react";
+import { ThreePreview } from "@/lib/volume/three-preview";
+import { useVolumeStore } from "@/store/volumeStore";
 
 /** Binds a ThreePreview instance to a canvas and syncs it with the store. */
-export function useThreePreview(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
+export function useThreePreview(
+  canvasRef: React.RefObject<HTMLCanvasElement | null>,
+) {
   const previewRef = useRef<ThreePreview | null>(null);
   const prepared3D = useVolumeStore((s) => s.prepared3D);
   const cursor = useVolumeStore((s) => s.cursor);
   const planesVisible = useVolumeStore((s) => s.toolbar.planes);
   const railOpen = useVolumeStore((s) => s.toolbar.rail);
   const wlDraft = useVolumeStore((s) => s.wlDraft);
+  const measurement = useVolumeStore((s) => s.measurement);
+  const spacing = useVolumeStore((s) => s.volume?.meta.spacing);
 
   // Create / destroy
   useEffect(() => {
@@ -54,6 +58,11 @@ export function useThreePreview(canvasRef: React.RefObject<HTMLCanvasElement | n
   useEffect(() => {
     previewRef.current?.setPlanesVisible(planesVisible);
   }, [planesVisible]);
+
+  // Measurement line
+  useEffect(() => {
+    previewRef.current?.setMeasurement(measurement, spacing ?? [1, 1, 1]);
+  }, [measurement, spacing]);
 
   // Rail toggle changes stage width — re-fit on next frame
   useEffect(() => {
