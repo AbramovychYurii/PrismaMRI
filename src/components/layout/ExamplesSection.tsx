@@ -231,9 +231,9 @@ export function ExamplesSection() {
       aria-label="Example CT datasets"
       style={{
         width: "100%",
-        marginTop: 20,
+        marginTop: 48,
         borderTop: "1px solid var(--rule)",
-        paddingTop: 14,
+        paddingTop: 24,
       }}
     >
       {/* Section header */}
