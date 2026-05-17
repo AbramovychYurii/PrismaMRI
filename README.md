@@ -38,14 +38,20 @@ So I built a **simpler way to review results for personal use**: three orthogona
 
 ## Example data
 
-Sample volumes are included so you can try the viewer without your own files:
+Sample volumes live in [`examples/`](examples/) (~450 MB total). Files over GitHub’s 100 MB limit are stored with **Git LFS**. After cloning:
 
-| File                                                                                                 | Description                         | Source                                                                                                                     |
-| ---------------------------------------------------------------------------------------------------- | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| [`examples/maxillofacial_CBCT.nrrd`](examples/maxillofacial_CBCT.nrrd)                               | Maxillofacial CBCT                  | **[Tamas Bistey](https://www.embodi3d.com/)** — [CT scan](https://www.embodi3d.com/files/file/61544-ct-scan/)              |
-| [`examples/dog_frontal_thorax_injured_paw_CT.nrrd`](examples/dog_frontal_thorax_injured_paw_CT.nrrd) | Dog frontal thorax CT (injured paw) | **[Gagghi](https://www.embodi3d.com/profile/27661-gagghi/)** — [gomito](https://www.embodi3d.com/files/file/60671-gomito/) |
+```bash
+git lfs install
+git lfs pull
+```
 
-After `npm run dev`, drag a file onto the import screen or use **Open file**. See [`examples/README.md`](examples/README.md) for details.
+| File | Description | Source |
+|------|-------------|--------|
+| [`examples/maxillofacial_CBCT.nrrd`](examples/maxillofacial_CBCT.nrrd) | Maxillofacial CBCT (~32 MB) | **[Tamas Bistey](https://www.embodi3d.com/)** — [CT scan](https://www.embodi3d.com/files/file/61544-ct-scan/) |
+| [`examples/dog_frontal_thorax_injured_paw_CT.nrrd`](examples/dog_frontal_thorax_injured_paw_CT.nrrd) | Dog frontal thorax CT, injured paw (~131 MB) | **[Gagghi](https://www.embodi3d.com/profile/27661-gagghi/)** — [gomito](https://www.embodi3d.com/files/file/60671-gomito/) |
+| [`examples/full_body.nrrd`](examples/full_body.nrrd) | Full-body CT (~290 MB) | **[Laci](https://www.embodi3d.com/profile/35743-laci/)** — [Laci-Body-1](https://www.embodi3d.com/files/file/43471-laci-body-1/) |
+
+After `npm run dev`, drag a file onto the import screen or use **Open file**. See [`examples/README.md`](examples/README.md) for attribution.
 
 ## Quick start
 
