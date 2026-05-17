@@ -122,6 +122,7 @@ function crosshairAxes(plane: SlicePlane): { v: Axis; h: Axis } {
 const PanelWrap = styled.div<{ $isLast: boolean }>`
   position: relative;
   flex: 1;
+  min-height: 0;
   background: #050403;
   border-bottom: ${({ $isLast }) =>
     $isLast ? "none" : "1px solid var(--rule)"};

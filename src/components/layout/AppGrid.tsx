@@ -13,7 +13,7 @@ const GridRoot = styled.div<{ $railOpen: boolean }>`
   display: grid;
   grid-template-columns: ${({ $railOpen }) =>
     $railOpen ? "1fr 360px" : "1fr 0px"};
-  grid-template-rows: 56px 1fr;
+  grid-template-rows: 56px minmax(0, 1fr);
   grid-template-areas: "header header" "stage rail";
   height: 100vh;
   width: 100vw;
