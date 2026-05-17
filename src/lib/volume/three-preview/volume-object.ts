@@ -77,20 +77,27 @@ export interface VolumeObject {
 
 export function buildVolumeMesh(prepared: PreparedVolumeFor3D): VolumeObject {
   const [w, h, d] = prepared.dims;
+  const [sx, sy, sz] = prepared.spacing;
   const texture = buildTexture(prepared);
   const colormap = buildColormap();
   const material = buildMaterial(texture, colormap, prepared);
 
+  // Geometry stays in voxel space so the shader's u_size stays correct.
+  // Physical aspect ratio is applied via mesh.scale — the inverse model
+  // matrix in the vertex shader converts world positions back to voxel space
+  // for correct texture sampling.
   const geometry = new THREE.BoxGeometry(w, h, d);
   geometry.translate(w / 2 - 0.5, h / 2 - 0.5, d / 2 - 0.5);
 
   const mesh = new THREE.Mesh(geometry, material);
+  mesh.scale.set(sx, sy, sz);
+
   return {
     mesh,
     material,
     texture,
     colormap,
-    size: new THREE.Vector3(w, h, d),
+    size: new THREE.Vector3(w * sx, h * sy, d * sz),
   };
 }
 
