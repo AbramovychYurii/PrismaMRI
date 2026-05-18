@@ -309,7 +309,7 @@ export function ImportOverlay() {
             </TagLine>
 
             <MainTitle>
-              A volumetric reader
+              An MRI reader
               <br />
               that <TitleAccent>stays</TitleAccent> on your device.
             </MainTitle>

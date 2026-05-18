@@ -122,3 +122,6 @@ export interface ActiveMeasurement {
   to: MeasurementPoint | null;
   distanceMm: number | null;
 }
+
+/** 3-D volume rendering preset. */
+export type RenderPreset = "mip" | "tissue" | "bone";

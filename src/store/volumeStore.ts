@@ -5,6 +5,7 @@ import type {
   LoadedVolume,
   MeasurementPoint,
   PreparedVolumeFor3D,
+  RenderPreset,
   SliceWindowLevel,
   SlicePlane,
   ToolbarState,
@@ -26,6 +27,7 @@ interface VolumeState {
   wlDraft: SliceWindowLevel;
   scrubVisible: Record<SlicePlane, boolean>;
   measurement: ActiveMeasurement | null;
+  renderPreset: RenderPreset;
 }
 
 interface VolumeActions {
@@ -42,6 +44,7 @@ interface VolumeActions {
   setMeasurementFrom: (p: MeasurementPoint) => void;
   setMeasurementTo: (p: MeasurementPoint) => void;
   clearMeasurement: () => void;
+  setRenderPreset: (preset: RenderPreset) => void;
   reset: () => void;
 }
 
@@ -60,11 +63,12 @@ const initialState: VolumeState = {
     message: "",
   },
   error: null,
-  toolbar: { planes: true, rail: true, focus: false, dock: true },
+  toolbar: { planes: false, rail: true, focus: false, dock: true },
   wl: { window: 3200, level: 1600 },
   wlDraft: { window: 3200, level: 1600 },
   scrubVisible: { coronal: true, sagittal: true, axial: true },
   measurement: null,
+  renderPreset: "mip",
 };
 
 export const useVolumeStore = create<VolumeState & VolumeActions>((set) => ({
@@ -83,6 +87,7 @@ export const useVolumeStore = create<VolumeState & VolumeActions>((set) => ({
       wl: volume.windowLevel,
       wlDraft: volume.windowLevel,
       measurement: null,
+      renderPreset: "mip",
       error: null,
     }),
   setCursor: (cursor) =>
@@ -136,5 +141,10 @@ export const useVolumeStore = create<VolumeState & VolumeActions>((set) => ({
       };
     }),
   clearMeasurement: () => set({ measurement: null }),
+  setRenderPreset: (renderPreset) =>
+    set((state) => {
+      const defaultWL = state.volume?.windowLevel ?? state.wl;
+      return { renderPreset, wl: defaultWL, wlDraft: defaultWL };
+    }),
   reset: () => set(initialState),
 }));

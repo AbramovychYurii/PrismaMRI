@@ -1,6 +1,12 @@
-import * as THREE from 'three';
-import { VolumeRenderShader1 } from 'three/examples/jsm/shaders/VolumeShader.js';
-import type { PreparedVolumeFor3D } from '@/types';
+import * as THREE from "three";
+import type { PreparedVolumeFor3D } from "@/types";
+import {
+  VolumeShader,
+  buildTransferFunction,
+  type RenderPreset,
+} from "@/lib/volume/three-preview/volume-shader";
+
+// ── Volume texture ─────────────────────────────────────────────────────────
 
 /** Data3DTexture: single-channel Uint8, linear filtering, tight packing. */
 export function buildTexture(prepared: PreparedVolumeFor3D): THREE.Data3DTexture {
@@ -20,51 +26,37 @@ export function buildTexture(prepared: PreparedVolumeFor3D): THREE.Data3DTexture
   return tex;
 }
 
-/**
- * Warm medical colormap: grayscale luminance ramp `18 + t*237`,
- * alpha ramp `10 + t*245`. Encoded as a 256×1 RGBA texture.
- */
-export function buildColormap(): THREE.DataTexture {
-  const n = 256;
-  const data = new Uint8Array(n * 4);
-  for (let i = 0; i < n; i++) {
-    const t = i / (n - 1);
-    const lum = Math.round(18 + t * 237);
-    data[i * 4 + 0] = lum;
-    data[i * 4 + 1] = Math.round(lum * 0.97);
-    data[i * 4 + 2] = Math.round(lum * 0.88);
-    data[i * 4 + 3] = Math.round(10 + t * 245);
-  }
-  const tex = new THREE.DataTexture(data, n, 1);
-  tex.format = THREE.RGBAFormat;
-  tex.type = THREE.UnsignedByteType;
-  tex.minFilter = THREE.LinearFilter;
-  tex.magFilter = THREE.LinearFilter;
-  tex.needsUpdate = true;
-  return tex;
-}
+// ── Material ───────────────────────────────────────────────────────────────
 
 export function buildMaterial(
   texture: THREE.Data3DTexture,
   colormap: THREE.DataTexture,
   prepared: PreparedVolumeFor3D,
+  preset: RenderPreset = "mip",
 ): THREE.ShaderMaterial {
   const [w, h, d] = prepared.dims;
-  const uniforms = THREE.UniformsUtils.clone(VolumeRenderShader1.uniforms);
-  uniforms.u_data.value = texture;
-  uniforms.u_size.value.set(w, h, d);
-  uniforms.u_clim.value.set(0, 1);
-  uniforms.u_renderstyle.value = 0; // 0 = MIP
-  uniforms.u_renderthreshold.value = prepared.threshold;
-  uniforms.u_cmdata.value = colormap;
+
+  const uniforms: Record<string, THREE.IUniform> = {
+    u_data:     { value: texture },
+    u_cmdata:   { value: colormap },
+    u_size:     { value: new THREE.Vector3(w, h, d) },
+    u_clim:     { value: new THREE.Vector2(0, 1) },
+    u_steps:    { value: 256 },
+    u_mode:     { value: preset === "mip" ? 1 : 0 },
+    u_shading:    { value: 0 },
+    u_camVoxel:   { value: new THREE.Vector3() },
+    u_rayDirVox:  { value: new THREE.Vector3(0, 0, -1) },
+  };
 
   return new THREE.ShaderMaterial({
     uniforms,
-    vertexShader: VolumeRenderShader1.vertexShader,
-    fragmentShader: VolumeRenderShader1.fragmentShader,
+    vertexShader:   VolumeShader.vertexShader,
+    fragmentShader: VolumeShader.fragmentShader,
     side: THREE.BackSide,
   });
 }
+
+// ── VolumeObject ───────────────────────────────────────────────────────────
 
 export interface VolumeObject {
   mesh: THREE.Mesh;
@@ -75,17 +67,17 @@ export interface VolumeObject {
   size: THREE.Vector3;
 }
 
-export function buildVolumeMesh(prepared: PreparedVolumeFor3D): VolumeObject {
+export function buildVolumeMesh(
+  prepared: PreparedVolumeFor3D,
+  preset: RenderPreset = "mip",
+): VolumeObject {
   const [w, h, d] = prepared.dims;
   const [sx, sy, sz] = prepared.spacing;
-  const texture = buildTexture(prepared);
-  const colormap = buildColormap();
-  const material = buildMaterial(texture, colormap, prepared);
+  const texture  = buildTexture(prepared);
+  const colormap = buildTransferFunction(preset);
+  const material = buildMaterial(texture, colormap, prepared, preset);
 
-  // Geometry stays in voxel space so the shader's u_size stays correct.
-  // Physical aspect ratio is applied via mesh.scale — the inverse model
-  // matrix in the vertex shader converts world positions back to voxel space
-  // for correct texture sampling.
+  // Geometry stays in voxel space; physical spacing applied via mesh.scale.
   const geometry = new THREE.BoxGeometry(w, h, d);
   geometry.translate(w / 2 - 0.5, h / 2 - 0.5, d / 2 - 0.5);
 

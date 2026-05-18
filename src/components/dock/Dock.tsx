@@ -6,6 +6,7 @@ import { DisplayCell } from "@/components/dock/DisplayCell";
 import { StudyCell } from "@/components/dock/StudyCell";
 import { NavigationCell } from "@/components/dock/NavigationCell";
 import { SessionCell } from "@/components/dock/SessionCell";
+import { RenderCell } from "@/components/dock/RenderCell";
 
 const DOCK_H = 200;
 
@@ -98,7 +99,7 @@ const DockPanel = styled.div<{ $open: boolean; $reduced: boolean }>`
   background: var(--panel);
   border-top: 1px solid var(--rule);
   display: grid;
-  grid-template-columns: 1.1fr 1.4fr 1fr 0.9fr;
+  grid-template-columns: 1.5fr 1fr 1fr 1.5fr 1fr;
   align-items: stretch;
   padding-bottom: 12px;
 `;
@@ -187,6 +188,9 @@ export function Dock() {
         </DockCell>
         <DockCell title="Navigation">
           <NavigationCell />
+        </DockCell>
+        <DockCell title="Render Mode">
+          <RenderCell />
         </DockCell>
         <DockCell title="Session" last>
           <SessionCell />

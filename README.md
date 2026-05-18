@@ -4,6 +4,8 @@ A browser-based viewer for volumetric MRI (and compatible studies). All data sta
 
 **Live demo:** [https://abramovychyurii.github.io/PrismaMRI/](https://abramovychyurii.github.io/PrismaMRI/)
 
+![PrismaMRI — 3D tissue rendering with orthogonal slice panels](docs/preview.png)
+
 ## Why this project exists
 
 After receiving my own MRI results, I only had a letter with a brief description of my condition and the findings. That was valuable for clinicians, but it did not fully satisfy my curiosity about _what was actually shown on the scans_.

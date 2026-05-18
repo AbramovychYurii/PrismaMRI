@@ -14,6 +14,7 @@ export function useThreePreview(
   const wlDraft = useVolumeStore((s) => s.wlDraft);
   const measurement = useVolumeStore((s) => s.measurement);
   const spacing = useVolumeStore((s) => s.volume?.meta.spacing);
+  const renderPreset = useVolumeStore((s) => s.renderPreset);
 
   // Create / destroy
   useEffect(() => {
@@ -63,6 +64,13 @@ export function useThreePreview(
   useEffect(() => {
     previewRef.current?.setMeasurement(measurement, spacing ?? [1, 1, 1]);
   }, [measurement, spacing]);
+
+  // Render preset — only meaningful once a volume is loaded
+  useEffect(() => {
+    if (prepared3D && previewRef.current) {
+      previewRef.current.setRenderPreset(renderPreset);
+    }
+  }, [renderPreset, prepared3D]);
 
   // Rail toggle changes stage width — re-fit on next frame
   useEffect(() => {

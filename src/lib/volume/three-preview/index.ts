@@ -13,7 +13,14 @@ import {
   disposeVolumeObject,
   type VolumeObject,
 } from "@/lib/volume/three-preview/volume-object";
+import {
+  buildTransferFunction,
+  type RenderPreset,
+} from "@/lib/volume/three-preview/volume-shader";
 import type { ActiveMeasurement } from "@/types";
+
+/** Ray-march steps — constant quality, no LOD reduction during interaction. */
+const RAY_STEPS = 256;
 
 export class ThreePreview {
   private readonly renderer: THREE.WebGLRenderer;
@@ -43,24 +50,23 @@ export class ThreePreview {
     this.loop();
   }
 
+  // ── Volume ─────────────────────────────────────────────────────────────────
+
   setVolume(prepared: PreparedVolumeFor3D): void {
     if (this.volume) {
       this.scene.remove(this.volume.mesh);
       disposeVolumeObject(this.volume);
       this.volume = null;
     }
-    const vol = buildVolumeMesh(prepared);
+    const vol = buildVolumeMesh(prepared, "mip");
     this.volume = vol;
     this.scene.add(vol.mesh);
 
     const dims = prepared.dims;
     const [sx, sy, sz] = prepared.spacing;
     this.cursorPlanes.setDims(dims, prepared.sourceDims);
-    // Cursor planes are computed in voxel space; scale the group to physical
-    // mm so they align with the spacing-scaled volume mesh.
     this.cursorPlanes.group.scale.set(sx, sy, sz);
 
-    // Frame the camera in physical world-space (mm), not voxel counts.
     const center = new THREE.Vector3(
       (dims[0] / 2 - 0.5) * sx,
       (dims[1] / 2 - 0.5) * sy,
@@ -76,10 +82,39 @@ export class ThreePreview {
 
     this.controls?.dispose();
     this.controls = buildControls(this.camera, this.canvas, center);
-    this.controls.addEventListener("change", () => { this.dirty = true; });
+    this.controls.addEventListener("change", () => {
+      this.dirty = true;
+    });
+
     this.dirty = true;
     this.resize();
   }
+
+  // ── Preset + shading ───────────────────────────────────────────────────────
+
+  setRenderPreset(preset: RenderPreset): void {
+    const m = this.volume?.material;
+    if (!m) return;
+
+    // Swap the colormap texture
+    const oldColormap = this.volume!.colormap;
+    const newColormap = buildTransferFunction(preset);
+    m.uniforms.u_cmdata.value = newColormap;
+    this.volume!.colormap = newColormap;
+    oldColormap.dispose();
+
+    // Mode: MIP vs DVR
+    m.uniforms.u_mode.value = preset === "mip" ? 1 : 0;
+
+    // Phong shading always on for DVR presets, irrelevant for MIP
+    m.uniforms.u_shading.value = preset !== "mip" ? 1 : 0;
+
+    m.uniforms.u_steps.value = RAY_STEPS;
+
+    this.dirty = true;
+  }
+
+  // ── Cursor / clim / measurement / planes ──────────────────────────────────
 
   setCursor(cursor: VolumeCursor): void {
     this.cursorPlanes.update(cursor);
@@ -87,9 +122,8 @@ export class ThreePreview {
   }
 
   /**
-   * Window/Level → raycast contrast. `low`/`high` are normalized 0..1 in the
-   * texture's quantization space: a narrow band brightens & raises contrast,
-   * a wide band flattens it — same intent as the 2D W/L.
+   * Window/Level → raycast contrast.
+   * `low`/`high` are normalised 0..1 in the texture's quantisation space.
    */
   setClim(low: number, high: number): void {
     const m = this.volume?.material;
@@ -113,11 +147,7 @@ export class ThreePreview {
       return;
     }
     const [sx, sy, sz] = spacing;
-    const fromW = new THREE.Vector3(
-      m.from.x * sx,
-      m.from.y * sy,
-      m.from.z * sz,
-    );
+    const fromW = new THREE.Vector3(m.from.x * sx, m.from.y * sy, m.from.z * sz);
     if (!m.to || m.distanceMm === null) {
       this.measurementLine.setFrom(fromW, this.sceneSize);
       this.dirty = true;
@@ -133,6 +163,8 @@ export class ThreePreview {
     this.dirty = true;
   }
 
+  // ── Resize ─────────────────────────────────────────────────────────────────
+
   resize(): void {
     const rect = this.canvas.getBoundingClientRect();
     const w = Math.max(1, Math.floor(rect.width));
@@ -147,11 +179,40 @@ export class ThreePreview {
     this.dirty = true;
   }
 
+  // ── Internals ──────────────────────────────────────────────────────────────
+
+  /** Sync camera position + ray direction into shader uniforms (voxel space). */
+  private updateCameraUniform(): void {
+    const vol = this.volume;
+    if (!vol) return;
+
+    // matrixWorld is only computed by three.js during renderer.render(). Force
+    // an update here so the very first frame uses the correct scale matrix
+    // instead of the default identity — otherwise the first render is wrong.
+    vol.mesh.updateMatrixWorld(true);
+
+    const invModel = vol.mesh.matrixWorld.clone().invert();
+
+    // Camera position in voxel space (point transform — includes translation).
+    const camVoxel = this.camera.position.clone().applyMatrix4(invModel);
+    vol.material.uniforms.u_camVoxel.value.copy(camVoxel);
+
+    // Camera forward direction in voxel space (direction transform — no translation).
+    // THREE.js camera looks down -Z in camera space; transform that to world then to voxel.
+    const fwdWorld = new THREE.Vector3(0, 0, -1)
+      .applyQuaternion(this.camera.quaternion)
+      .normalize();
+    // For a pure-scale model matrix (no rotation), transformDirection = element-wise /scale.
+    const fwdVoxel = fwdWorld.clone().transformDirection(invModel).normalize();
+    vol.material.uniforms.u_rayDirVox.value.copy(fwdVoxel);
+  }
+
   private loop = (): void => {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.loop);
     this.controls?.update();
     if (!this.dirty) return;
+    this.updateCameraUniform();
     this.renderer.render(this.scene, this.camera);
     this.dirty = false;
   };

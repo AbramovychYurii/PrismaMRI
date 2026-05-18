@@ -11,22 +11,10 @@ const BrandWrap = styled.div`
 `;
 
 const LogoBox = styled.div`
-  width: 26px;
-  height: 26px;
-  border: 1px solid var(--amber);
   color: var(--amber);
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 2px;
-  position: relative;
-`;
-
-const LogoInner = styled.span`
-  position: absolute;
-  inset: 3px;
-  border: 1px solid currentColor;
-  opacity: 0.5;
 `;
 
 const BrandText = styled.div``;
@@ -50,11 +38,13 @@ function BrandLogo() {
   return (
     <svg
       viewBox="0 0 24 24"
-      width={12}
-      height={12}
+      width={18}
+      height={18}
       fill="none"
       stroke="currentColor"
       strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
     >
       <path d="M12 2 2 7l10 5 10-5-10-5z" />
       <path d="M2 17l10 5 10-5M2 12l10 5 10-5" />
@@ -66,7 +56,6 @@ export function BrandBlock() {
   return (
     <BrandWrap>
       <LogoBox>
-        <LogoInner />
         <BrandLogo />
       </LogoBox>
       <BrandText>

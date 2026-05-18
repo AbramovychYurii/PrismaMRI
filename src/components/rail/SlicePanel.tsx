@@ -491,6 +491,7 @@ function ExpandedSlicePanel({
   }, [onClose]);
 
   function handleClick(e: React.MouseEvent) {
+    e.stopPropagation();
     if (!isActive) {
       setActivePlane(plane);
       return;
@@ -528,8 +529,22 @@ function ExpandedSlicePanel({
 
   function handleContextMenu(e: React.MouseEvent) {
     e.preventDefault();
+    e.stopPropagation();
     setActivePlane(plane);
     if (canvasRef.current) openMenu(e, canvasRef.current, drawFracs);
+  }
+
+  function handleWheel(e: React.WheelEvent) {
+    e.stopPropagation();
+    onWheel(e);
+  }
+
+  function handlePointerDown(e: React.PointerEvent) {
+    e.stopPropagation();
+  }
+
+  function handlePointerUp(e: React.PointerEvent) {
+    e.stopPropagation();
   }
 
   const accentColor = PLANE_ACCENT[plane];
@@ -540,7 +555,9 @@ function ExpandedSlicePanel({
       $isActive={isActive}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
-      onWheel={onWheel}
+      onWheel={handleWheel}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
     >
       <StyledCanvas ref={canvasRef} />
       {cross && (

@@ -6,7 +6,9 @@ import { TrackballControls } from 'three/examples/jsm/controls/TrackballControls
  * is designed for orthographic projection (parallel ray casting).
  */
 export function buildCamera(aspect: number, maxEdge: number): THREE.OrthographicCamera {
-  const half = maxEdge * 0.72;
+  // Must cover the bounding-sphere radius of the volume (worst case: cube diagonal
+  // = sqrt(3)/2 ≈ 0.866 × maxEdge). Use 1.0 × maxEdge so corners never clip.
+  const half = maxEdge * 1.0;
   const cam = new THREE.OrthographicCamera(
     -half * aspect,
     half * aspect,
@@ -44,5 +46,9 @@ export function buildControls(
   controls.staticMoving = true;
   controls.dynamicDampingFactor = 0.18;
   controls.target.copy(target);
+  // Sync internal state (_eye, _lastPosition, etc.) to the camera's current
+  // position/target so the first controls.update() in the render loop does not
+  // produce a spurious camera jump.
+  controls.update();
   return controls;
 }
