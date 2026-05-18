@@ -116,20 +116,78 @@ export function resolveScalarRange(
 }
 
 /**
- * Histogram-percentile window/level (5th..99.9th). Far more robust than
- * raw min/max for CBCT/CT where a few extreme voxels skew the range.
+ * Otsu's single-threshold: returns the bin index that maximises between-class
+ * variance. O(n) scan after the histogram is built.
+ * For CT: separates air/background from tissue.
+ * For MRI: separates background noise from signal.
+ */
+export function otsuBin(h: ScalarHistogram): number {
+  const n = h.bins.length;
+  const total = h.count;
+  if (total === 0) return 0;
+
+  let totalMean = 0;
+  for (let i = 0; i < n; i++) totalMean += i * h.bins[i];
+
+  let sumB = 0, countB = 0, bestVar = 0, bestBin = 0;
+  for (let i = 0; i < n; i++) {
+    countB += h.bins[i];
+    const countF = total - countB;
+    if (countB === 0 || countF === 0) { sumB += i * h.bins[i]; continue; }
+    sumB += i * h.bins[i];
+    const meanB = sumB / countB;
+    const meanF = (totalMean - sumB) / countF;
+    const between = (countB / total) * (countF / total) * (meanB - meanF) ** 2;
+    if (between > bestVar) { bestVar = between; bestBin = i; }
+  }
+  return bestBin;
+}
+
+/**
+ * Smart window/level for any modality:
+ *
+ * CT / HU data (h.min < −500):
+ *   Lower bound fixed at −300 HU — just above the air/fat boundary,
+ *   well below soft tissue (0–80 HU). Upper bound: 99.8th percentile.
+ *   This reliably avoids the dominant air cluster without depending on
+ *   the histogram shape.
+ *
+ * MRI / non-negative data:
+ *   Otsu's method separates background noise from signal. The lower
+ *   bound is set to the scalar value at the Otsu boundary; upper bound:
+ *   99.8th percentile.
  */
 export function resolveHistogramWindowLevel(h: ScalarHistogram): SliceWindowLevel {
-  const [lo, hi] = batchPercentile(h, [0.05, 0.999]);
+  if (h.count === 0) return { window: 1, level: h.min };
+
+  const [hi] = batchPercentile(h, [0.998]);
+  let lo: number;
+
+  if (h.min < -500) {
+    // CT / HU: hard lower bound at -300 HU (above air, below soft tissue).
+    lo = Math.max(h.min, -300);
+  } else {
+    // MRI / other: Otsu scalar value as the background/foreground boundary.
+    const bin = otsuBin(h);
+    const step = (h.max - h.min) / h.bins.length;
+    lo = h.min + (bin + 1) * step;
+  }
+
+  if (lo >= hi) lo = h.min; // degenerate fallback
   const window = Math.max(1, hi - lo);
   return { window, level: lo + window / 2 };
 }
 
-/** Iso-threshold for 3D raycast: blend of 95th and 99th percentiles, 0..1. */
-export function resolveIsoThreshold(h: ScalarHistogram): number {
+/**
+ * Iso-threshold for 3D raycast: blend of 95th and 99th percentiles mapped
+ * to the texture's quantised [sourceRange lo..hi] space.
+ * Returns a value in 0..1 where 0 = sourceRange lo, 1 = sourceRange hi.
+ */
+export function resolveIsoThreshold(h: ScalarHistogram, sourceRange?: [number, number]): number {
   if (h.count === 0) return 0.15;
   const [p95, p99] = batchPercentile(h, [0.95, 0.99]);
   const blended = p95 * 0.45 + p99 * 0.55;
-  const t = (blended - h.min) / (h.max - h.min || 1);
+  const [lo, hi] = sourceRange ?? [h.min, h.max];
+  const t = (blended - lo) / (hi - lo || 1);
   return Math.min(0.95, Math.max(0.02, t));
 }

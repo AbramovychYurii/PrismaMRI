@@ -3,6 +3,10 @@ import type { ImportProgress } from '@/types';
 import { loadVolumeFromSource } from '@/lib/import/load-volume';
 import { prepareVolumeFor3D } from '@/lib/volume/preview-3d';
 import { progressPercent } from '@/workers/volume/progress';
+import {
+  buildScalarHistogram,
+  resolveHistogramWindowLevel,
+} from '@/workers/volume/scalars';
 import type { WorkerRequest, WorkerResponse } from '@/workers/volume/types';
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
@@ -29,7 +33,10 @@ ctx.onmessage = async (e: MessageEvent<WorkerRequest>) => {
     const volume = await loadVolumeFromSource(req.source, emit);
 
     emit({ stage: 'preparing-3d', current: 0, total: 1, message: 'Building 3D texture…' });
-    const prepared = prepareVolumeFor3D(volume);
+    // Build histogram once — reused for smart W/L and 3D texture quantisation.
+    const hist = buildScalarHistogram(volume.voxels, 1024);
+    const windowLevel = resolveHistogramWindowLevel(hist);
+    const prepared = prepareVolumeFor3D(volume, hist);
     emit({ stage: 'preparing-3d', current: 1, total: 1, message: 'Building 3D texture…' });
 
     const voxelsBuf = volume.voxels.buffer;
@@ -43,7 +50,7 @@ ctx.onmessage = async (e: MessageEvent<WorkerRequest>) => {
         meta: volume.meta,
         scalarMin: volume.scalarMin,
         scalarMax: volume.scalarMax,
-        windowLevel: volume.windowLevel,
+        windowLevel,
         formatId: volume.formatId,
         prepared: {
           data: preparedBuf as ArrayBuffer,

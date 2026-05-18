@@ -4,6 +4,7 @@ import {
   buildScalarHistogram,
   resolveIsoThreshold,
   resolveScalarRange,
+  type ScalarHistogram,
 } from '@/workers/volume/scalars';
 
 function downsampleStride(dims: Vec3): number {
@@ -17,7 +18,10 @@ function downsampleStride(dims: Vec3): number {
  * Quantize the float volume to a Uint8 Data3DTexture payload, downsampling
  * oversized volumes so the largest edge fits in `MAX_3D_TEXTURE_EDGE`.
  */
-export function prepareVolumeFor3D(volume: LoadedVolume): PreparedVolumeFor3D {
+export function prepareVolumeFor3D(
+  volume: LoadedVolume,
+  prebuiltHist?: ScalarHistogram,
+): PreparedVolumeFor3D {
   const [sx, sy, sz] = volume.meta.dims;
   const stride = downsampleStride(volume.meta.dims);
 
@@ -25,10 +29,10 @@ export function prepareVolumeFor3D(volume: LoadedVolume): PreparedVolumeFor3D {
   const dy = Math.max(1, Math.floor(sy / stride));
   const dz = Math.max(1, Math.floor(sz / stride));
 
-  const hist = buildScalarHistogram(volume.voxels, 1024);
+  const hist = prebuiltHist ?? buildScalarHistogram(volume.voxels, 1024);
   const [lo, hi] = resolveScalarRange(hist);
   const span = hi - lo || 1;
-  const threshold = resolveIsoThreshold(hist);
+  const threshold = resolveIsoThreshold(hist, [lo, hi]);
 
   const out = new Uint8Array(dx * dy * dz);
   const src = volume.voxels;
