@@ -3,6 +3,7 @@ import type {
   ImportProgress,
   LoadedVolume,
   MeasurementPoint,
+  PlanesMode,
   PreparedVolumeFor3D,
   RenderPreset,
   SlicePlane,
@@ -37,7 +38,8 @@ interface VolumeActions {
   setActivePlane: (p: SlicePlane) => void;
   setLoading: (s: Partial<VolumeState['loading']>) => void;
   setError: (msg: string | null) => void;
-  toggleToolbar: (key: keyof ToolbarState) => void;
+  toggleToolbar: (key: Exclude<keyof ToolbarState, 'planes'>) => void;
+  cyclePlanesMode: () => void;
   setWL: (wl: Partial<SliceWindowLevel>) => void;
   setWLDraft: (wl: Partial<SliceWindowLevel>) => void;
   setScrubVisible: (axis: SlicePlane, value: boolean) => void;
@@ -63,7 +65,7 @@ const initialState: VolumeState = {
     message: '',
   },
   error: null,
-  toolbar: { planes: false, rail: true, focus: false, dock: true },
+  toolbar: { planes: 'off' satisfies PlanesMode, rail: true, focus: false, dock: true },
   wl: { window: 3200, level: 1600 },
   wlDraft: { window: 3200, level: 1600 },
   scrubVisible: { coronal: true, sagittal: true, axial: true },
@@ -110,9 +112,12 @@ export const useVolumeStore = create<VolumeState & VolumeActions>((set) => ({
     })),
   setError: (error) => set({ error }),
   toggleToolbar: (key) =>
-    set((state) => ({
-      toolbar: { ...state.toolbar, [key]: !state.toolbar[key] },
-    })),
+    set((state) => ({ toolbar: { ...state.toolbar, [key]: !state.toolbar[key] } })),
+  cyclePlanesMode: () =>
+    set((state) => {
+      const cycle: Record<PlanesMode, PlanesMode> = { off: 'active', active: 'all', all: 'off' };
+      return { toolbar: { ...state.toolbar, planes: cycle[state.toolbar.planes] } };
+    }),
   setWL: (wl) => set((state) => ({ wl: { ...state.wl, ...wl } })),
   setWLDraft: (wl) => set((state) => ({ wlDraft: { ...state.wlDraft, ...wl } })),
   setScrubVisible: (axis, value) =>

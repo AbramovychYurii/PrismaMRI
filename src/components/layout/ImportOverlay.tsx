@@ -353,6 +353,7 @@ export function ImportOverlay() {
                 aria-hidden="true"
                 focusable={false}
                 size={64}
+                strokeWidth={0.75}
                 style={{ color: 'var(--amber)', marginBottom: 22 }}
               />
 

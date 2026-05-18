@@ -1,13 +1,18 @@
 import { ThreePreview } from '@/lib/volume/three-preview';
 import { useVolumeStore } from '@/store';
+import type { SlicePlane } from '@/types';
 import { useEffect, useRef } from 'react';
+
+/** Fallback plane when no panel has been clicked yet. */
+const DEFAULT_PLANE: SlicePlane = 'coronal';
 
 /** Binds a ThreePreview instance to a canvas and syncs it with the store. */
 export function useThreePreview(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   const previewRef = useRef<ThreePreview | null>(null);
   const prepared3D = useVolumeStore((s) => s.prepared3D);
   const cursor = useVolumeStore((s) => s.cursor);
-  const planesVisible = useVolumeStore((s) => s.toolbar.planes);
+  const planesMode = useVolumeStore((s) => s.toolbar.planes);
+  const activePlane = useVolumeStore((s) => s.activePlane);
   const railOpen = useVolumeStore((s) => s.toolbar.rail);
   const wlDraft = useVolumeStore((s) => s.wlDraft);
   const measurement = useVolumeStore((s) => s.measurement);
@@ -53,10 +58,10 @@ export function useThreePreview(canvasRef: React.RefObject<HTMLCanvasElement | n
     previewRef.current.setClim(low, high);
   }, [wlDraft, prepared3D]);
 
-  // Planes toggle
+  // Planes mode — reacts to both mode change and active plane change
   useEffect(() => {
-    previewRef.current?.setPlanesVisible(planesVisible);
-  }, [planesVisible]);
+    previewRef.current?.setPlaneMode(planesMode, activePlane ?? DEFAULT_PLANE);
+  }, [planesMode, activePlane]);
 
   // Measurement line
   useEffect(() => {
