@@ -9,8 +9,8 @@ import type { ToolbarState } from "@/types";
 
 interface ToolbarButton {
   id: keyof ToolbarState;
-  label: string;
   icon: React.ReactNode;
+  label?: string;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -18,18 +18,15 @@ interface ToolbarButton {
 const BUTTONS: ToolbarButton[] = [
   {
     id: "planes",
-    label: "Planes",
-    icon: <Layers size={11} />,
+    icon: <Layers size={16} />,
   },
   {
     id: "focus",
-    label: "Focus",
-    icon: <Maximize2 size={11} />,
+    icon: <Maximize2 size={16} />,
   },
   {
     id: "rail",
-    label: "Rail",
-    icon: <PanelRight size={11} />,
+    icon: <PanelRight size={16} />,
   },
 ];
 
@@ -54,7 +51,7 @@ const ToolBtn = styled.button<{ $on: boolean; $hover: boolean }>`
   backdrop-filter: blur(8px);
   border: 1px solid ${({ $on }) => ($on ? "var(--amber-dim)" : "var(--rule)")};
   border-radius: 999px;
-  padding: 6px 14px;
+  padding: 12px 12px;
   color: ${({ $on, $hover }) =>
     $on ? "var(--amber)" : $hover ? "var(--ink)" : "var(--ink-2)"};
   font-family: var(--mono);
