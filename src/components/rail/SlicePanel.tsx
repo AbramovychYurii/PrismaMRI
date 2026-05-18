@@ -19,10 +19,7 @@ import {
   PLANE_LABEL,
 } from "@/constants";
 import { clamp } from "@/lib/volume/math";
-import {
-  SliceScrubber,
-  SliceScrubberToggle,
-} from "@/components/rail/SliceScrubber";
+import { SliceScrubber } from "@/components/rail/SliceScrubber";
 import type { SlicePlane, VolumeCursor } from "@/types";
 import type { DrawFracs } from "@/hooks/useMeasurementInteraction";
 import { MeasureMenu } from "@/components/rail/MeasureMenu";
@@ -47,7 +44,11 @@ function physicalAspect(
 }
 
 /** Returns the letterboxed image rect as panel-space fractions. */
-function computeDrawFracs(physAspect: number, cw: number, ch: number): DrawFracs {
+function computeDrawFracs(
+  physAspect: number,
+  cw: number,
+  ch: number,
+): DrawFracs {
   if (physAspect >= cw / ch) {
     const drawH = cw / physAspect;
     return { xF: 0, yF: (ch - drawH) / 2 / ch, wF: 1, hF: drawH / ch };
@@ -346,7 +347,10 @@ function TrayButton({
       type="button"
       aria-label={label}
       aria-pressed={active}
-      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
       onPointerDown={(e) => e.stopPropagation()}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
@@ -392,11 +396,23 @@ function ExpandedSlicePanel({
 
   const drawFracs = useMemo<DrawFracs | null>(() => {
     if (!dims || !spacing) return null;
-    return computeDrawFracs(physicalAspect(plane, dims, spacing), canvasSize.w, canvasSize.h);
+    return computeDrawFracs(
+      physicalAspect(plane, dims, spacing),
+      canvasSize.w,
+      canvasSize.h,
+    );
   }, [plane, dims, spacing, canvasSize]);
 
-  const { measurement, measureDots, menu, openMenu, closeMenu, onMeasureFrom, onMeasureTo, onClear } =
-    useMeasurementInteraction(plane, dims, cursor);
+  const {
+    measurement,
+    measureDots,
+    menu,
+    openMenu,
+    closeMenu,
+    onMeasureFrom,
+    onMeasureTo,
+    onClear,
+  } = useMeasurementInteraction(plane, dims, cursor);
 
   const image = useSliceImage(plane);
   const onWheel = useSliceScroll(plane);
@@ -413,7 +429,10 @@ function ExpandedSlicePanel({
   }, [plane, dims, cursor, drawFracs]);
 
   const adjustedDots = useMemo(
-    () => drawFracs ? measureDots.map((d) => imageToPanel(d.fx, d.fy, drawFracs)) : measureDots,
+    () =>
+      drawFracs
+        ? measureDots.map((d) => imageToPanel(d.fx, d.fy, drawFracs))
+        : measureDots,
     [measureDots, drawFracs],
   );
 
@@ -432,17 +451,32 @@ function ExpandedSlicePanel({
     ctx.fillStyle = "#080604";
     ctx.fillRect(0, 0, cw, ch);
     if (!image) return;
-    if (!offscreen.current) offscreen.current = document.createElement("canvas");
+    if (!offscreen.current)
+      offscreen.current = document.createElement("canvas");
     const off = offscreen.current;
     off.width = image.width;
     off.height = image.height;
     const octx = off.getContext("2d");
     if (!octx) return;
-    octx.putImageData(new ImageData(image.data as Uint8ClampedArray<ArrayBuffer>, image.width, image.height), 0, 0);
+    octx.putImageData(
+      new ImageData(
+        image.data as Uint8ClampedArray<ArrayBuffer>,
+        image.width,
+        image.height,
+      ),
+      0,
+      0,
+    );
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
     if (drawFracs) {
-      ctx.drawImage(off, drawFracs.xF * cw, drawFracs.yF * ch, drawFracs.wF * cw, drawFracs.hF * ch);
+      ctx.drawImage(
+        off,
+        drawFracs.xF * cw,
+        drawFracs.yF * ch,
+        drawFracs.wF * cw,
+        drawFracs.hF * ch,
+      );
     } else {
       ctx.drawImage(off, 0, 0, cw, ch);
     }
@@ -457,18 +491,30 @@ function ExpandedSlicePanel({
   }, [onClose]);
 
   function handleClick(e: React.MouseEvent) {
-    if (!isActive) { setActivePlane(plane); return; }
+    if (!isActive) {
+      setActivePlane(plane);
+      return;
+    }
     const canvas = canvasRef.current;
     if (!canvas || !dims || !cursor) return;
     const rect = canvas.getBoundingClientRect();
     const panelFx = clamp((e.clientX - rect.left) / rect.width, 0, 1);
     const panelFy = clamp((e.clientY - rect.top) / rect.height, 0, 1);
-    const { fx, fy } = drawFracs ? panelToImage(panelFx, panelFy, drawFracs) : { fx: panelFx, fy: panelFy };
+    const { fx, fy } = drawFracs
+      ? panelToImage(panelFx, panelFy, drawFracs)
+      : { fx: panelFx, fy: panelFy };
     const [w, h, d] = dims;
     const next: VolumeCursor = { ...cursor };
-    if (plane === "coronal") { next.x = Math.round(fx * (w - 1)); next.z = Math.round((1 - fy) * (d - 1)); }
-    else if (plane === "sagittal") { next.y = Math.round(fx * (h - 1)); next.z = Math.round((1 - fy) * (d - 1)); }
-    else { next.x = Math.round(fx * (w - 1)); next.y = Math.round(fy * (h - 1)); }
+    if (plane === "coronal") {
+      next.x = Math.round(fx * (w - 1));
+      next.z = Math.round((1 - fy) * (d - 1));
+    } else if (plane === "sagittal") {
+      next.y = Math.round(fx * (h - 1));
+      next.z = Math.round((1 - fy) * (d - 1));
+    } else {
+      next.x = Math.round(fx * (w - 1));
+      next.y = Math.round(fy * (h - 1));
+    }
     setCursor(next);
   }
 
@@ -499,8 +545,16 @@ function ExpandedSlicePanel({
       <StyledCanvas ref={canvasRef} />
       {cross && (
         <CrosshairOverlay>
-          <CrossH $top={cross.fy * 100} $color={axisColor(axes.h)} $glow={axisGlow(axes.h)} />
-          <CrossV $left={cross.fx * 100} $color={axisColor(axes.v)} $glow={axisGlow(axes.v)} />
+          <CrossH
+            $top={cross.fy * 100}
+            $color={axisColor(axes.h)}
+            $glow={axisGlow(axes.h)}
+          />
+          <CrossV
+            $left={cross.fx * 100}
+            $color={axisColor(axes.v)}
+            $glow={axisGlow(axes.v)}
+          />
           <CrossCenter $left={cross.fx * 100} $top={cross.fy * 100}>
             <CrossDot />
           </CrossCenter>
@@ -509,7 +563,9 @@ function ExpandedSlicePanel({
       <PanelHeader>
         <PlaneGlyph $color={accentColor}>{PLANE_GLYPH[plane]}</PlaneGlyph>
         <PlaneLabel>
-          <PlaneLabelAccent $color={accentColor}>{labelPrimary}</PlaneLabelAccent>
+          <PlaneLabelAccent $color={accentColor}>
+            {labelPrimary}
+          </PlaneLabelAccent>
           {` · ${labelSecondary}`}
         </PlaneLabel>
       </PanelHeader>
@@ -528,10 +584,18 @@ function ExpandedSlicePanel({
         )}
       </ButtonTray>
       {total > 0 && (
-        <SliceScrubber axis={plane} slice={idx} total={total} visible={scrubVisible} onChange={handleScrub} />
+        <SliceScrubber
+          axis={plane}
+          slice={idx}
+          total={total}
+          visible={scrubVisible}
+          onChange={handleScrub}
+        />
       )}
       <PanelFooter $scrubVisible={scrubVisible}>
-        <span>{footer.hint} · {footer.code}</span>
+        <span>
+          {footer.hint} · {footer.code}
+        </span>
         {total > 0 && (
           <SliceCounter>
             <span>{idx}</span>
@@ -587,7 +651,11 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
 
   const drawFracs = useMemo<DrawFracs | null>(() => {
     if (!dims || !spacing) return null;
-    return computeDrawFracs(physicalAspect(plane, dims, spacing), canvasSize.w, canvasSize.h);
+    return computeDrawFracs(
+      physicalAspect(plane, dims, spacing),
+      canvasSize.w,
+      canvasSize.h,
+    );
   }, [plane, dims, spacing, canvasSize]);
   const scrubVisible = useVolumeStore((s) => s.scrubVisible[plane]);
   const setScrubVisible = useVolumeStore((s) => s.setScrubVisible);
@@ -660,7 +728,13 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
     if (drawFracs) {
-      ctx.drawImage(off, drawFracs.xF * cw, drawFracs.yF * ch, drawFracs.wF * cw, drawFracs.hF * ch);
+      ctx.drawImage(
+        off,
+        drawFracs.xF * cw,
+        drawFracs.yF * ch,
+        drawFracs.wF * cw,
+        drawFracs.hF * ch,
+      );
     } else {
       ctx.drawImage(off, 0, 0, cw, ch);
     }
@@ -749,10 +823,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
         </PlaneLabel>
       </PanelHeader>
       <ButtonTray>
-        <TrayButton
-          label="Expand panel"
-          onClick={() => setExpanded(true)}
-        >
+        <TrayButton label="Expand panel" onClick={() => setExpanded(true)}>
           <Maximize2 size={11} />
         </TrayButton>
         {total > 0 && (
@@ -775,7 +846,9 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
         />
       )}
       <PanelFooter $scrubVisible={scrubVisible}>
-        <span>{footer.hint} · {footer.code}</span>
+        <span>
+          {footer.hint} · {footer.code}
+        </span>
         {total > 0 && (
           <SliceCounter>
             <span>{idx}</span>

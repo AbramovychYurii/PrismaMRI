@@ -7,8 +7,8 @@ import {
   type PointerEvent as RPointerEvent,
 } from "react";
 import styled from "styled-components";
-import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
-import { PLANE_ACCENT, accentRgba } from "@/constants";
+import { ChevronUp, ChevronDown } from "lucide-react";
+import { PLANE_ACCENT } from "@/constants";
 import type { SlicePlane } from "@/types";
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -139,27 +139,6 @@ const ThumbPill = styled.div<{ $top: number; $accent: string }>`
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
-`;
-
-const ToggleButton = styled.button<{
-  $active: boolean;
-  $hover: boolean;
-  $border: string;
-  $color: string;
-}>`
-  width: 22px;
-  height: 22px;
-  flex-shrink: 0;
-  border-radius: 3px;
-  border: 1px solid ${({ $border }) => $border};
-  background: ${({ $active }) =>
-    $active ? accentRgba("amber", 0.08) : "transparent"};
-  color: ${({ $color }) => $color};
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  padding: 0;
 `;
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -402,50 +381,5 @@ export function SliceScrubber({
 
       <ChevronButton dir="down" label="Previous slice" onStep={step} />
     </ScrubberContainer>
-  );
-}
-
-// ── SliceScrubberToggle ────────────────────────────────────────────────────
-
-export function SliceScrubberToggle({
-  active,
-  onToggle,
-}: {
-  active: boolean;
-  onToggle: () => void;
-}) {
-  const [hover, setHover] = useState(false);
-  const border = active
-    ? "var(--amber-dim)"
-    : hover
-      ? "var(--rule-2)"
-      : "var(--rule)";
-  const color = active ? "var(--amber)" : hover ? "var(--ink)" : "var(--ink-3)";
-
-  const handleMouseEnter = () => setHover(true);
-  const handleMouseLeave = () => setHover(false);
-  const handlePointerDown = (e: RPointerEvent<HTMLButtonElement>) =>
-    e.stopPropagation();
-  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.stopPropagation();
-    onToggle();
-  };
-
-  return (
-    <ToggleButton
-      type="button"
-      aria-label="Toggle slice scrubber"
-      aria-pressed={active}
-      onPointerDown={handlePointerDown}
-      onClick={handleClick}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      $active={active}
-      $hover={hover}
-      $border={border}
-      $color={color}
-    >
-      <ChevronsUpDown size={11} />
-    </ToggleButton>
   );
 }
