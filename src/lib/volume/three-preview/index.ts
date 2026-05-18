@@ -7,8 +7,13 @@ import {
   disposeVolumeObject,
 } from '@/lib/volume/three-preview/volume-object';
 import { type RenderPreset, buildTransferFunction } from '@/lib/volume/three-preview/volume-shader';
-import type { PreparedVolumeFor3D, VolumeCursor } from '@/types';
-import type { ActiveMeasurement } from '@/types';
+import type {
+  ActiveMeasurement,
+  PlanesMode,
+  PreparedVolumeFor3D,
+  SlicePlane,
+  VolumeCursor,
+} from '@/types';
 import * as THREE from 'three';
 import type { TrackballControls } from 'three/examples/jsm/controls/TrackballControls.js';
 
@@ -148,8 +153,8 @@ export class ThreePreview {
     this.dirty = true;
   }
 
-  setPlanesVisible(visible: boolean): void {
-    this.cursorPlanes.setVisible(visible);
+  setPlaneMode(mode: PlanesMode, activePlane: SlicePlane): void {
+    this.cursorPlanes.setMode(mode, activePlane);
     this.dirty = true;
   }
 

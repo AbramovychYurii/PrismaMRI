@@ -1,5 +1,5 @@
 import { ACCENT_HEX_NUM, PLANE_ACCENT_KEY } from '@/constants';
-import type { Vec3, VolumeCursor } from '@/types';
+import type { PlanesMode, SlicePlane, Vec3, VolumeCursor } from '@/types';
 import * as THREE from 'three';
 
 /**
@@ -50,7 +50,7 @@ export class CursorPlanes {
       new THREE.MeshBasicMaterial({
         color,
         transparent: true,
-        opacity: 0.22,
+        opacity: 0.15,
         side: THREE.DoubleSide,
         depthWrite: false,
         depthTest: false,
@@ -61,7 +61,7 @@ export class CursorPlanes {
       new THREE.LineBasicMaterial({
         color,
         transparent: true,
-        opacity: 0.85,
+        opacity: 0.55,
         depthWrite: false,
         depthTest: false,
       }),
@@ -112,8 +112,22 @@ export class CursorPlanes {
     this.place(this.sagittal, [px, cy, cz], [d, h, 1], [0, Math.PI / 2, 0]);
   }
 
-  setVisible(v: boolean): void {
-    this.group.visible = v;
+  setMode(mode: PlanesMode, activePlane: SlicePlane): void {
+    this.group.visible = mode !== 'off';
+    if (mode === 'off') return;
+    const show = (p: AxisPlane, v: boolean) => {
+      p.fill.visible = v;
+      p.edge.visible = v;
+    };
+    if (mode === 'all') {
+      show(this.coronal, true);
+      show(this.sagittal, true);
+      show(this.axial, true);
+    } else {
+      show(this.coronal, activePlane === 'coronal');
+      show(this.sagittal, activePlane === 'sagittal');
+      show(this.axial, activePlane === 'axial');
+    }
   }
 
   dispose(): void {

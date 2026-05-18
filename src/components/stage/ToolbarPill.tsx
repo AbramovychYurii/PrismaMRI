@@ -1,33 +1,68 @@
 import { accentRgba } from '@/constants';
 import { useVolumeStore } from '@/store';
-import type { ToolbarState } from '@/types';
-import { Layers, Maximize2, PanelRight } from 'lucide-react';
+import type { PlanesMode, ToolbarState } from '@/types';
+import { Maximize2, PanelRight } from 'lucide-react';
 import { useState } from 'react';
 import styled from 'styled-components';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
 interface ToolbarButton {
-  id: keyof ToolbarState;
+  id: Exclude<keyof ToolbarState, 'planes'>;
   icon: React.ReactNode;
   label?: string;
+}
+
+// ── Icons ──────────────────────────────────────────────────────────────────
+
+/** Isometric cube — top face same size as the single-slice icon */
+function IconLayersAll() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={20}
+      height={20}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {/* Top face — same diamond shape as IconLayerOne */}
+      <path d="M12 2 L22 7 L12 12 L2 7 Z" />
+      {/* Right face */}
+      <path d="M22 7 L22 18 L12 23 L12 12 Z" />
+      {/* Left face */}
+      <path d="M2 7 L12 12 L12 23 L2 18 Z" />
+    </svg>
+  );
+}
+
+/** Single layer — "active plane only" */
+function IconLayerOne() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={20}
+      height={20}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 7 2 12l10 5 10-5-10-5z" />
+    </svg>
+  );
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
 const BUTTONS: ToolbarButton[] = [
-  {
-    id: 'planes',
-    icon: <Layers size={16} />,
-  },
-  {
-    id: 'focus',
-    icon: <Maximize2 size={16} />,
-  },
-  {
-    id: 'rail',
-    icon: <PanelRight size={16} />,
-  },
+  { id: 'focus', icon: <Maximize2 size={20} /> },
+  { id: 'rail', icon: <PanelRight size={20} /> },
 ];
 
 // ── Styled components ──────────────────────────────────────────────────────
@@ -62,6 +97,38 @@ const ToolBtn = styled.button<{ $on: boolean; $hover: boolean }>`
 
 // ── Sub-components ─────────────────────────────────────────────────────────
 
+function PlanesButton() {
+  const mode = useVolumeStore((s) => s.toolbar.planes);
+  const cyclePlanesMode = useVolumeStore((s) => s.cyclePlanesMode);
+  const [hover, setHover] = useState(false);
+
+  const on = mode !== 'off';
+  const icon: Record<PlanesMode, React.ReactNode> = {
+    off: <IconLayerOne />,
+    active: <IconLayerOne />,
+    all: <IconLayersAll />,
+  };
+  const handleClick = () => cyclePlanesMode();
+  const handleMouseEnter = () => setHover(true);
+  const handleMouseLeave = () => setHover(false);
+
+  return (
+    <ToolBtn
+      type="button"
+      aria-label={
+        mode === 'off' ? 'Hide planes' : mode === 'active' ? 'Show one plane' : 'Show all planes'
+      }
+      onClick={handleClick}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      $on={on}
+      $hover={hover}
+    >
+      {icon[mode]}
+    </ToolBtn>
+  );
+}
+
 function ToolButton({ btn }: { btn: ToolbarButton }) {
   const on = useVolumeStore((s) => s.toolbar[btn.id]);
   const toggle = useVolumeStore((s) => s.toggleToolbar);
@@ -89,6 +156,7 @@ function ToolButton({ btn }: { btn: ToolbarButton }) {
 export function ToolbarPill() {
   return (
     <PillWrap>
+      <PlanesButton />
       {BUTTONS.map((b) => (
         <ToolButton key={b.id} btn={b} />
       ))}

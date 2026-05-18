@@ -104,8 +104,10 @@ export interface ScanFolderSource {
   entries: ScanFolderEntry[];
 }
 
+export type PlanesMode = 'off' | 'active' | 'all';
+
 export interface ToolbarState {
-  planes: boolean;
+  planes: PlanesMode;
   rail: boolean;
   focus: boolean;
   dock: boolean;
