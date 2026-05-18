@@ -119,7 +119,7 @@ function crosshairAxes(plane: SlicePlane): { v: Axis; h: Axis } {
 
 // ── Styled components ──────────────────────────────────────────────────────
 
-const PanelWrap = styled.div<{ $isLast: boolean }>`
+const PanelWrap = styled.div<{ $isLast: boolean; $isActive: boolean }>`
   position: relative;
   flex: 1;
   min-height: 0;
@@ -127,7 +127,7 @@ const PanelWrap = styled.div<{ $isLast: boolean }>`
   border-bottom: ${({ $isLast }) =>
     $isLast ? "none" : "1px solid var(--rule)"};
   overflow: hidden;
-  cursor: crosshair;
+  cursor: ${({ $isActive }) => ($isActive ? "crosshair" : "pointer")};
 `;
 
 const StyledCanvas = styled.canvas`
@@ -389,7 +389,10 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
   }, [image, drawFracs, canvasSize]);
 
   function handleClick(e: React.MouseEvent) {
-    setActivePlane(plane);
+    if (!isActive) {
+      setActivePlane(plane);
+      return;
+    }
     const canvas = canvasRef.current;
     if (!canvas || !dims || !cursor) return;
     const rect = canvas.getBoundingClientRect();
@@ -438,6 +441,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
       onContextMenu={handleContextMenu}
       onWheel={onWheel}
       $isLast={isLast}
+      $isActive={isActive}
     >
       <StyledCanvas ref={canvasRef} />
       {cross && (
