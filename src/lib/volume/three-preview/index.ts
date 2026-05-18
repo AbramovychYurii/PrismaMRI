@@ -1,23 +1,16 @@
-import * as THREE from "three";
-import type { TrackballControls } from "three/examples/jsm/controls/TrackballControls.js";
-import type { PreparedVolumeFor3D, VolumeCursor } from "@/types";
+import { buildCamera, buildControls, frameCamera } from '@/lib/volume/three-preview/camera';
+import { CursorPlanes } from '@/lib/volume/three-preview/cursor-planes';
+import { MeasurementLine } from '@/lib/volume/three-preview/measurement-line';
 import {
-  buildCamera,
-  buildControls,
-  frameCamera,
-} from "@/lib/volume/three-preview/camera";
-import { CursorPlanes } from "@/lib/volume/three-preview/cursor-planes";
-import { MeasurementLine } from "@/lib/volume/three-preview/measurement-line";
-import {
+  type VolumeObject,
   buildVolumeMesh,
   disposeVolumeObject,
-  type VolumeObject,
-} from "@/lib/volume/three-preview/volume-object";
-import {
-  buildTransferFunction,
-  type RenderPreset,
-} from "@/lib/volume/three-preview/volume-shader";
-import type { ActiveMeasurement } from "@/types";
+} from '@/lib/volume/three-preview/volume-object';
+import { type RenderPreset, buildTransferFunction } from '@/lib/volume/three-preview/volume-shader';
+import type { PreparedVolumeFor3D, VolumeCursor } from '@/types';
+import type { ActiveMeasurement } from '@/types';
+import * as THREE from 'three';
+import type { TrackballControls } from 'three/examples/jsm/controls/TrackballControls.js';
 
 /** Ray-march steps — constant quality, no LOD reduction during interaction. */
 const RAY_STEPS = 256;
@@ -40,7 +33,7 @@ export class ThreePreview {
       canvas,
       antialias: true,
       alpha: true,
-      powerPreference: "high-performance",
+      powerPreference: 'high-performance',
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.scene.add(this.cursorPlanes.group);
@@ -58,7 +51,7 @@ export class ThreePreview {
       disposeVolumeObject(this.volume);
       this.volume = null;
     }
-    const vol = buildVolumeMesh(prepared, "mip");
+    const vol = buildVolumeMesh(prepared, 'mip');
     this.volume = vol;
     this.scene.add(vol.mesh);
 
@@ -82,7 +75,7 @@ export class ThreePreview {
 
     this.controls?.dispose();
     this.controls = buildControls(this.camera, this.canvas, center);
-    this.controls.addEventListener("change", () => {
+    this.controls.addEventListener('change', () => {
       this.dirty = true;
     });
 
@@ -104,10 +97,10 @@ export class ThreePreview {
     oldColormap.dispose();
 
     // Mode: MIP vs DVR
-    m.uniforms.u_mode.value = preset === "mip" ? 1 : 0;
+    m.uniforms.u_mode.value = preset === 'mip' ? 1 : 0;
 
     // Phong shading always on for DVR presets, irrelevant for MIP
-    m.uniforms.u_shading.value = preset !== "mip" ? 1 : 0;
+    m.uniforms.u_shading.value = preset !== 'mip' ? 1 : 0;
 
     m.uniforms.u_steps.value = RAY_STEPS;
 
@@ -137,10 +130,7 @@ export class ThreePreview {
     this.dirty = true;
   }
 
-  setMeasurement(
-    m: ActiveMeasurement | null,
-    spacing: [number, number, number],
-  ): void {
+  setMeasurement(m: ActiveMeasurement | null, spacing: [number, number, number]): void {
     if (!m) {
       this.measurementLine.clear();
       this.dirty = true;

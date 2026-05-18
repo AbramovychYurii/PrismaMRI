@@ -1,4 +1,4 @@
-import * as THREE from "three";
+import * as THREE from 'three';
 
 const DOT_COLOR = new THREE.Color(0xff4500);
 
@@ -84,7 +84,7 @@ function buildTicks(
   }
   if (pts.length === 0) return null;
   const geo = new THREE.BufferGeometry();
-  geo.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
   const mat = new THREE.LineBasicMaterial({
     color: DOT_COLOR,
     depthTest: false,
@@ -95,19 +95,19 @@ function buildTicks(
 function makeLabel(text: string): THREE.Sprite {
   const W = 512;
   const H = 80;
-  const canvas = document.createElement("canvas");
+  const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("no 2d ctx");
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('no 2d ctx');
   ctx.clearRect(0, 0, W, H);
 
   ctx.font = 'bold 42px "Courier New", monospace';
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
 
   // Dark drop-shadow for legibility on bright tissue
-  ctx.shadowColor = "rgba(0,0,0,0.99)";
+  ctx.shadowColor = 'rgba(0,0,0,0.99)';
   ctx.shadowBlur = 5;
   ctx.shadowOffsetX = 1;
   ctx.shadowOffsetY = 1;
@@ -161,14 +161,8 @@ export class MeasurementLine {
     dir.normalize();
 
     const radius = sceneSize * POINT_RADIUS_FACTOR;
-    const tickH = Math.max(
-      sceneSize * TICK_SCENE_FACTOR,
-      distanceMm * TICK_DIST_FACTOR,
-    );
-    const labelW = Math.max(
-      sceneSize * LABEL_SCENE_FACTOR,
-      distanceMm * LABEL_DIST_FACTOR,
-    );
+    const tickH = Math.max(sceneSize * TICK_SCENE_FACTOR, distanceMm * TICK_DIST_FACTOR);
+    const labelW = Math.max(sceneSize * LABEL_SCENE_FACTOR, distanceMm * LABEL_DIST_FACTOR);
     const perp = stablePerpendicular(dir);
 
     this.add(buildMainLine(fromWorld, toWorld));
@@ -186,11 +180,7 @@ export class MeasurementLine {
     label.position
       .copy(new THREE.Vector3().lerpVectors(fromWorld, toWorld, 0.5))
       .addScaledVector(perp, tickH * 3);
-    label.scale.set(
-      labelW * LABEL_SCALE,
-      labelW * LABEL_SCALE * LABEL_ASPECT,
-      1,
-    );
+    label.scale.set(labelW * LABEL_SCALE, labelW * LABEL_SCALE * LABEL_ASPECT, 1);
     this.add(label);
   }
 

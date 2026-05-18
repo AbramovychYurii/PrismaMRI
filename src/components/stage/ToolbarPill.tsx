@@ -1,9 +1,9 @@
-import { useState } from "react";
-import styled from "styled-components";
-import { Layers, Maximize2, PanelRight } from "lucide-react";
-import { useVolumeStore } from "@/store";
-import { accentRgba } from "@/constants";
-import type { ToolbarState } from "@/types";
+import { accentRgba } from '@/constants';
+import { useVolumeStore } from '@/store';
+import type { ToolbarState } from '@/types';
+import { Layers, Maximize2, PanelRight } from 'lucide-react';
+import { useState } from 'react';
+import styled from 'styled-components';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -17,15 +17,15 @@ interface ToolbarButton {
 
 const BUTTONS: ToolbarButton[] = [
   {
-    id: "planes",
+    id: 'planes',
     icon: <Layers size={16} />,
   },
   {
-    id: "focus",
+    id: 'focus',
     icon: <Maximize2 size={16} />,
   },
   {
-    id: "rail",
+    id: 'rail',
     icon: <PanelRight size={16} />,
   },
 ];
@@ -43,17 +43,12 @@ const PillWrap = styled.div`
 
 const ToolBtn = styled.button<{ $on: boolean; $hover: boolean }>`
   background: ${({ $on, $hover }) =>
-    $on
-      ? accentRgba("amber", 0.08)
-      : $hover
-        ? "rgba(28,24,18,0.92)"
-        : "rgba(20,18,14,0.85)"};
+    $on ? accentRgba('amber', 0.08) : $hover ? 'rgba(28,24,18,0.92)' : 'rgba(20,18,14,0.85)'};
   backdrop-filter: blur(8px);
-  border: 1px solid ${({ $on }) => ($on ? "var(--amber-dim)" : "var(--rule)")};
+  border: 1px solid ${({ $on }) => ($on ? 'var(--amber-dim)' : 'var(--rule)')};
   border-radius: 999px;
   padding: 12px 12px;
-  color: ${({ $on, $hover }) =>
-    $on ? "var(--amber)" : $hover ? "var(--ink)" : "var(--ink-2)"};
+  color: ${({ $on, $hover }) => ($on ? 'var(--amber)' : $hover ? 'var(--ink)' : 'var(--ink-2)')};
   font-family: var(--mono);
   font-size: 10.5px;
   letter-spacing: 0.1em;

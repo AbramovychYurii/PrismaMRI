@@ -25,11 +25,7 @@ export function frameCamera(
   center: THREE.Vector3,
   maxEdge: number,
 ): void {
-  cam.position.set(
-    center.x + maxEdge * 1.4,
-    center.y - maxEdge * 1.1,
-    center.z + maxEdge * 1.6,
-  );
+  cam.position.set(center.x + maxEdge * 1.4, center.y - maxEdge * 1.1, center.z + maxEdge * 1.6);
   cam.up.set(0, 0, 1);
   cam.lookAt(center);
 }

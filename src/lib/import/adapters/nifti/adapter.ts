@@ -1,7 +1,7 @@
-import { gunzipSync } from 'fflate';
-import type { LoadedVolume, Vec3 } from '@/types';
-import { resolveWindowLevel } from '@/lib/volume/math';
 import type { ImportFormatAdapter, ImportSource, ProgressFn } from '@/lib/import/types';
+import { resolveWindowLevel } from '@/lib/volume/math';
+import type { LoadedVolume, Vec3 } from '@/types';
+import { gunzipSync } from 'fflate';
 
 function isNiftiName(name: string): boolean {
   return name.endsWith('.nii') || name.endsWith('.nii.gz') || name.endsWith('.hdr');
@@ -92,11 +92,7 @@ export const niftiAdapter: ImportFormatAdapter = {
     }
 
     const [scalarMin, scalarMax] = scalarRange(out);
-    const spacing: Vec3 = [
-      Math.abs(dx) || 1,
-      Math.abs(dy) || 1,
-      Math.abs(dz) || 1,
-    ];
+    const spacing: Vec3 = [Math.abs(dx) || 1, Math.abs(dy) || 1, Math.abs(dz) || 1];
 
     return {
       voxels: out,

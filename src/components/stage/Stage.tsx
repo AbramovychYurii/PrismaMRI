@@ -1,9 +1,9 @@
-import { useRef } from "react";
-import styled, { css } from "styled-components";
-import { useThreePreview } from "@/hooks";
-import { useVolumeStore } from "@/store";
-import { ToolbarPill } from "@/components/stage/ToolbarPill";
-import { TickScale } from "@/components/stage/TickScale";
+import { TickScale } from '@/components/stage/TickScale';
+import { ToolbarPill } from '@/components/stage/ToolbarPill';
+import { useThreePreview } from '@/hooks';
+import { useVolumeStore } from '@/store';
+import { useRef } from 'react';
+import styled, { css } from 'styled-components';
 
 // ── Styled components ──────────────────────────────────────────────────────
 
@@ -87,9 +87,7 @@ export function Stage() {
   return (
     <StageSection $focus={focus}>
       <StageCanvas ref={canvasRef} />
-      {!hasVolume && (
-        <NoVolumePlaceholder>No volume loaded</NoVolumePlaceholder>
-      )}
+      {!hasVolume && <NoVolumePlaceholder>No volume loaded</NoVolumePlaceholder>}
       <TitleGroup>
         <VolumeSubLabel>Ray-cast · native res</VolumeSubLabel>
       </TitleGroup>

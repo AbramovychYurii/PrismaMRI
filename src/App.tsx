@@ -1,7 +1,7 @@
-import { useVolumeStore } from '@/store/volumeStore';
-import { ViewerActionsProvider } from '@/hooks/ViewerActionsContext';
 import { AppGrid } from '@/components/layout/AppGrid';
 import { ImportOverlay } from '@/components/layout/ImportOverlay';
+import { ViewerActionsProvider } from '@/hooks/ViewerActionsContext';
+import { useVolumeStore } from '@/store/volumeStore';
 
 export function App() {
   const view = useVolumeStore((s) => s.view);

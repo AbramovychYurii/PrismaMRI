@@ -1,17 +1,15 @@
-import type { LoadedVolume, PreparedVolumeFor3D, Vec3 } from '@/types';
 import { MAX_3D_TEXTURE_EDGE } from '@/constants';
+import type { LoadedVolume, PreparedVolumeFor3D, Vec3 } from '@/types';
 import {
+  type ScalarHistogram,
   buildScalarHistogram,
   resolveIsoThreshold,
   resolveScalarRange,
-  type ScalarHistogram,
 } from '@/workers/volume/scalars';
 
 function downsampleStride(dims: Vec3): number {
   const maxEdge = Math.max(dims[0], dims[1], dims[2]);
-  return maxEdge <= MAX_3D_TEXTURE_EDGE
-    ? 1
-    : Math.ceil(maxEdge / MAX_3D_TEXTURE_EDGE);
+  return maxEdge <= MAX_3D_TEXTURE_EDGE ? 1 : Math.ceil(maxEdge / MAX_3D_TEXTURE_EDGE);
 }
 
 /**

@@ -1,22 +1,17 @@
-import * as THREE from "three";
-import type { PreparedVolumeFor3D } from "@/types";
 import {
+  type RenderPreset,
   VolumeShader,
   buildTransferFunction,
-  type RenderPreset,
-} from "@/lib/volume/three-preview/volume-shader";
+} from '@/lib/volume/three-preview/volume-shader';
+import type { PreparedVolumeFor3D } from '@/types';
+import * as THREE from 'three';
 
 // ── Volume texture ─────────────────────────────────────────────────────────
 
 /** Data3DTexture: single-channel Uint8, linear filtering, tight packing. */
 export function buildTexture(prepared: PreparedVolumeFor3D): THREE.Data3DTexture {
   const [w, h, d] = prepared.dims;
-  const tex = new THREE.Data3DTexture(
-    prepared.data as Uint8Array<ArrayBuffer>,
-    w,
-    h,
-    d,
-  );
+  const tex = new THREE.Data3DTexture(prepared.data as Uint8Array<ArrayBuffer>, w, h, d);
   tex.format = THREE.RedFormat;
   tex.type = THREE.UnsignedByteType;
   tex.minFilter = THREE.LinearFilter;
@@ -32,25 +27,25 @@ export function buildMaterial(
   texture: THREE.Data3DTexture,
   colormap: THREE.DataTexture,
   prepared: PreparedVolumeFor3D,
-  preset: RenderPreset = "mip",
+  preset: RenderPreset = 'mip',
 ): THREE.ShaderMaterial {
   const [w, h, d] = prepared.dims;
 
   const uniforms: Record<string, THREE.IUniform> = {
-    u_data:     { value: texture },
-    u_cmdata:   { value: colormap },
-    u_size:     { value: new THREE.Vector3(w, h, d) },
-    u_clim:     { value: new THREE.Vector2(0, 1) },
-    u_steps:    { value: 256 },
-    u_mode:     { value: preset === "mip" ? 1 : 0 },
-    u_shading:    { value: 0 },
-    u_camVoxel:   { value: new THREE.Vector3() },
-    u_rayDirVox:  { value: new THREE.Vector3(0, 0, -1) },
+    u_data: { value: texture },
+    u_cmdata: { value: colormap },
+    u_size: { value: new THREE.Vector3(w, h, d) },
+    u_clim: { value: new THREE.Vector2(0, 1) },
+    u_steps: { value: 256 },
+    u_mode: { value: preset === 'mip' ? 1 : 0 },
+    u_shading: { value: 0 },
+    u_camVoxel: { value: new THREE.Vector3() },
+    u_rayDirVox: { value: new THREE.Vector3(0, 0, -1) },
   };
 
   return new THREE.ShaderMaterial({
     uniforms,
-    vertexShader:   VolumeShader.vertexShader,
+    vertexShader: VolumeShader.vertexShader,
     fragmentShader: VolumeShader.fragmentShader,
     side: THREE.BackSide,
   });
@@ -69,11 +64,11 @@ export interface VolumeObject {
 
 export function buildVolumeMesh(
   prepared: PreparedVolumeFor3D,
-  preset: RenderPreset = "mip",
+  preset: RenderPreset = 'mip',
 ): VolumeObject {
   const [w, h, d] = prepared.dims;
   const [sx, sy, sz] = prepared.spacing;
-  const texture  = buildTexture(prepared);
+  const texture = buildTexture(prepared);
   const colormap = buildTransferFunction(preset);
   const material = buildMaterial(texture, colormap, prepared, preset);
 

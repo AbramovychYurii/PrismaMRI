@@ -1,4 +1,4 @@
-import styled from "styled-components";
+import styled from 'styled-components';
 
 // ── Styled components ──────────────────────────────────────────────────────
 
@@ -45,6 +45,7 @@ function BrandLogo() {
       strokeWidth={2}
       strokeLinecap="round"
       strokeLinejoin="round"
+      aria-hidden="true"
     >
       <path d="M12 2 2 7l10 5 10-5-10-5z" />
       <path d="M2 17l10 5 10-5M2 12l10 5 10-5" />

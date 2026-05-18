@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react';
-import { useVolumeStore } from '@/store/volumeStore';
 import { WL_DEBOUNCE_MS } from '@/constants';
+import { useVolumeStore } from '@/store/volumeStore';
+import { useEffect, useRef } from 'react';
 
 /**
  * Debounced commit of the W/L draft (disc drag) to the committed W/L that

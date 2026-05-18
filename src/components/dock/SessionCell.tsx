@@ -1,6 +1,6 @@
-import styled from "styled-components";
-import { ChevronLeft } from "lucide-react";
-import { useVolumeStore } from "@/store";
+import { useVolumeStore } from '@/store';
+import { ChevronLeft } from 'lucide-react';
+import styled from 'styled-components';
 
 // ── Styled components ──────────────────────────────────────────────────────
 
@@ -58,7 +58,7 @@ export function SessionCell() {
   const setView = useVolumeStore((s) => s.setView);
   const volume = useVolumeStore((s) => s.volume);
 
-  const handleBack = () => setView("import");
+  const handleBack = () => setView('import');
 
   return (
     <>
@@ -70,8 +70,8 @@ export function SessionCell() {
         <KbdTag>Esc</KbdTag>
       </BackButton>
       <Disclaimer>
-        <DisclaimerBold>Reference only.</DisclaimerBold> Not for diagnosis,
-        treatment planning, measurements, or implant workflows.
+        <DisclaimerBold>Reference only.</DisclaimerBold> Not for diagnosis, treatment planning,
+        measurements, or implant workflows.
       </Disclaimer>
     </>
   );

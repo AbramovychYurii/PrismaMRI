@@ -1,7 +1,7 @@
-import { unzipSync } from 'fflate';
-import type { LoadedVolume } from '@/types';
 import { importFormatAdapters } from '@/lib/import/adapters';
 import type { ImportFile, ImportSource, ProgressFn } from '@/lib/import/types';
+import type { LoadedVolume } from '@/types';
+import { unzipSync } from 'fflate';
 
 async function expandZips(source: ImportSource, onProgress: ProgressFn): Promise<ImportSource> {
   const zips = source.files.filter((f) => f.name.endsWith('.zip'));

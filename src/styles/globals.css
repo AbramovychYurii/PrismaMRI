@@ -1,4 +1,4 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
 @theme {
   --color-bg: #0c0b09;
@@ -18,9 +18,9 @@
   --color-azure: #82a8d4;
   --color-rose: #d97a6b;
 
-  --font-serif: 'IBM Plex Serif', Georgia, serif;
-  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  --font-serif: "IBM Plex Serif", Georgia, serif;
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
 }
 
 :root {
@@ -40,13 +40,19 @@
   --violet: #b59dd1;
   --azure: #82a8d4;
   --rose: #d97a6b;
-  --serif: 'IBM Plex Serif', Georgia, serif;
-  --sans: 'IBM Plex Sans', system-ui, sans-serif;
-  --mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  --serif: "IBM Plex Serif", Georgia, serif;
+  --sans: "IBM Plex Sans", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
 }
 
-* { box-sizing: border-box; }
-html, body, #root { height: 100%; }
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  height: 100%;
+}
 body {
   margin: 0;
   background: var(--bg);
@@ -59,17 +65,16 @@ body {
 
 /* paper grain background — exact from prototype */
 body::before {
-  content: '';
+  content: "";
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background:
-    radial-gradient(1200px 700px at 20% -10%, rgba(255, 181, 71, 0.04), transparent 60%),
+  background: radial-gradient(1200px 700px at 20% -10%, rgba(255, 181, 71, 0.04), transparent 60%),
     radial-gradient(900px 600px at 110% 110%, rgba(127, 209, 197, 0.03), transparent 60%);
 }
 body::after {
-  content: '';
+  content: "";
   position: fixed;
   inset: 0;
   z-index: 0;
@@ -84,8 +89,15 @@ body::after {
   );
 }
 
-button { font: inherit; color: inherit; }
-input, select, textarea { outline: none; }
+button {
+  font: inherit;
+  color: inherit;
+}
+input,
+select,
+textarea {
+  outline: none;
+}
 
 /* WCAG 2.2 § 2.4.11 — visible focus for keyboard users */
 :focus-visible {
@@ -93,13 +105,28 @@ input, select, textarea { outline: none; }
   outline-offset: 3px;
   border-radius: 2px;
 }
-::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: var(--rule-2); border-radius: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--rule-2);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
 
-.font-serif { font-family: var(--serif); }
-.font-sans { font-family: var(--sans); }
-.font-mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.font-serif {
+  font-family: var(--serif);
+}
+.font-sans {
+  font-family: var(--sans);
+}
+.font-mono {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+}
 
 /* === W/L sliders (Display cell) === */
 .wl-slider {

@@ -1,5 +1,5 @@
-import type { ImportProgress, LoadedVolume, PreparedVolumeFor3D } from '@/types';
 import type { ImportSource } from '@/lib/import/types';
+import type { ImportProgress, LoadedVolume, PreparedVolumeFor3D } from '@/types';
 import type { WorkerResponse } from '@/workers/volume/types';
 
 export interface LoadResult {
@@ -34,10 +34,7 @@ export function loadVolumeInWorker(
       }
       // done
       const volume: LoadedVolume = {
-        voxels:
-          msg.voxelKind === 'i16'
-            ? new Int16Array(msg.voxels)
-            : new Float32Array(msg.voxels),
+        voxels: msg.voxelKind === 'i16' ? new Int16Array(msg.voxels) : new Float32Array(msg.voxels),
         meta: msg.meta,
         scalarMin: msg.scalarMin,
         scalarMax: msg.scalarMax,

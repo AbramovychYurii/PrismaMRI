@@ -1,6 +1,6 @@
-import * as THREE from 'three';
 import { ACCENT_HEX_NUM, PLANE_ACCENT_KEY } from '@/constants';
 import type { Vec3, VolumeCursor } from '@/types';
+import * as THREE from 'three';
 
 /**
  * PrismaMRI plane accents — must match the side-panel slice accents:

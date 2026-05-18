@@ -1,12 +1,9 @@
-/// <reference lib="webworker" />
-import type { ImportProgress } from '@/types';
 import { loadVolumeFromSource } from '@/lib/import/load-volume';
 import { prepareVolumeFor3D } from '@/lib/volume/preview-3d';
+/// <reference lib="webworker" />
+import type { ImportProgress } from '@/types';
 import { progressPercent } from '@/workers/volume/progress';
-import {
-  buildScalarHistogram,
-  resolveHistogramWindowLevel,
-} from '@/workers/volume/scalars';
+import { buildScalarHistogram, resolveHistogramWindowLevel } from '@/workers/volume/scalars';
 import type { WorkerRequest, WorkerResponse } from '@/workers/volume/types';
 
 const ctx = self as unknown as DedicatedWorkerGlobalScope;

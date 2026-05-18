@@ -1,19 +1,18 @@
-import { useState, type ReactNode } from "react";
-import styled from "styled-components";
-import { ChevronDown } from "lucide-react";
-import { useVolumeStore } from "@/store";
-import { DisplayCell } from "@/components/dock/DisplayCell";
-import { StudyCell } from "@/components/dock/StudyCell";
-import { NavigationCell } from "@/components/dock/NavigationCell";
-import { SessionCell } from "@/components/dock/SessionCell";
-import { RenderCell } from "@/components/dock/RenderCell";
+import { DisplayCell } from '@/components/dock/DisplayCell';
+import { NavigationCell } from '@/components/dock/NavigationCell';
+import { RenderCell } from '@/components/dock/RenderCell';
+import { SessionCell } from '@/components/dock/SessionCell';
+import { StudyCell } from '@/components/dock/StudyCell';
+import { useVolumeStore } from '@/store';
+import { ChevronDown } from 'lucide-react';
+import { type ReactNode, useState } from 'react';
+import styled from 'styled-components';
 
 const DOCK_H = 200;
 
 function prefersReduced() {
   return (
-    typeof window !== "undefined" &&
-    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+    typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
   );
 }
 
@@ -42,7 +41,7 @@ const StyledCellHead = styled.div`
 
 const StyledDockCell = styled.div<{ $last?: boolean }>`
   padding: 14px 22px 16px;
-  border-right: ${({ $last }) => ($last ? "none" : "1px solid var(--rule)")};
+  border-right: ${({ $last }) => ($last ? 'none' : '1px solid var(--rule)')};
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -59,20 +58,17 @@ const ToggleButton = styled.button<{
   transform: translateX(-50%);
   z-index: 20;
   transition: ${({ $reduced }) =>
-    $reduced
-      ? "none"
-      : "bottom 260ms ease, background 100ms, border-color 100ms"};
+    $reduced ? 'none' : 'bottom 260ms ease, background 100ms, border-color 100ms'};
   display: flex;
   align-items: center;
   justify-content: center;
   width: 32px;
   height: 32px;
-  background: ${({ $hover }) =>
-    $hover ? "rgba(28,22,14,0.97)" : "rgba(15,12,8,0.88)"};
+  background: ${({ $hover }) => ($hover ? 'rgba(28,22,14,0.97)' : 'rgba(15,12,8,0.88)')};
   border: 1px solid
-    ${({ $hover }) => ($hover ? "var(--amber)" : "var(--amber-dim)")};
+    ${({ $hover }) => ($hover ? 'var(--amber)' : 'var(--amber-dim)')};
   border-radius: 50%;
-  color: ${({ $hover }) => ($hover ? "var(--amber)" : "var(--ink-3)")};
+  color: ${({ $hover }) => ($hover ? 'var(--amber)' : 'var(--ink-3)')};
   cursor: pointer;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(8px);
@@ -82,8 +78,8 @@ const ChevronWrap = styled.span<{ $open: boolean; $reduced: boolean }>`
   display: flex;
   align-items: center;
   justify-content: center;
-  transform: ${({ $open }) => ($open ? "rotate(0deg)" : "rotate(180deg)")};
-  transition: ${({ $reduced }) => ($reduced ? "none" : "transform 260ms ease")};
+  transform: ${({ $open }) => ($open ? 'rotate(0deg)' : 'rotate(180deg)')};
+  transition: ${({ $reduced }) => ($reduced ? 'none' : 'transform 260ms ease')};
 `;
 
 const DockPanel = styled.div<{ $open: boolean; $reduced: boolean }>`
@@ -92,9 +88,8 @@ const DockPanel = styled.div<{ $open: boolean; $reduced: boolean }>`
   left: 0;
   right: 0;
   height: ${DOCK_H}px;
-  transform: ${({ $open }) =>
-    $open ? "translateY(0)" : `translateY(${DOCK_H}px)`};
-  transition: ${({ $reduced }) => ($reduced ? "none" : "transform 260ms ease")};
+  transform: ${({ $open }) => ($open ? 'translateY(0)' : `translateY(${DOCK_H}px)`)};
+  transition: ${({ $reduced }) => ($reduced ? 'none' : 'transform 260ms ease')};
   z-index: 15;
   background: var(--panel);
   border-top: 1px solid var(--rule);
@@ -148,7 +143,7 @@ function PanelsToggle({
   return (
     <ToggleButton
       type="button"
-      aria-label={open ? "Hide control panels" : "Show control panels"}
+      aria-label={open ? 'Hide control panels' : 'Show control panels'}
       aria-expanded={open}
       onClick={onToggle}
       onMouseEnter={handleMouseEnter}
@@ -170,9 +165,9 @@ export function Dock() {
   const view = useVolumeStore((s) => s.view);
   const reduced = prefersReduced();
 
-  const handleToggle = () => toggleToolbar("dock");
+  const handleToggle = () => toggleToolbar('dock');
 
-  if (view !== "viewer") return null;
+  if (view !== 'viewer') return null;
 
   return (
     <>

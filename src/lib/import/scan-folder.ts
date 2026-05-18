@@ -14,9 +14,7 @@ export function fromFileList(files: FileList | File[]): ImportSource {
       : (arr[0]?.name ?? 'volume');
   return {
     rootName,
-    files: arr.map((f) =>
-      toImportFile(f, (f as File).webkitRelativePath || f.name),
-    ),
+    files: arr.map((f) => toImportFile(f, (f as File).webkitRelativePath || f.name)),
   };
 }
 

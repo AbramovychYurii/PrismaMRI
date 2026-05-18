@@ -1,12 +1,7 @@
-import { useState, useMemo, useCallback } from "react";
-import { useVolumeStore } from "@/store";
-import { clamp } from "@/lib/volume/math";
-import type {
-  ActiveMeasurement,
-  MeasurementPoint,
-  SlicePlane,
-  VolumeCursor,
-} from "@/types";
+import { clamp } from '@/lib/volume/math';
+import { useVolumeStore } from '@/store';
+import type { ActiveMeasurement, MeasurementPoint, SlicePlane, VolumeCursor } from '@/types';
+import { useCallback, useMemo, useState } from 'react';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -27,14 +22,14 @@ function measureDotFrac(
   pt: MeasurementPoint,
 ): { fx: number; fy: number } | null {
   const [w, h, d] = dims;
-  if (plane === "coronal") {
+  if (plane === 'coronal') {
     if (pt.y !== cursor.y) return null;
     return {
       fx: pt.x / Math.max(1, w - 1),
       fy: (d - 1 - pt.z) / Math.max(1, d - 1),
     };
   }
-  if (plane === "sagittal") {
+  if (plane === 'sagittal') {
     if (pt.x !== cursor.x) return null;
     return {
       fx: pt.y / Math.max(1, h - 1),
@@ -79,10 +74,10 @@ function screenToVoxel(
   }
   const [w, h, d] = dims;
   const voxel: MeasurementPoint = { ...cursor };
-  if (plane === "coronal") {
+  if (plane === 'coronal') {
     voxel.x = Math.round(fx * (w - 1));
     voxel.z = Math.round((1 - fy) * (d - 1));
-  } else if (plane === "sagittal") {
+  } else if (plane === 'sagittal') {
     voxel.y = Math.round(fx * (h - 1));
     voxel.z = Math.round((1 - fy) * (d - 1));
   } else {

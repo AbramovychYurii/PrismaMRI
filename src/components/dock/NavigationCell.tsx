@@ -1,6 +1,6 @@
-import styled from "styled-components";
-import { useVolumeStore } from "@/store";
-import { ACCENT_VAR, AXIS_ACCENT, type Axis } from "@/constants";
+import { ACCENT_VAR, AXIS_ACCENT, type Axis } from '@/constants';
+import { useVolumeStore } from '@/store';
+import styled from 'styled-components';
 
 // ── Styled components ──────────────────────────────────────────────────────
 
@@ -64,7 +64,7 @@ const TipKey = styled.b`
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
-const AXES: Axis[] = ["x", "y", "z"];
+const AXES: Axis[] = ['x', 'y', 'z'];
 
 export function NavigationCell() {
   const cursor = useVolumeStore((s) => s.cursor);
@@ -79,7 +79,7 @@ export function NavigationCell() {
             return (
               <AxisSpan key={a} $color={c}>
                 <AxisLabel $color={c}>{a}</AxisLabel>
-                {cursor ? cursor[a] : "—"}
+                {cursor ? cursor[a] : '—'}
               </AxisSpan>
             );
           })}

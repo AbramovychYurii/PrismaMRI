@@ -1,11 +1,9 @@
-import { useEffect, useRef } from "react";
-import { ThreePreview } from "@/lib/volume/three-preview";
-import { useVolumeStore } from "@/store";
+import { ThreePreview } from '@/lib/volume/three-preview';
+import { useVolumeStore } from '@/store';
+import { useEffect, useRef } from 'react';
 
 /** Binds a ThreePreview instance to a canvas and syncs it with the store. */
-export function useThreePreview(
-  canvasRef: React.RefObject<HTMLCanvasElement | null>,
-) {
+export function useThreePreview(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   const previewRef = useRef<ThreePreview | null>(null);
   const prepared3D = useVolumeStore((s) => s.prepared3D);
   const cursor = useVolumeStore((s) => s.cursor);
@@ -73,6 +71,7 @@ export function useThreePreview(
   }, [renderPreset, prepared3D]);
 
   // Rail toggle changes stage width — re-fit on next frame
+  // biome-ignore lint/correctness/useExhaustiveDependencies: previewRef is stable (useRef), intentionally omitted
   useEffect(() => {
     const id = requestAnimationFrame(() => previewRef.current?.resize());
     return () => cancelAnimationFrame(id);

@@ -1,28 +1,24 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
-import styled from "styled-components";
-import { ChevronsUpDown, Maximize2, Minimize2 } from "lucide-react";
-import { useVolumeStore } from "@/store";
-import {
-  useSliceImage,
-  useSliceScroll,
-  useMeasurementInteraction,
-} from "@/hooks";
+import { MeasureMenu } from '@/components/rail/MeasureMenu';
+import { SliceScrubber } from '@/components/rail/SliceScrubber';
 import {
   ACCENT_VAR,
   AXIS_ACCENT,
   type Axis,
-  accentRgba,
   PLANE_ACCENT,
   PLANE_FOOTER,
   PLANE_GLYPH,
   PLANE_LABEL,
-} from "@/constants";
-import { clamp } from "@/lib/volume/math";
-import { SliceScrubber } from "@/components/rail/SliceScrubber";
-import type { SlicePlane, VolumeCursor } from "@/types";
-import type { DrawFracs } from "@/hooks/useMeasurementInteraction";
-import { MeasureMenu } from "@/components/rail/MeasureMenu";
+  accentRgba,
+} from '@/constants';
+import { useMeasurementInteraction, useSliceImage, useSliceScroll } from '@/hooks';
+import type { DrawFracs } from '@/hooks/useMeasurementInteraction';
+import { clamp } from '@/lib/volume/math';
+import { useVolumeStore } from '@/store';
+import type { SlicePlane, VolumeCursor } from '@/types';
+import { ChevronsUpDown, Maximize2, Minimize2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import styled from 'styled-components';
 
 // ── Tuning knobs ──────────────────────────────────────────────────────────
 
@@ -38,17 +34,13 @@ function physicalAspect(
 ): number {
   const [sx, sy, sz] = spacing;
   const [w, h, d] = dims;
-  if (plane === "coronal") return (w * sx) / (d * sz);
-  if (plane === "sagittal") return (h * sy) / (d * sz);
+  if (plane === 'coronal') return (w * sx) / (d * sz);
+  if (plane === 'sagittal') return (h * sy) / (d * sz);
   return (w * sx) / (h * sy);
 }
 
 /** Returns the letterboxed image rect as panel-space fractions. */
-function computeDrawFracs(
-  physAspect: number,
-  cw: number,
-  ch: number,
-): DrawFracs {
+function computeDrawFracs(physAspect: number, cw: number, ch: number): DrawFracs {
   if (physAspect >= cw / ch) {
     const drawH = cw / physAspect;
     return { xF: 0, yF: (ch - drawH) / 2 / ch, wF: 1, hF: drawH / ch };
@@ -76,8 +68,8 @@ function sliceIndexInfo(
   cursor: VolumeCursor | null,
 ) {
   if (!dims || !cursor) return { idx: 0, total: 0 };
-  if (plane === "coronal") return { idx: cursor.y + 1, total: dims[1] };
-  if (plane === "sagittal") return { idx: cursor.x + 1, total: dims[0] };
+  if (plane === 'coronal') return { idx: cursor.y + 1, total: dims[1] };
+  if (plane === 'sagittal') return { idx: cursor.x + 1, total: dims[0] };
   return { idx: cursor.z + 1, total: dims[2] };
 }
 
@@ -91,13 +83,13 @@ function crosshairFrac(
   c: VolumeCursor,
 ): { fx: number; fy: number } {
   const [w, h, d] = dims;
-  if (plane === "coronal") {
+  if (plane === 'coronal') {
     return {
       fx: c.x / Math.max(1, w - 1),
       fy: (d - 1 - c.z) / Math.max(1, d - 1),
     };
   }
-  if (plane === "sagittal") {
+  if (plane === 'sagittal') {
     return {
       fx: c.y / Math.max(1, h - 1),
       fy: (d - 1 - c.z) / Math.max(1, d - 1),
@@ -115,9 +107,9 @@ const axisGlow = (a: Axis) => accentRgba(AXIS_ACCENT[a], 0.45);
  * the two axes orthogonal to its own, tinted with their system colors.
  */
 function crosshairAxes(plane: SlicePlane): { v: Axis; h: Axis } {
-  if (plane === "coronal") return { v: "y", h: "z" };
-  if (plane === "sagittal") return { v: "x", h: "z" };
-  return { v: "x", h: "y" };
+  if (plane === 'coronal') return { v: 'y', h: 'z' };
+  if (plane === 'sagittal') return { v: 'x', h: 'z' };
+  return { v: 'x', h: 'y' };
 }
 
 // ── Styled components ──────────────────────────────────────────────────────
@@ -127,10 +119,9 @@ const PanelWrap = styled.div<{ $isLast: boolean; $isActive: boolean }>`
   flex: 1;
   min-height: 0;
   background: #050403;
-  border-bottom: ${({ $isLast }) =>
-    $isLast ? "none" : "1px solid var(--rule)"};
+  border-bottom: ${({ $isLast }) => ($isLast ? 'none' : '1px solid var(--rule)')};
   overflow: hidden;
-  cursor: ${({ $isActive }) => ($isActive ? "crosshair" : "pointer")};
+  cursor: ${({ $isActive }) => ($isActive ? 'crosshair' : 'pointer')};
 `;
 
 const StyledCanvas = styled.canvas`
@@ -249,7 +240,7 @@ const PanelFooter = styled.div<{ $scrubVisible: boolean }>`
   position: absolute;
   bottom: 8px;
   left: 14px;
-  right: ${({ $scrubVisible }) => ($scrubVisible ? "46px" : "14px")};
+  right: ${({ $scrubVisible }) => ($scrubVisible ? '46px' : '14px')};
   z-index: 4;
   display: flex;
   justify-content: space-between;
@@ -268,7 +259,7 @@ const ActiveBorder = styled.div`
   z-index: 5;
   border: 1.5px solid var(--amber);
   pointer-events: none;
-  box-shadow: inset 0 0 0 1px ${accentRgba("amber", 0.15)};
+  box-shadow: inset 0 0 0 1px ${accentRgba('amber', 0.15)};
 `;
 
 const MeasureDot = styled.div<{ $fx: number; $fy: number; $size: number }>`
@@ -304,11 +295,10 @@ const TrayBtn = styled.button<{ $active?: boolean; $hover: boolean }>`
   border-radius: 3px;
   border: 1px solid
     ${({ $active, $hover }) =>
-      $active ? "var(--amber-dim)" : $hover ? "var(--rule-2)" : "var(--rule)"};
-  background: ${({ $active }) =>
-    $active ? accentRgba("amber", 0.08) : "transparent"};
+      $active ? 'var(--amber-dim)' : $hover ? 'var(--rule-2)' : 'var(--rule)'};
+  background: ${({ $active }) => ($active ? accentRgba('amber', 0.08) : 'transparent')};
   color: ${({ $active, $hover }) =>
-    $active ? "var(--amber)" : $hover ? "var(--ink)" : "var(--ink-3)"};
+    $active ? 'var(--amber)' : $hover ? 'var(--ink)' : 'var(--ink-3)'};
   display: flex;
   align-items: center;
   justify-content: center;
@@ -325,7 +315,7 @@ const FullscreenOverlay = styled.div<{ $isActive: boolean }>`
   z-index: 50;
   background: #050403;
   overflow: hidden;
-  cursor: ${({ $isActive }) => ($isActive ? "crosshair" : "default")};
+  cursor: ${({ $isActive }) => ($isActive ? 'crosshair' : 'default')};
 `;
 
 // ── TrayButton ─────────────────────────────────────────────────────────────
@@ -396,11 +386,7 @@ function ExpandedSlicePanel({
 
   const drawFracs = useMemo<DrawFracs | null>(() => {
     if (!dims || !spacing) return null;
-    return computeDrawFracs(
-      physicalAspect(plane, dims, spacing),
-      canvasSize.w,
-      canvasSize.h,
-    );
+    return computeDrawFracs(physicalAspect(plane, dims, spacing), canvasSize.w, canvasSize.h);
   }, [plane, dims, spacing, canvasSize]);
 
   const {
@@ -429,10 +415,7 @@ function ExpandedSlicePanel({
   }, [plane, dims, cursor, drawFracs]);
 
   const adjustedDots = useMemo(
-    () =>
-      drawFracs
-        ? measureDots.map((d) => imageToPanel(d.fx, d.fy, drawFracs))
-        : measureDots,
+    () => (drawFracs ? measureDots.map((d) => imageToPanel(d.fx, d.fy, drawFracs)) : measureDots),
     [measureDots, drawFracs],
   );
 
@@ -446,29 +429,24 @@ function ExpandedSlicePanel({
     const ch = Math.max(1, Math.floor(canvasSize.h * dpr));
     if (canvas.width !== cw) canvas.width = cw;
     if (canvas.height !== ch) canvas.height = ch;
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    ctx.fillStyle = "#080604";
+    ctx.fillStyle = '#080604';
     ctx.fillRect(0, 0, cw, ch);
     if (!image) return;
-    if (!offscreen.current)
-      offscreen.current = document.createElement("canvas");
+    if (!offscreen.current) offscreen.current = document.createElement('canvas');
     const off = offscreen.current;
     off.width = image.width;
     off.height = image.height;
-    const octx = off.getContext("2d");
+    const octx = off.getContext('2d');
     if (!octx) return;
     octx.putImageData(
-      new ImageData(
-        image.data as Uint8ClampedArray<ArrayBuffer>,
-        image.width,
-        image.height,
-      ),
+      new ImageData(image.data as Uint8ClampedArray<ArrayBuffer>, image.width, image.height),
       0,
       0,
     );
     ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
+    ctx.imageSmoothingQuality = 'high';
     if (drawFracs) {
       ctx.drawImage(
         off,
@@ -484,10 +462,10 @@ function ExpandedSlicePanel({
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === 'Escape') onClose();
     }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
   function handleClick(e: React.MouseEvent) {
@@ -506,10 +484,10 @@ function ExpandedSlicePanel({
       : { fx: panelFx, fy: panelFy };
     const [w, h, d] = dims;
     const next: VolumeCursor = { ...cursor };
-    if (plane === "coronal") {
+    if (plane === 'coronal') {
       next.x = Math.round(fx * (w - 1));
       next.z = Math.round((1 - fy) * (d - 1));
-    } else if (plane === "sagittal") {
+    } else if (plane === 'sagittal') {
       next.y = Math.round(fx * (h - 1));
       next.z = Math.round((1 - fy) * (d - 1));
     } else {
@@ -522,8 +500,8 @@ function ExpandedSlicePanel({
   function handleScrub(nextSlice: number) {
     if (!cursor) return;
     const i = nextSlice - 1;
-    if (plane === "coronal") setCursor({ ...cursor, y: i });
-    else if (plane === "sagittal") setCursor({ ...cursor, x: i });
+    if (plane === 'coronal') setCursor({ ...cursor, y: i });
+    else if (plane === 'sagittal') setCursor({ ...cursor, x: i });
     else setCursor({ ...cursor, z: i });
   }
 
@@ -548,7 +526,7 @@ function ExpandedSlicePanel({
   }
 
   const accentColor = PLANE_ACCENT[plane];
-  const [labelPrimary, labelSecondary] = PLANE_LABEL[plane].split(" · ");
+  const [labelPrimary, labelSecondary] = PLANE_LABEL[plane].split(' · ');
 
   return createPortal(
     <FullscreenOverlay
@@ -562,16 +540,8 @@ function ExpandedSlicePanel({
       <StyledCanvas ref={canvasRef} />
       {cross && (
         <CrosshairOverlay>
-          <CrossH
-            $top={cross.fy * 100}
-            $color={axisColor(axes.h)}
-            $glow={axisGlow(axes.h)}
-          />
-          <CrossV
-            $left={cross.fx * 100}
-            $color={axisColor(axes.v)}
-            $glow={axisGlow(axes.v)}
-          />
+          <CrossH $top={cross.fy * 100} $color={axisColor(axes.h)} $glow={axisGlow(axes.h)} />
+          <CrossV $left={cross.fx * 100} $color={axisColor(axes.v)} $glow={axisGlow(axes.v)} />
           <CrossCenter $left={cross.fx * 100} $top={cross.fy * 100}>
             <CrossDot />
           </CrossCenter>
@@ -580,9 +550,7 @@ function ExpandedSlicePanel({
       <PanelHeader>
         <PlaneGlyph $color={accentColor}>{PLANE_GLYPH[plane]}</PlaneGlyph>
         <PlaneLabel>
-          <PlaneLabelAccent $color={accentColor}>
-            {labelPrimary}
-          </PlaneLabelAccent>
+          <PlaneLabelAccent $color={accentColor}>{labelPrimary}</PlaneLabelAccent>
           {` · ${labelSecondary}`}
         </PlaneLabel>
       </PanelHeader>
@@ -668,11 +636,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
 
   const drawFracs = useMemo<DrawFracs | null>(() => {
     if (!dims || !spacing) return null;
-    return computeDrawFracs(
-      physicalAspect(plane, dims, spacing),
-      canvasSize.w,
-      canvasSize.h,
-    );
+    return computeDrawFracs(physicalAspect(plane, dims, spacing), canvasSize.w, canvasSize.h);
   }, [plane, dims, spacing, canvasSize]);
   const scrubVisible = useVolumeStore((s) => s.scrubVisible[plane]);
   const setScrubVisible = useVolumeStore((s) => s.setScrubVisible);
@@ -693,7 +657,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
   const isActive = activePlane === plane;
   const { idx, total } = sliceIndexInfo(plane, dims, cursor);
   const footer = PLANE_FOOTER[plane];
-  const isLast = plane === "axial";
+  const isLast = plane === 'axial';
 
   const cross = useMemo(() => {
     if (!dims || !cursor) return null;
@@ -703,10 +667,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
   }, [plane, dims, cursor, drawFracs]);
 
   const adjustedDots = useMemo(
-    () =>
-      drawFracs
-        ? measureDots.map((d) => imageToPanel(d.fx, d.fy, drawFracs))
-        : measureDots,
+    () => (drawFracs ? measureDots.map((d) => imageToPanel(d.fx, d.fy, drawFracs)) : measureDots),
     [measureDots, drawFracs],
   );
 
@@ -720,30 +681,25 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
     const ch = Math.max(1, Math.floor(canvasSize.h * dpr));
     if (canvas.width !== cw) canvas.width = cw;
     if (canvas.height !== ch) canvas.height = ch;
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    ctx.fillStyle = "#080604";
+    ctx.fillStyle = '#080604';
     ctx.fillRect(0, 0, cw, ch);
     if (!image) return;
 
-    if (!offscreen.current)
-      offscreen.current = document.createElement("canvas");
+    if (!offscreen.current) offscreen.current = document.createElement('canvas');
     const off = offscreen.current;
     off.width = image.width;
     off.height = image.height;
-    const octx = off.getContext("2d");
+    const octx = off.getContext('2d');
     if (!octx) return;
     octx.putImageData(
-      new ImageData(
-        image.data as Uint8ClampedArray<ArrayBuffer>,
-        image.width,
-        image.height,
-      ),
+      new ImageData(image.data as Uint8ClampedArray<ArrayBuffer>, image.width, image.height),
       0,
       0,
     );
     ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = "high";
+    ctx.imageSmoothingQuality = 'high';
     if (drawFracs) {
       ctx.drawImage(
         off,
@@ -772,10 +728,10 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
       : { fx: panelFx, fy: panelFy };
     const [w, h, d] = dims;
     const next: VolumeCursor = { ...cursor };
-    if (plane === "coronal") {
+    if (plane === 'coronal') {
       next.x = Math.round(fx * (w - 1));
       next.z = Math.round((1 - fy) * (d - 1));
-    } else if (plane === "sagittal") {
+    } else if (plane === 'sagittal') {
       next.y = Math.round(fx * (h - 1));
       next.z = Math.round((1 - fy) * (d - 1));
     } else {
@@ -788,8 +744,8 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
   function handleScrub(nextSlice: number) {
     if (!cursor) return;
     const i = nextSlice - 1;
-    if (plane === "coronal") setCursor({ ...cursor, y: i });
-    else if (plane === "sagittal") setCursor({ ...cursor, x: i });
+    if (plane === 'coronal') setCursor({ ...cursor, y: i });
+    else if (plane === 'sagittal') setCursor({ ...cursor, x: i });
     else setCursor({ ...cursor, z: i });
   }
 
@@ -802,7 +758,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
   }
 
   const accentColor = PLANE_ACCENT[plane];
-  const [labelPrimary, labelSecondary] = PLANE_LABEL[plane].split(" · ");
+  const [labelPrimary, labelSecondary] = PLANE_LABEL[plane].split(' · ');
 
   return (
     <PanelWrap
@@ -815,16 +771,8 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
       <StyledCanvas ref={canvasRef} />
       {cross && (
         <CrosshairOverlay>
-          <CrossH
-            $top={cross.fy * 100}
-            $color={axisColor(axes.h)}
-            $glow={axisGlow(axes.h)}
-          />
-          <CrossV
-            $left={cross.fx * 100}
-            $color={axisColor(axes.v)}
-            $glow={axisGlow(axes.v)}
-          />
+          <CrossH $top={cross.fy * 100} $color={axisColor(axes.h)} $glow={axisGlow(axes.h)} />
+          <CrossV $left={cross.fx * 100} $color={axisColor(axes.v)} $glow={axisGlow(axes.v)} />
           <CrossCenter $left={cross.fx * 100} $top={cross.fy * 100}>
             <CrossDot />
           </CrossCenter>
@@ -833,9 +781,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
       <PanelHeader>
         <PlaneGlyph $color={accentColor}>{PLANE_GLYPH[plane]}</PlaneGlyph>
         <PlaneLabel>
-          <PlaneLabelAccent $color={accentColor}>
-            {labelPrimary}
-          </PlaneLabelAccent>
+          <PlaneLabelAccent $color={accentColor}>{labelPrimary}</PlaneLabelAccent>
           {` · ${labelSecondary}`}
         </PlaneLabel>
       </PanelHeader>
@@ -889,9 +835,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
           onClose={closeMenu}
         />
       )}
-      {expanded && (
-        <ExpandedSlicePanel plane={plane} onClose={() => setExpanded(false)} />
-      )}
+      {expanded && <ExpandedSlicePanel plane={plane} onClose={() => setExpanded(false)} />}
     </PanelWrap>
   );
 }

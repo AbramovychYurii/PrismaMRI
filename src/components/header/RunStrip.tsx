@@ -1,5 +1,5 @@
-import styled from "styled-components";
-import { useVolumeStore } from "@/store";
+import { useVolumeStore } from '@/store';
+import styled from 'styled-components';
 
 // ── Styled components ──────────────────────────────────────────────────────
 
@@ -11,7 +11,7 @@ const StripGrid = styled.div`
 
 const RunCellWrap = styled.div<{ $last?: boolean }>`
   padding: 6px 18px;
-  border-right: ${({ $last }) => ($last ? "none" : "1px solid var(--rule)")};
+  border-right: ${({ $last }) => ($last ? 'none' : '1px solid var(--rule)')};
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -82,33 +82,31 @@ export function RunStrip() {
   let measureValue: string;
   let measureDim: string | undefined;
   if (!measurement) {
-    measureValue = "—";
+    measureValue = '—';
   } else if (measurement.distanceMm !== null) {
     measureValue = measurement.distanceMm.toFixed(1);
-    measureDim = "mm";
+    measureDim = 'mm';
   } else {
-    measureValue = "Set endpoint";
+    measureValue = 'Set endpoint';
   }
 
   return (
     <StripGrid>
-      <RunCell k="Scanner" v={meta?.scanner ?? "—"} />
+      <RunCell k="Scanner" v={meta?.scanner ?? '—'} />
       <RunCell
         k="Volume"
-        v={dims ? `${dims[0]} × ${dims[1]} × ${dims[2]}` : "—"}
-        dim={dims ? "vox" : undefined}
+        v={dims ? `${dims[0]} × ${dims[1]} × ${dims[2]}` : '—'}
+        dim={dims ? 'vox' : undefined}
       />
       <RunCell
         k="Spacing"
-        v={spacing ? spacing.map((s) => s.toFixed(2)).join(" × ") : "—"}
-        dim={spacing ? "mm" : undefined}
+        v={spacing ? spacing.map((s) => s.toFixed(2)).join(' × ') : '—'}
+        dim={spacing ? 'mm' : undefined}
       />
       <RunCell
         k="Modality"
-        v={meta?.modality ?? "—"}
-        dim={
-          meta?.bitsAllocated ? `· ${meta.bitsAllocated}-bit · HU` : undefined
-        }
+        v={meta?.modality ?? '—'}
+        dim={meta?.bitsAllocated ? `· ${meta.bitsAllocated}-bit · HU` : undefined}
       />
       <RunCellWrap $last>
         <RunKey>Measure</RunKey>

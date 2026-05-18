@@ -1,7 +1,7 @@
-import styled from "styled-components";
-import { useVolumeStore } from "@/store";
-import { SlicePanel } from "@/components/rail/SlicePanel";
-import type { SlicePlane } from "@/types";
+import { SlicePanel } from '@/components/rail/SlicePanel';
+import { useVolumeStore } from '@/store';
+import type { SlicePlane } from '@/types';
+import styled from 'styled-components';
 
 // ── Styled components ──────────────────────────────────────────────────────
 
@@ -16,7 +16,7 @@ const RailAside = styled.aside`
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
-const PLANES: SlicePlane[] = ["coronal", "sagittal", "axial"];
+const PLANES: SlicePlane[] = ['coronal', 'sagittal', 'axial'];
 
 export function Rail() {
   const railOpen = useVolumeStore((s) => s.toolbar.rail);

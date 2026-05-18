@@ -1,12 +1,9 @@
-import { useMemo } from 'react';
-import { useVolumeStore } from '@/store/volumeStore';
 import { extractSliceGrayImage } from '@/lib/volume/slices';
+import { useVolumeStore } from '@/store/volumeStore';
 import type { SliceImage, SlicePlane } from '@/types';
+import { useMemo } from 'react';
 
-function sliceIndexFor(
-  plane: SlicePlane,
-  cursor: { x: number; y: number; z: number },
-): number {
+function sliceIndexFor(plane: SlicePlane, cursor: { x: number; y: number; z: number }): number {
   if (plane === 'coronal') return cursor.y;
   if (plane === 'sagittal') return cursor.x;
   return cursor.z;

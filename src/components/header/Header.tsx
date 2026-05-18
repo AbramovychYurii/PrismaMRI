@@ -1,8 +1,8 @@
-import styled from "styled-components";
-import { BrandBlock } from "@/components/header/BrandBlock";
-import { RunStrip } from "@/components/header/RunStrip";
-import { useVolumeStore } from "@/store";
-import { accentRgba } from "@/constants";
+import { BrandBlock } from '@/components/header/BrandBlock';
+import { RunStrip } from '@/components/header/RunStrip';
+import { accentRgba } from '@/constants';
+import { useVolumeStore } from '@/store';
+import styled from 'styled-components';
 
 // ── Styled components ──────────────────────────────────────────────────────
 
@@ -32,7 +32,7 @@ const LoadingBar = styled.div<{ $width: number }>`
   width: ${({ $width }) => $width}%;
   background: var(--amber);
   transition: width 180ms ease-out;
-  box-shadow: 0 0 6px ${accentRgba("amber", 0.6)};
+  box-shadow: 0 0 6px ${accentRgba('amber', 0.6)};
 `;
 
 export function Header() {

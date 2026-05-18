@@ -1,7 +1,7 @@
-import { useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
-import styled from "styled-components";
-import { MapPin, Ruler, Trash2 } from "lucide-react";
+import { MapPin, Ruler, Trash2 } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import styled from 'styled-components';
 
 // ── Styled components ──────────────────────────────────────────────────────
 
@@ -90,13 +90,13 @@ export function MeasureMenu({
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     }
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === 'Escape') onClose();
     }
-    document.addEventListener("mousedown", onMouseDown);
-    document.addEventListener("keydown", onKey);
+    document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('keydown', onKey);
     return () => {
-      document.removeEventListener("mousedown", onMouseDown);
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('keydown', onKey);
     };
   }, [onClose]);
 
@@ -108,12 +108,7 @@ export function MeasureMenu({
   }
 
   return createPortal(
-    // biome-ignore lint/a11y/useKeyWithClickEvents: stop React portal event bubbling to slice panel
-    <Menu
-      ref={ref}
-      style={{ left: safeX, top: safeY }}
-      onClick={(e) => e.stopPropagation()}
-    >
+    <Menu ref={ref} style={{ left: safeX, top: safeY }} onClick={(e) => e.stopPropagation()}>
       <Item type="button" onClick={wrap(onMeasureFrom)}>
         <MapPin size={12} />
         Measure from here

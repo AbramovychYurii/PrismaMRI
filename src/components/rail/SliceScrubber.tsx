@@ -1,24 +1,24 @@
+import { PLANE_ACCENT } from '@/constants';
+import type { SlicePlane } from '@/types';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import {
+  type PointerEvent as RPointerEvent,
   useCallback,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
-  type PointerEvent as RPointerEvent,
-} from "react";
-import styled from "styled-components";
-import { ChevronUp, ChevronDown } from "lucide-react";
-import { PLANE_ACCENT } from "@/constants";
-import type { SlicePlane } from "@/types";
+} from 'react';
+import styled from 'styled-components';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
 const ACCENT = PLANE_ACCENT;
 
 const PLANE_NAME: Record<SlicePlane, string> = {
-  coronal: "Coronal",
-  sagittal: "Sagittal",
-  axial: "Axial",
+  coronal: 'Coronal',
+  sagittal: 'Sagittal',
+  axial: 'Axial',
 };
 
 const HOLD_DELAY_MS = 350;
@@ -28,8 +28,7 @@ const THUMB_PILL_H = 16;
 
 function prefersReducedMotion(): boolean {
   return (
-    typeof window !== "undefined" &&
-    window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+    typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
   );
 }
 
@@ -45,17 +44,16 @@ const ChevronBtn = styled.button<{
   flex-shrink: 0;
   border-radius: 3px;
   border: 1px solid
-    ${({ $hover }) => ($hover ? "var(--ink-4)" : "var(--rule-2)")};
-  background: ${({ $hover }) =>
-    $hover ? "rgba(28,24,18,0.95)" : "rgba(15,13,10,0.85)"};
-  color: ${({ $hover }) => ($hover ? "var(--ink)" : "var(--ink-2)")};
+    ${({ $hover }) => ($hover ? 'var(--ink-4)' : 'var(--rule-2)')};
+  background: ${({ $hover }) => ($hover ? 'rgba(28,24,18,0.95)' : 'rgba(15,13,10,0.85)')};
+  color: ${({ $hover }) => ($hover ? 'var(--ink)' : 'var(--ink-2)')};
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   padding: 0;
-  transform: ${({ $pressed }) => ($pressed ? "scale(0.94)" : "none")};
-  transition: ${({ $reduced }) => ($reduced ? "none" : "transform 80ms ease")};
+  transform: ${({ $pressed }) => ($pressed ? 'scale(0.94)' : 'none')};
+  transition: ${({ $reduced }) => ($reduced ? 'none' : 'transform 80ms ease')};
 `;
 
 const ScrubberContainer = styled.div<{ $visible: boolean; $reduced: boolean }>`
@@ -72,11 +70,9 @@ const ScrubberContainer = styled.div<{ $visible: boolean; $reduced: boolean }>`
   padding: 8px 6px 8px 4px;
   background: linear-gradient(to left, rgba(10, 8, 5, 0.85), transparent 70%);
   opacity: ${({ $visible }) => ($visible ? 1 : 0)};
-  transform: ${({ $visible }) =>
-    $visible ? "translateX(0)" : "translateX(8px)"};
-  pointer-events: ${({ $visible }) => ($visible ? "auto" : "none")};
-  transition: ${({ $reduced }) =>
-    $reduced ? "none" : "opacity 160ms ease, transform 160ms ease"};
+  transform: ${({ $visible }) => ($visible ? 'translateX(0)' : 'translateX(8px)')};
+  pointer-events: ${({ $visible }) => ($visible ? 'auto' : 'none')};
+  transition: ${({ $reduced }) => ($reduced ? 'none' : 'opacity 160ms ease, transform 160ms ease')};
 `;
 
 const TickSheet = styled.div`
@@ -164,7 +160,7 @@ function ChevronButton({
   label,
   onStep,
 }: {
-  dir: "up" | "down";
+  dir: 'up' | 'down';
   label: string;
   onStep: (delta: number) => void;
 }) {
@@ -172,7 +168,7 @@ function ChevronButton({
   const [pressed, setPressed] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const interval = useRef<ReturnType<typeof setInterval> | null>(null);
-  const delta = dir === "up" ? 1 : -1;
+  const delta = dir === 'up' ? 1 : -1;
   const reduced = prefersReducedMotion();
 
   const stopRepeat = useCallback(() => {
@@ -199,8 +195,7 @@ function ChevronButton({
     e.stopPropagation();
     stopRepeat();
   };
-  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) =>
-    e.stopPropagation();
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => e.stopPropagation();
   const handleMouseEnter = () => setHover(true);
   const handleMouseLeave = () => setHover(false);
 
@@ -219,20 +214,14 @@ function ChevronButton({
       $pressed={pressed}
       $reduced={reduced}
     >
-      {dir === "up" ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+      {dir === 'up' ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
     </ChevronBtn>
   );
 }
 
 // ── SliceScrubber ──────────────────────────────────────────────────────────
 
-export function SliceScrubber({
-  axis,
-  slice,
-  total,
-  visible,
-  onChange,
-}: SliceScrubberProps) {
+export function SliceScrubber({ axis, slice, total, visible, onChange }: SliceScrubberProps) {
   const accent = ACCENT[axis];
   const trackRef = useRef<HTMLDivElement>(null);
   const [trackH, setTrackH] = useState(0);
@@ -245,6 +234,7 @@ export function SliceScrubber({
   }, []);
 
   // Re-measure on mount, resize, and when toggled visible (height was 0).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `measure` is stable (useCallback), `visible` is intentional trigger
   useLayoutEffect(() => {
     measure();
   }, [measure, visible]);
@@ -271,9 +261,7 @@ export function SliceScrubber({
       const pct = Math.max(0, Math.min(1, y / usable));
       const next = Math.round((1 - pct) * (total - 1)) + 1;
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      rafRef.current = requestAnimationFrame(() =>
-        onChange(clampSlice(next, total)),
-      );
+      rafRef.current = requestAnimationFrame(() => onChange(clampSlice(next, total)));
     },
     [onChange, total],
   );
@@ -308,12 +296,12 @@ export function SliceScrubber({
 
   function handleKey(e: React.KeyboardEvent) {
     let next: number | null = null;
-    if (e.key === "ArrowUp") next = slice + 1;
-    else if (e.key === "ArrowDown") next = slice - 1;
-    else if (e.key === "PageUp") next = slice + 10;
-    else if (e.key === "PageDown") next = slice - 10;
-    else if (e.key === "Home") next = total;
-    else if (e.key === "End") next = 1;
+    if (e.key === 'ArrowUp') next = slice + 1;
+    else if (e.key === 'ArrowDown') next = slice - 1;
+    else if (e.key === 'PageUp') next = slice + 10;
+    else if (e.key === 'PageDown') next = slice - 10;
+    else if (e.key === 'Home') next = total;
+    else if (e.key === 'End') next = 1;
     if (next !== null) {
       e.preventDefault();
       e.stopPropagation();
@@ -328,10 +316,8 @@ export function SliceScrubber({
   const thumbY = Math.max(halfPill, Math.min(trackH - halfPill, thumbYRaw));
   const fillHeight = pct * usable;
 
-  const handleContainerPointerDown = (e: RPointerEvent<HTMLDivElement>) =>
-    e.stopPropagation();
-  const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) =>
-    e.stopPropagation();
+  const handleContainerPointerDown = (e: RPointerEvent<HTMLDivElement>) => e.stopPropagation();
+  const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation();
 
   return (
     <ScrubberContainer
@@ -359,12 +345,12 @@ export function SliceScrubber({
         onKeyDown={handleKey}
         style={{
           flex: 1,
-          width: "100%",
-          position: "relative",
-          cursor: "ns-resize",
+          width: '100%',
+          position: 'relative',
+          cursor: 'ns-resize',
           padding: `${INSET}px 0`,
-          outline: "none",
-          touchAction: "none",
+          outline: 'none',
+          touchAction: 'none',
         }}
       >
         {/* TICK SHEET */}

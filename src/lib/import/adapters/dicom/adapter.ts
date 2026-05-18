@@ -1,7 +1,11 @@
-import type { LoadedVolume, Vec3 } from '@/types';
-import { resolveWindowLevel } from '@/lib/volume/math';
+import {
+  type DicomTags,
+  parseImplicitLittleEndianDicom,
+  sortDicomSlices,
+} from '@/lib/import/adapters/dicom/reader';
 import type { ImportFormatAdapter, ImportSource, ProgressFn } from '@/lib/import/types';
-import { parseImplicitLittleEndianDicom, sortDicomSlices, type DicomTags } from '@/lib/import/adapters/dicom/reader';
+import { resolveWindowLevel } from '@/lib/volume/math';
+import type { LoadedVolume, Vec3 } from '@/types';
 
 function isDicomName(name: string): boolean {
   return name.endsWith('.dcm') || name.endsWith('.dicom') || name.endsWith('.ima');
@@ -99,7 +103,11 @@ export const dicomAdapter: ImportFormatAdapter = {
 
     // Z spacing from slice position delta, else slice thickness, else 1.
     let zSpacing = first.sliceThickness ?? 1;
-    if (sorted.length > 1 && sorted[0].tags.imagePositionPatient && sorted[1].tags.imagePositionPatient) {
+    if (
+      sorted.length > 1 &&
+      sorted[0].tags.imagePositionPatient &&
+      sorted[1].tags.imagePositionPatient
+    ) {
       const a = sorted[0].tags.imagePositionPatient;
       const b = sorted[1].tags.imagePositionPatient;
       const d = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
@@ -124,12 +132,7 @@ export const dicomAdapter: ImportFormatAdapter = {
       },
       scalarMin,
       scalarMax,
-      windowLevel: resolveWindowLevel(
-        scalarMin,
-        scalarMax,
-        first.windowCenter,
-        first.windowWidth,
-      ),
+      windowLevel: resolveWindowLevel(scalarMin, scalarMax, first.windowCenter, first.windowWidth),
       formatId: 'dicom',
     };
   },

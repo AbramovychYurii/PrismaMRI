@@ -1,5 +1,5 @@
-import styled from "styled-components";
-import { useVolumeStore } from "@/store";
+import { useVolumeStore } from '@/store';
+import styled from 'styled-components';
 
 // ── Styled components ──────────────────────────────────────────────────────
 
@@ -61,7 +61,7 @@ const SliderHint = styled.div`
 // ── Sub-components ─────────────────────────────────────────────────────────
 
 interface SliderRowProps {
-  name: "Window" | "Level";
+  name: 'Window' | 'Level';
   value: number;
   min: number;
   max: number;
@@ -70,20 +70,11 @@ interface SliderRowProps {
   onChange: (v: number) => void;
 }
 
-function SliderRow({
-  name,
-  value,
-  min,
-  max,
-  accent,
-  hint,
-  onChange,
-}: SliderRowProps) {
+function SliderRow({ name, value, min, max, accent, hint, onChange }: SliderRowProps) {
   const span = max - min || 1;
   const fill = `${Math.max(0, Math.min(100, ((value - min) / span) * 100))}%`;
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) =>
-    onChange(Number(e.target.value));
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => onChange(Number(e.target.value));
 
   return (
     <SliderRowWrap>
@@ -104,8 +95,8 @@ function SliderRow({
         onChange={handleChange}
         style={
           {
-            "--accent": accent,
-            "--fill": fill,
+            '--accent': accent,
+            '--fill': fill,
           } as React.CSSProperties
         }
       />

@@ -1,3 +1,4 @@
+import type { ImportSource } from '@/lib/import/types';
 import type {
   ImportProgress,
   LoadedVolume,
@@ -5,7 +6,6 @@ import type {
   PreparedVolumeFor3D,
   SliceWindowLevel,
 } from '@/types';
-import type { ImportSource } from '@/lib/import/types';
 
 export interface WorkerLoadRequest {
   type: 'load';

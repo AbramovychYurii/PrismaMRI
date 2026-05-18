@@ -1,7 +1,7 @@
-import { useState } from "react";
-import styled from "styled-components";
-import { useViewerActions } from "@/hooks";
-import { useVolumeStore } from "@/store";
+import { useViewerActions } from '@/hooks';
+import { useVolumeStore } from '@/store';
+import { useState } from 'react';
+import styled from 'styled-components';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -25,44 +25,44 @@ const BASE = import.meta.env.BASE_URL;
 // In dev the Vite plugin serves /examples/*.nrrd locally.
 // On GitHub Pages, LFS files must be fetched from GitHub's media CDN.
 const NRRD_BASE = import.meta.env.DEV
-  ? ""
-  : "https://media.githubusercontent.com/media/AbramovychYurii/PrismaMRI/main";
+  ? ''
+  : 'https://media.githubusercontent.com/media/AbramovychYurii/PrismaMRI/main';
 
 const EXAMPLES: ExampleMeta[] = [
   {
-    id: "maxillofacial_CBCT",
-    file: "maxillofacial_CBCT.nrrd",
-    title: "Maxilla",
-    subtitle: "upper jaw",
-    dims: "401 × 401 × 201",
-    spacing: "0.25 mm",
-    size: "32 MB",
-    description: "Upper jaw — high-resolution dental CT.",
-    tag: "CT",
+    id: 'maxillofacial_CBCT',
+    file: 'maxillofacial_CBCT.nrrd',
+    title: 'Maxilla',
+    subtitle: 'upper jaw',
+    dims: '401 × 401 × 201',
+    spacing: '0.25 mm',
+    size: '32 MB',
+    description: 'Upper jaw — high-resolution dental CT.',
+    tag: 'CT',
     thumbnail: `${BASE}examples/thumbnails/maxillofacial_CBCT.jpg`,
   },
   {
-    id: "dog_frontal_thorax_injured_paw_CT",
-    file: "dog_frontal_thorax_injured_paw_CT.nrrd",
-    title: "Canine",
-    subtitle: "thorax",
-    dims: "512 × 512 × 459",
-    spacing: "0.73 mm",
-    size: "131 MB",
-    description: "Canine forequarters with injured front paw.",
-    tag: "CT",
+    id: 'dog_frontal_thorax_injured_paw_CT',
+    file: 'dog_frontal_thorax_injured_paw_CT.nrrd',
+    title: 'Canine',
+    subtitle: 'thorax',
+    dims: '512 × 512 × 459',
+    spacing: '0.73 mm',
+    size: '131 MB',
+    description: 'Canine forequarters with injured front paw.',
+    tag: 'CT',
     thumbnail: `${BASE}examples/thumbnails/dog_frontal_thorax_injured_paw.jpg`,
   },
   {
-    id: "full_body",
-    file: "full_body.nrrd",
-    title: "Full body",
-    subtitle: "torso + pelvis",
-    dims: "512 × 512 × 996",
-    spacing: "0.83 mm",
-    size: "290 MB",
-    description: "Whole-body scan — sagittal view.",
-    tag: "CT",
+    id: 'full_body',
+    file: 'full_body.nrrd',
+    title: 'Full body',
+    subtitle: 'torso + pelvis',
+    dims: '512 × 512 × 996',
+    spacing: '0.83 mm',
+    size: '290 MB',
+    description: 'Whole-body scan — sagittal view.',
+    tag: 'CT',
     thumbnail: `${BASE}examples/thumbnails/full_body.png`,
   },
 ];
@@ -114,11 +114,11 @@ const CardButton = styled.button<{ $disabled: boolean; $hover: boolean }>`
   width: 100%;
   display: flex;
   flex-direction: column;
-  background: ${({ $hover }) => ($hover ? "var(--panel-2)" : "var(--panel)")};
-  border: 1px solid ${({ $hover }) => ($hover ? "var(--amber)" : "var(--rule)")};
+  background: ${({ $hover }) => ($hover ? 'var(--panel-2)' : 'var(--panel)')};
+  border: 1px solid ${({ $hover }) => ($hover ? 'var(--amber)' : 'var(--rule)')};
   border-radius: 4px;
   overflow: hidden;
-  cursor: ${({ $disabled }) => ($disabled ? "not-allowed" : "pointer")};
+  cursor: ${({ $disabled }) => ($disabled ? 'not-allowed' : 'pointer')};
   text-align: left;
   padding: 0;
   opacity: ${({ $disabled }) => ($disabled ? 0.45 : 1)};
@@ -126,8 +126,7 @@ const CardButton = styled.button<{ $disabled: boolean; $hover: boolean }>`
     border-color 150ms,
     background 150ms,
     opacity 150ms;
-  box-shadow: ${({ $hover }) =>
-    $hover ? "0 0 0 1px rgba(255,181,71,0.08)" : "none"};
+  box-shadow: ${({ $hover }) => ($hover ? '0 0 0 1px rgba(255,181,71,0.08)' : 'none')};
 `;
 
 const CornerTL = styled.span<{ $hover: boolean }>`
@@ -184,8 +183,7 @@ const ThumbnailImg = styled.img<{ $hover: boolean }>`
   height: 100%;
   object-fit: cover;
   display: block;
-  filter: ${({ $hover }) =>
-    $hover ? "brightness(1.1) contrast(1.05)" : "brightness(0.95)"};
+  filter: ${({ $hover }) => ($hover ? 'brightness(1.1) contrast(1.05)' : 'brightness(0.95)')};
   transition: filter 150ms;
 `;
 
@@ -257,18 +255,11 @@ function ExampleCard({
       <CornerTR aria-hidden="true" />
 
       {/* Modality badge — ink-2 = 8.9:1 contrast on dark overlay → passes WCAG AA */}
-      <ModalityBadge aria-label={`Modality: ${example.tag}`}>
-        {example.tag}
-      </ModalityBadge>
+      <ModalityBadge aria-label={`Modality: ${example.tag}`}>{example.tag}</ModalityBadge>
 
       {/* Thumbnail — fixed height, no aspect-ratio stretch */}
       <ThumbnailWrap>
-        <ThumbnailImg
-          src={example.thumbnail}
-          alt=""
-          aria-hidden="true"
-          $hover={showHover}
-        />
+        <ThumbnailImg src={example.thumbnail} alt="" aria-hidden="true" $hover={showHover} />
       </ThumbnailWrap>
 
       {/* Meta — visible text, aria-label on button provides full context */}
@@ -300,19 +291,15 @@ export function ExamplesSection() {
       <SectionHeader>
         <SectionTitle>Examples</SectionTitle>
         <SectionLabel aria-hidden="true">
-          {examplesDisabled ? "Loading…" : "Pre-loaded · Click to open"}
+          {examplesDisabled ? 'Loading…' : 'Pre-loaded · Click to open'}
         </SectionLabel>
       </SectionHeader>
 
       {/* Cards */}
-      <CardList role="list">
+      <CardList>
         {EXAMPLES.map((ex) => (
           <li key={ex.id}>
-            <ExampleCard
-              example={ex}
-              disabled={examplesDisabled}
-              onLoad={handleLoad(ex)}
-            />
+            <ExampleCard example={ex} disabled={examplesDisabled} onLoad={handleLoad(ex)} />
           </li>
         ))}
       </CardList>

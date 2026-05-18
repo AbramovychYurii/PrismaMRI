@@ -1,7 +1,7 @@
-import { gunzipSync } from 'fflate';
-import type { LoadedVolume, Vec3 } from '@/types';
-import { resolveWindowLevel } from '@/lib/volume/math';
 import type { ImportFormatAdapter, ImportSource, ProgressFn } from '@/lib/import/types';
+import { resolveWindowLevel } from '@/lib/volume/math';
+import type { LoadedVolume, Vec3 } from '@/types';
+import { gunzipSync } from 'fflate';
 
 function isMhaName(name: string): boolean {
   return name.endsWith('.mha') || name.endsWith('.mhd');

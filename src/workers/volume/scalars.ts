@@ -106,11 +106,7 @@ export function percentile(h: ScalarHistogram, p: number): number {
 /**
  * Robust scalar range, trimming outliers via the 0.5th / 99.5th percentiles.
  */
-export function resolveScalarRange(
-  h: ScalarHistogram,
-  lo = 0.005,
-  hi = 0.995,
-): [number, number] {
+export function resolveScalarRange(h: ScalarHistogram, lo = 0.005, hi = 0.995): [number, number] {
   const [l, r] = batchPercentile(h, [lo, hi]);
   return [l, r];
 }
@@ -129,16 +125,25 @@ export function otsuBin(h: ScalarHistogram): number {
   let totalMean = 0;
   for (let i = 0; i < n; i++) totalMean += i * h.bins[i];
 
-  let sumB = 0, countB = 0, bestVar = 0, bestBin = 0;
+  let sumB = 0;
+  let countB = 0;
+  let bestVar = 0;
+  let bestBin = 0;
   for (let i = 0; i < n; i++) {
     countB += h.bins[i];
     const countF = total - countB;
-    if (countB === 0 || countF === 0) { sumB += i * h.bins[i]; continue; }
+    if (countB === 0 || countF === 0) {
+      sumB += i * h.bins[i];
+      continue;
+    }
     sumB += i * h.bins[i];
     const meanB = sumB / countB;
     const meanF = (totalMean - sumB) / countF;
     const between = (countB / total) * (countF / total) * (meanB - meanF) ** 2;
-    if (between > bestVar) { bestVar = between; bestBin = i; }
+    if (between > bestVar) {
+      bestVar = between;
+      bestBin = i;
+    }
   }
   return bestBin;
 }

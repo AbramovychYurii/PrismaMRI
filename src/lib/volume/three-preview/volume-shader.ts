@@ -1,5 +1,5 @@
-import * as THREE from "three";
-import type { RenderPreset } from "@/types";
+import type { RenderPreset } from '@/types';
+import * as THREE from 'three';
 
 export type { RenderPreset };
 
@@ -20,14 +20,14 @@ export function buildTransferFunction(preset: RenderPreset): THREE.DataTexture {
 
   for (let i = 0; i < N; i++) {
     const t = i / (N - 1);
-    let r = 0,
-      g = 0,
-      b = 0,
-      a = 0;
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    let a = 0;
 
     switch (preset) {
       // ── MIP – warm grayscale ramp ────────────────────────────────────────
-      case "mip": {
+      case 'mip': {
         const lum = Math.round(18 + t * 237);
         r = lum;
         g = Math.round(lum * 0.97);
@@ -37,34 +37,34 @@ export function buildTransferFunction(preset: RenderPreset): THREE.DataTexture {
       }
 
       // ── Tissue – air/water/muscle/fat/marrow segmentation ────────────────
-      case "tissue": {
+      case 'tissue': {
         if (t < 0.06) {
           // air / background → transparent
           a = 0;
-        } else if (t < 0.30) {
+        } else if (t < 0.3) {
           // fluid / dark soft-tissue → cool blue-grey
-          const s = (t - 0.06) / (0.30 - 0.06);
+          const s = (t - 0.06) / (0.3 - 0.06);
           r = Math.round(lerp(65, 145, s));
           g = Math.round(lerp(85, 165, s));
           b = Math.round(lerp(125, 195, s));
           a = Math.round(lerp(12, 90, s));
         } else if (t < 0.58) {
           // muscle / soft tissue → warm red-brown (brighter)
-          const s = (t - 0.30) / (0.58 - 0.30);
+          const s = (t - 0.3) / (0.58 - 0.3);
           r = Math.round(lerp(200, 238, s));
           g = Math.round(lerp(90, 118, s));
           b = Math.round(lerp(65, 75, s));
           a = Math.round(lerp(110, 185, s));
-        } else if (t < 0.80) {
+        } else if (t < 0.8) {
           // fat → golden yellow
-          const s = (t - 0.58) / (0.80 - 0.58);
+          const s = (t - 0.58) / (0.8 - 0.58);
           r = Math.round(lerp(240, 252, s));
           g = Math.round(lerp(200, 228, s));
           b = Math.round(lerp(65, 105, s));
           a = Math.round(lerp(195, 235, s));
         } else {
           // bright marrow / dense tissue → cream white
-          const s = (t - 0.80) / (1.0 - 0.80);
+          const s = (t - 0.8) / (1.0 - 0.8);
           r = Math.round(lerp(252, 255, s));
           g = Math.round(lerp(245, 255, s));
           b = Math.round(lerp(220, 245, s));
@@ -74,7 +74,7 @@ export function buildTransferFunction(preset: RenderPreset): THREE.DataTexture {
       }
 
       // ── Bone – highlight dense bright structures ─────────────────────────
-      case "bone": {
+      case 'bone': {
         if (t < 0.52) {
           a = 0; // soft tissue & fluid → transparent
         } else if (t < 0.68) {
@@ -92,7 +92,6 @@ export function buildTransferFunction(preset: RenderPreset): THREE.DataTexture {
         }
         break;
       }
-
     }
 
     data[i * 4 + 0] = Math.max(0, Math.min(255, Math.round(r)));

@@ -1,1 +1,1 @@
-export { useVolumeStore, type AppView } from "./volumeStore";
+export { useVolumeStore, type AppView } from './volumeStore';

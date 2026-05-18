@@ -1,7 +1,7 @@
-import { useCallback, useEffect } from 'react';
-import { useVolumeStore } from '@/store/volumeStore';
 import { clamp } from '@/lib/volume/math';
+import { useVolumeStore } from '@/store/volumeStore';
 import type { SlicePlane } from '@/types';
+import { useCallback, useEffect } from 'react';
 
 function axisFor(plane: SlicePlane): 'x' | 'y' | 'z' {
   return plane === 'coronal' ? 'y' : plane === 'sagittal' ? 'x' : 'z';

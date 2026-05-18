@@ -1,5 +1,5 @@
-import styled from "styled-components";
-import { useVolumeStore } from "@/store";
+import { useVolumeStore } from '@/store';
+import styled from 'styled-components';
 
 // ── Styled components ──────────────────────────────────────────────────────
 
@@ -60,34 +60,24 @@ export function StudyCell() {
   const volume = useVolumeStore((s) => s.volume);
   const meta = volume?.meta;
 
-  const voxelCount = meta?.dims
-    ? meta.dims[0] * meta.dims[1] * meta.dims[2]
-    : 0;
+  const voxelCount = meta?.dims ? meta.dims[0] * meta.dims[1] * meta.dims[2] : 0;
   const bytes = voxelCount * 2;
 
   return (
     <StudyGrid>
-      <Row k="ID" v={meta?.studyId ?? "—"} />
-      <Row k="Acquired" v={meta?.acquired ?? "—"} />
-      <Row k="Protocol" v={meta?.protocol ?? "—"} />
+      <Row k="ID" v={meta?.studyId ?? '—'} />
+      <Row k="Acquired" v={meta?.acquired ?? '—'} />
+      <Row k="Protocol" v={meta?.protocol ?? '—'} />
       <Row
         k="Voxels"
-        v={
-          voxelCount
-            ? voxelCount.toLocaleString("en-US").replace(/,/g, " ")
-            : "—"
-        }
+        v={voxelCount ? voxelCount.toLocaleString('en-US').replace(/,/g, ' ') : '—'}
         dim={voxelCount ? `· ${formatBytes(bytes)}` : undefined}
       />
       <Row
         k="Range"
-        v={
-          volume
-            ? `${Math.round(volume.scalarMin)} → ${Math.round(volume.scalarMax)} HU`
-            : "—"
-        }
+        v={volume ? `${Math.round(volume.scalarMin)} → ${Math.round(volume.scalarMax)} HU` : '—'}
       />
-      <Row k="Source" v={volume ? "Local · in-memory" : "—"} />
+      <Row k="Source" v={volume ? 'Local · in-memory' : '—'} />
     </StudyGrid>
   );
 }

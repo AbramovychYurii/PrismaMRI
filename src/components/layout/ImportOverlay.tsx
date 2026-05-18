@@ -1,19 +1,19 @@
-import { useState } from "react";
-import styled from "styled-components";
-import { FolderOpen } from "lucide-react";
-import { useVolumeStore } from "@/store";
-import { useViewerActions } from "@/hooks";
-import { APP_NAME } from "@/constants";
-import { ExamplesSection } from "@/components/layout/ExamplesSection";
+import { ExamplesSection } from '@/components/layout/ExamplesSection';
+import { APP_NAME } from '@/constants';
+import { useViewerActions } from '@/hooks';
+import { useVolumeStore } from '@/store';
+import { FolderOpen } from 'lucide-react';
+import { useState } from 'react';
+import styled from 'styled-components';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
 const FORMATS = [
-  { token: "DCM", rest: " series" },
-  { token: "NII", rest: " · nii.gz" },
-  { token: "MHA", rest: " · mhd" },
-  { token: "NRRD", rest: "" },
-  { token: "ZIP", rest: "" },
+  { token: 'DCM', rest: ' series' },
+  { token: 'NII', rest: ' · nii.gz' },
+  { token: 'MHA', rest: ' · mhd' },
+  { token: 'NRRD', rest: '' },
+  { token: 'ZIP', rest: '' },
 ];
 
 interface FsEntry {
@@ -27,14 +27,10 @@ interface FsEntry {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-async function collectFromEntry(
-  entry: FsEntry,
-  path: string,
-  out: File[],
-): Promise<void> {
+async function collectFromEntry(entry: FsEntry, path: string, out: File[]): Promise<void> {
   if (entry.isFile) {
     const file = await new Promise<File>((res) => entry.file(res));
-    Object.defineProperty(file, "webkitRelativePath", {
+    Object.defineProperty(file, 'webkitRelativePath', {
       value: path ? `${path}/${file.name}` : file.name,
       configurable: true,
     });
@@ -43,8 +39,7 @@ async function collectFromEntry(
   }
   if (entry.isDirectory) {
     const reader = entry.createReader();
-    const readBatch = () =>
-      new Promise<FsEntry[]>((res) => reader.readEntries(res));
+    const readBatch = () => new Promise<FsEntry[]>((res) => reader.readEntries(res));
     let batch = await readBatch();
     while (batch.length > 0) {
       for (const e of batch) {
@@ -180,9 +175,9 @@ const DisclaimerText = styled.p`
 const DropZone = styled.div<{ $hover: boolean }>`
   position: relative;
   min-height: 280px;
-  background: ${({ $hover }) => ($hover ? "var(--panel-2)" : "var(--panel)")};
+  background: ${({ $hover }) => ($hover ? 'var(--panel-2)' : 'var(--panel)')};
   border: 1px dashed
-    ${({ $hover }) => ($hover ? "var(--amber)" : "var(--rule-2)")};
+    ${({ $hover }) => ($hover ? 'var(--amber)' : 'var(--rule-2)')};
   border-radius: 4px;
   display: flex;
   flex-direction: column;
@@ -279,7 +274,7 @@ export function ImportOverlay() {
     if (entries.length > 0) {
       const files: File[] = [];
       for (const entry of entries) {
-        await collectFromEntry(entry, "", files);
+        await collectFromEntry(entry, '', files);
       }
       if (files.length > 0) {
         openFiles(files);
@@ -315,9 +310,8 @@ export function ImportOverlay() {
             </MainTitle>
 
             <DescParagraph>
-              Drop a DICOM folder, NIfTI bundle, MHA stack, NRRD, or compressed
-              archive. Parsing runs in workers; the volume is held in memory
-              only for the duration of this session.
+              Drop a DICOM folder, NIfTI bundle, MHA stack, NRRD, or compressed archive. Parsing
+              runs in workers; the volume is held in memory only for the duration of this session.
             </DescParagraph>
 
             <FormatList aria-label="Supported formats">
@@ -342,7 +336,7 @@ export function ImportOverlay() {
           {/* ── Right column: drop zone ── */}
           <div>
             <DropZone
-              role="region"
+              as="section"
               aria-label="Drag-and-drop target — drop a volume file here to open it"
               onMouseEnter={handleMouseEnter}
               onMouseLeave={handleMouseLeave}
@@ -359,20 +353,16 @@ export function ImportOverlay() {
                 aria-hidden="true"
                 focusable={false}
                 size={64}
-                style={{ color: "var(--amber)", marginBottom: 22 }}
+                style={{ color: 'var(--amber)', marginBottom: 22 }}
               />
 
               {/* Loading status announced to screen readers */}
               <LoadingTitle aria-live="polite" aria-atomic="true">
-                {loading.active
-                  ? loading.message || "Loading…"
-                  : "Drop volume to begin"}
+                {loading.active ? loading.message || 'Loading…' : 'Drop volume to begin'}
               </LoadingTitle>
 
               <LoadingSubText aria-hidden="true">
-                {loading.active
-                  ? `${loading.percent}%`
-                  : "DICOM · NIfTI · MHA · NRRD · ZIP"}
+                {loading.active ? `${loading.percent}%` : 'DICOM · NIfTI · MHA · NRRD · ZIP'}
               </LoadingSubText>
 
               <ButtonsRow>

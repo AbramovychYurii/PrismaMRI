@@ -38,9 +38,7 @@ export function fetchBlobWithProgress(
         xhr.responseType = 'blob';
 
         xhr.onprogress = (event) => {
-          const total = event.lengthComputable
-            ? event.total
-            : (probedTotal ?? 0);
+          const total = event.lengthComputable ? event.total : (probedTotal ?? 0);
           report(event.loaded, total);
         };
 

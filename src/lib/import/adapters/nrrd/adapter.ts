@@ -1,13 +1,16 @@
-import { gunzipSync } from 'fflate';
-import type { LoadedVolume, Vec3 } from '@/types';
-import { resolveWindowLevel } from '@/lib/volume/math';
 import type { ImportFormatAdapter, ImportSource, ProgressFn } from '@/lib/import/types';
+import { resolveWindowLevel } from '@/lib/volume/math';
+import type { LoadedVolume, Vec3 } from '@/types';
+import { gunzipSync } from 'fflate';
 
 function isNrrdName(name: string): boolean {
   return name.endsWith('.nrrd') || name.endsWith('.nhdr');
 }
 
-const TYPE_MAP: Record<string, { bytes: number; read: (dv: DataView, o: number, le: boolean) => number }> = {
+const TYPE_MAP: Record<
+  string,
+  { bytes: number; read: (dv: DataView, o: number, le: boolean) => number }
+> = {
   'signed char': { bytes: 1, read: (d, o) => d.getInt8(o) },
   int8: { bytes: 1, read: (d, o) => d.getInt8(o) },
   'unsigned char': { bytes: 1, read: (d, o) => d.getUint8(o) },
@@ -89,10 +92,7 @@ export const nrrdAdapter: ImportFormatAdapter = {
     // Integer sources that fit Int16 stay Int16 (halves memory on big 16-bit
     // volumes); ushort/uint/float widen to Float32.
     const fitsI16 =
-      desc.bytes === 1 ||
-      type === 'short' ||
-      type === 'int16' ||
-      type === 'signed short';
+      desc.bytes === 1 || type === 'short' || type === 'int16' || type === 'signed short';
     const out: Float32Array | Int16Array = fitsI16
       ? new Int16Array(count)
       : new Float32Array(count);
@@ -103,9 +103,7 @@ export const nrrdAdapter: ImportFormatAdapter = {
     let spacing: Vec3 = [1, 1, 1];
     const sd = fields.get('space directions');
     if (sd) {
-      const vecs = [...sd.matchAll(/\(([^)]+)\)/g)].map((mm) =>
-        mm[1].split(',').map(Number),
-      );
+      const vecs = [...sd.matchAll(/\(([^)]+)\)/g)].map((mm) => mm[1].split(',').map(Number));
       if (vecs.length >= 3) {
         spacing = [
           Math.hypot(...vecs[0]) || 1,

@@ -1,5 +1,5 @@
+import { buildInt16WLLut, grayToRgba, mapIntensityToGray } from '@/lib/volume/math';
 import type { LoadedVolume, SliceImage, SlicePlane, SliceWindowLevel } from '@/types';
-import { mapIntensityToGray, grayToRgba, buildInt16WLLut } from '@/lib/volume/math';
 
 const MAX_CACHE = 64;
 
@@ -20,7 +20,7 @@ function cacheKey(plane: SlicePlane, index: number, wl: SliceWindowLevel): strin
 function getEntry(volume: LoadedVolume): CacheEntry {
   let e = cache.get(volume);
   if (!e) {
-    e = { order: [], map: new Map(), lut: null, lutWindow: NaN, lutLevel: NaN };
+    e = { order: [], map: new Map(), lut: null, lutWindow: Number.NaN, lutLevel: Number.NaN };
     cache.set(volume, e);
   }
   return e;
@@ -64,7 +64,8 @@ export function extractAxialImage(
     for (let i = 0; i < total; i++) {
       const g = lut[(vox[base + i] as number) + 32768];
       const o = i * 4;
-      data[o] = data[o + 1] = data[o + 2] = g; data[o + 3] = 255;
+      data[o] = data[o + 1] = data[o + 2] = g;
+      data[o + 3] = 255;
     }
   } else {
     for (let i = 0; i < total; i++) {
@@ -94,7 +95,8 @@ export function extractCoronalImage(
       for (let x = 0; x < w; x++) {
         const g = lut[(vox[base + x] as number) + 32768];
         const o = (dstRow + x) * 4;
-        data[o] = data[o + 1] = data[o + 2] = g; data[o + 3] = 255;
+        data[o] = data[o + 1] = data[o + 2] = g;
+        data[o + 3] = 255;
       }
     } else {
       for (let x = 0; x < w; x++) {
@@ -125,7 +127,8 @@ export function extractSagittalImage(
       for (let y = 0; y < h; y++) {
         const g = lut[(vox[x + w * y + zBase] as number) + 32768];
         const o = (dstRow + y) * 4;
-        data[o] = data[o + 1] = data[o + 2] = g; data[o + 3] = 255;
+        data[o] = data[o + 1] = data[o + 2] = g;
+        data[o + 3] = 255;
       }
     } else {
       for (let y = 0; y < h; y++) {

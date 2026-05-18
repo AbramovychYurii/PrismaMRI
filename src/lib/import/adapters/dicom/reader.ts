@@ -178,9 +178,7 @@ export function parseImplicitLittleEndianDicom(
         break;
       }
       case T.ImageOrientation:
-        tags.imageOrientationPatient = parseNumberList(
-          decodeString(view, r.valueOffset, r.length),
-        );
+        tags.imageOrientationPatient = parseNumberList(decodeString(view, r.valueOffset, r.length));
         break;
       case T.SliceLocation:
         tags.sliceLocation = Number.parseFloat(decodeString(view, r.valueOffset, r.length));
@@ -195,8 +193,7 @@ export function parseImplicitLittleEndianDicom(
         tags.columns = view.getUint16(r.valueOffset, true);
         break;
       case T.NumberOfFrames:
-        tags.numberOfFrames =
-          Number.parseInt(decodeString(view, r.valueOffset, r.length), 10) || 1;
+        tags.numberOfFrames = Number.parseInt(decodeString(view, r.valueOffset, r.length), 10) || 1;
         break;
       case T.PixelSpacing: {
         const ps = parseNumberList(decodeString(view, r.valueOffset, r.length));
@@ -219,17 +216,14 @@ export function parseImplicitLittleEndianDicom(
         tags.windowWidth = parseNumberList(decodeString(view, r.valueOffset, r.length))[0];
         break;
       case T.RescaleIntercept:
-        tags.rescaleIntercept =
-          Number.parseFloat(decodeString(view, r.valueOffset, r.length)) || 0;
+        tags.rescaleIntercept = Number.parseFloat(decodeString(view, r.valueOffset, r.length)) || 0;
         break;
       case T.RescaleSlope:
-        tags.rescaleSlope =
-          Number.parseFloat(decodeString(view, r.valueOffset, r.length)) || 1;
+        tags.rescaleSlope = Number.parseFloat(decodeString(view, r.valueOffset, r.length)) || 1;
         break;
       case T.PixelData:
         tags.pixelDataOffset = r.valueOffset;
-        tags.pixelDataLength =
-          r.length === 0xffffffff ? view.byteLength - r.valueOffset : r.length;
+        tags.pixelDataLength = r.length === 0xffffffff ? view.byteLength - r.valueOffset : r.length;
         if (headerOnly) {
           return finalize(tags);
         }
@@ -328,11 +322,7 @@ export function computeDicomSliceLocation(t: DicomTags): number {
   if (iop && iop.length >= 6 && ipp) {
     const r = [iop[0], iop[1], iop[2]];
     const c = [iop[3], iop[4], iop[5]];
-    const n = [
-      r[1] * c[2] - r[2] * c[1],
-      r[2] * c[0] - r[0] * c[2],
-      r[0] * c[1] - r[1] * c[0],
-    ];
+    const n = [r[1] * c[2] - r[2] * c[1], r[2] * c[0] - r[0] * c[2], r[0] * c[1] - r[1] * c[0]];
     return ipp[0] * n[0] + ipp[1] * n[1] + ipp[2] * n[2];
   }
   if (t.sliceLocation !== undefined && Number.isFinite(t.sliceLocation)) {
