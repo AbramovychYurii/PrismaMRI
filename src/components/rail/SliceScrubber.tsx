@@ -24,6 +24,7 @@ const PLANE_NAME: Record<SlicePlane, string> = {
 const HOLD_DELAY_MS = 350;
 const HOLD_REPEAT_MS = 50;
 const INSET = 4;
+const THUMB_PILL_H = 16;
 
 function prefersReducedMotion(): boolean {
   return (
@@ -123,12 +124,13 @@ const ThumbPill = styled.div<{ $top: number; $accent: string }>`
   left: 50%;
   top: ${({ $top }) => $top}px;
   width: 26px;
-  height: 16px;
+  height: ${THUMB_PILL_H}px;
   transform: translate(-50%, -50%);
   border-radius: 3px;
-  background: rgba(28, 24, 18, 0.95);
+  background: color-mix(in srgb, ${({ $accent }) => $accent} 90%, transparent);
   border: 1px solid ${({ $accent }) => $accent};
-  color: ${({ $accent }) => $accent};
+  z-index: 1;
+  color: var(--bg);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -137,15 +139,6 @@ const ThumbPill = styled.div<{ $top: number; $accent: string }>`
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
-`;
-
-const ThumbLine = styled.span`
-  position: absolute;
-  left: -3px;
-  right: -3px;
-  top: 50%;
-  border-top: 1px solid currentColor;
-  opacity: 0.6;
 `;
 
 const ToggleButton = styled.button<{
@@ -351,7 +344,9 @@ export function SliceScrubber({
 
   const usable = Math.max(0, trackH - INSET * 2);
   const pct = total > 1 ? (slice - 1) / (total - 1) : 0;
-  const thumbY = INSET + (1 - pct) * usable;
+  const halfPill = THUMB_PILL_H / 2;
+  const thumbYRaw = INSET + (1 - pct) * usable;
+  const thumbY = Math.max(halfPill, Math.min(trackH - halfPill, thumbYRaw));
   const fillHeight = pct * usable;
 
   const handleContainerPointerDown = (e: RPointerEvent<HTMLDivElement>) =>
@@ -401,7 +396,6 @@ export function SliceScrubber({
         <FillBar aria-hidden $height={fillHeight} $accent={accent} />
         {/* THUMB */}
         <ThumbPill aria-hidden $top={thumbY} $accent={accent}>
-          <ThumbLine />
           {slice}
         </ThumbPill>
       </div>

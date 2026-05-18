@@ -2,7 +2,6 @@ import { useRef } from "react";
 import styled, { css } from "styled-components";
 import { useThreePreview } from "@/hooks";
 import { useVolumeStore } from "@/store";
-import { RegistrationMarks } from "@/components/stage/RegistrationMarks";
 import { ToolbarPill } from "@/components/stage/ToolbarPill";
 import { TickScale } from "@/components/stage/TickScale";
 
@@ -68,17 +67,6 @@ const TitleGroup = styled.div`
   min-width: 0;
 `;
 
-const VolumeTitle = styled.div`
-  font-family: var(--serif);
-  font-size: 22px;
-  line-height: 1;
-  font-weight: 400;
-  letter-spacing: -0.005em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-`;
-
 const VolumeSubLabel = styled.div`
   font-family: var(--mono);
   font-size: 10.5px;
@@ -102,9 +90,7 @@ export function Stage() {
       {!hasVolume && (
         <NoVolumePlaceholder>No volume loaded</NoVolumePlaceholder>
       )}
-      <RegistrationMarks />
       <TitleGroup>
-        <VolumeTitle>Main volume</VolumeTitle>
         <VolumeSubLabel>Ray-cast · native res</VolumeSubLabel>
       </TitleGroup>
       <ToolbarPill />
