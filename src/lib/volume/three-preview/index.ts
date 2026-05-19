@@ -41,6 +41,21 @@ export class ThreePreview {
   private readonly _fwdWorld = new THREE.Vector3();
   private readonly _fwdVoxel = new THREE.Vector3();
 
+  // ── Snap-to-plane animation state ─────────────────────────────────────────
+  private _snapActive = false;
+  private _snapStartTs = 0;
+  private readonly _snapFromPos = new THREE.Vector3();
+  private readonly _snapToPos = new THREE.Vector3();
+  private readonly _snapFromUp = new THREE.Vector3();
+  private readonly _snapToUp = new THREE.Vector3();
+  private readonly _snapCenter = new THREE.Vector3();
+  private _snapRadius = 1;
+  /** Volume center in world space — kept for snap target. */
+  private readonly _volumeCenter = new THREE.Vector3();
+  // Dedicated scratch objects for the snap animation (not reused elsewhere).
+  private readonly _snapDirA = new THREE.Vector3();
+  private readonly _snapDirB = new THREE.Vector3();
+
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({
       canvas,
@@ -77,6 +92,7 @@ export class ThreePreview {
       (dims[1] / 2 - 0.5) * sy,
       (dims[2] / 2 - 0.5) * sz,
     );
+    this._volumeCenter.copy(center);
     const maxEdge = Math.max(dims[0] * sx, dims[1] * sy, dims[2] * sz);
     this.sceneSize = maxEdge;
 
@@ -179,6 +195,13 @@ export class ThreePreview {
     this.dirty = true;
   }
 
+  setClipMode(enabled: boolean): void {
+    const m = this.volume?.material;
+    if (!m) return;
+    m.uniforms.u_clipMode.value = enabled ? 1 : 0;
+    this.dirty = true;
+  }
+
   setPlaneMode(mode: PlanesMode, activePlane: SlicePlane): void {
     this.cursorPlanes.setMode(mode, activePlane);
     const m = this.volume?.material;
@@ -188,6 +211,50 @@ export class ThreePreview {
         activePlane === 'coronal' ? 0 : activePlane === 'sagittal' ? 1 : 2;
     }
     this.dirty = true;
+  }
+
+  // ── Snap-to-plane ──────────────────────────────────────────────────────────
+
+  /**
+   * Smoothly animate the camera to the standard anatomical view for `plane`.
+   * The camera distance (zoom) is preserved; only orientation changes.
+   *
+   * View conventions (matching 2-D slice panel layout):
+   *   coronal  — looking along -Y, Z up   (frontal / anterior view)
+   *   sagittal — looking along +X, Z up   (right lateral view)
+   *   axial    — looking along +Z, -Y up  (superior / top-down view)
+   */
+  snapToPlane(plane: SlicePlane): void {
+    if (!this.controls) return;
+
+    const center = this.controls.target;
+    const radius = this.camera.position.distanceTo(center);
+
+    // Target camera direction (unit vector FROM center TO camera) and up vector.
+    const dirMap: Record<SlicePlane, [THREE.Vector3, THREE.Vector3]> = {
+      coronal:  [new THREE.Vector3(0, -1,  0), new THREE.Vector3(0, 0,  1)],
+      sagittal: [new THREE.Vector3(1,  0,  0), new THREE.Vector3(0, 0,  1)],
+      axial:    [new THREE.Vector3(0,  0,  1), new THREE.Vector3(0, -1, 0)],
+    };
+    const [dir, up] = dirMap[plane];
+
+    this._snapFromPos.copy(this.camera.position);
+    this._snapFromUp.copy(this.camera.up);
+    this._snapToPos.copy(center).addScaledVector(dir, radius);
+    this._snapToUp.copy(up);
+    this._snapCenter.copy(center);
+    this._snapRadius = radius;
+    this._snapStartTs = 0; // will be set on first animation frame
+    this._snapActive = true;
+
+    // Suspend trackball during animation so it doesn't fight us.
+    this.controls.enabled = false;
+    this.dirty = true;
+  }
+
+  private _easeInOut(t: number): number {
+    // Cubic ease-in-out
+    return t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
   }
 
   // ── Resize ─────────────────────────────────────────────────────────────────
@@ -233,10 +300,53 @@ export class ThreePreview {
     vol.material.uniforms.u_rayDirVox.value.copy(this._fwdVoxel);
   }
 
-  private loop = (): void => {
+  private loop = (ts = 0): void => {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.loop);
-    this.controls?.update();
+
+    // ── Snap animation ───────────────────────────────────────────────────────
+    if (this._snapActive) {
+      // Latch start timestamp on the first frame of this animation.
+      if (this._snapStartTs === 0) this._snapStartTs = ts;
+
+      const DURATION = 400;
+      const raw = Math.min(1, (ts - this._snapStartTs) / DURATION);
+      const e = this._easeInOut(raw);
+
+      // Lerp the two direction vectors, re-normalise → great-circle interpolation,
+      // no per-frame quaternion allocation needed.
+      this._snapDirA.copy(this._snapFromPos).sub(this._snapCenter).normalize();
+      this._snapDirB.copy(this._snapToPos).sub(this._snapCenter).normalize();
+      this._snapDirA.lerpVectors(this._snapDirA, this._snapDirB, e).normalize();
+      this.camera.position
+        .copy(this._snapCenter)
+        .addScaledVector(this._snapDirA, this._snapRadius);
+
+      // Lerp up vector and re-aim.
+      this.camera.up.lerpVectors(this._snapFromUp, this._snapToUp, e).normalize();
+      this.camera.lookAt(this._snapCenter);
+
+      if (raw >= 1) {
+        this._snapActive = false;
+        this._snapStartTs = 0;
+        // Final frame: set camera exactly at target position before handing
+        // control back, so TrackballControls picks up the correct _eye vector.
+        this.camera.position.copy(this._snapToPos);
+        this.camera.up.copy(this._snapToUp);
+        this.camera.lookAt(this._snapCenter);
+        if (this.controls) {
+          this.controls.enabled = true;
+          this.controls.update();
+        }
+      }
+
+      this.dirty = true;
+    } else {
+      // Only update controls when we are NOT animating — controls.update()
+      // unconditionally writes camera.position = target + _eye, which would
+      // override every snap animation frame.
+      this.controls?.update();
+    }
     if (!this.dirty) return;
     this.updateCameraUniform();
     this.renderer.render(this.scene, this.camera);

@@ -15,7 +15,7 @@ import type { DrawFracs } from '@/hooks/useMeasurementInteraction';
 import { clamp } from '@/lib/volume/math';
 import { useVolumeStore } from '@/store';
 import type { SlicePlane, VolumeCursor } from '@/types';
-import { ChevronsUpDown, Maximize2, Minimize2 } from 'lucide-react';
+import { ChevronsUpDown, Eye, Maximize2, Minimize2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
@@ -366,6 +366,7 @@ function ExpandedSlicePanel({
   const activePlane = useVolumeStore((s) => s.activePlane);
   const setActivePlane = useVolumeStore((s) => s.setActivePlane);
   const setCursor = useVolumeStore((s) => s.setCursor);
+  const requestSnapToView = useVolumeStore((s) => s.requestSnapToView);
   const dims = useVolumeStore((s) => s.volume?.meta.dims);
   const spacing = useVolumeStore((s) => s.volume?.meta.spacing);
   const cursor = useVolumeStore((s) => s.cursor);
@@ -555,6 +556,12 @@ function ExpandedSlicePanel({
         </PlaneLabel>
       </PanelHeader>
       <ButtonTray>
+        <TrayButton
+          label="Align 3D view to this plane"
+          onClick={() => requestSnapToView(plane)}
+        >
+          <Eye size={11} />
+        </TrayButton>
         <TrayButton label="Collapse panel" onClick={onClose}>
           <Minimize2 size={11} />
         </TrayButton>
@@ -617,6 +624,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
   const activePlane = useVolumeStore((s) => s.activePlane);
   const setActivePlane = useVolumeStore((s) => s.setActivePlane);
   const setCursor = useVolumeStore((s) => s.setCursor);
+  const requestSnapToView = useVolumeStore((s) => s.requestSnapToView);
   const dims = useVolumeStore((s) => s.volume?.meta.dims);
   const spacing = useVolumeStore((s) => s.volume?.meta.spacing);
   const cursor = useVolumeStore((s) => s.cursor);
@@ -786,6 +794,12 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
         </PlaneLabel>
       </PanelHeader>
       <ButtonTray>
+        <TrayButton
+          label="Align 3D view to this plane"
+          onClick={() => requestSnapToView(plane)}
+        >
+          <Eye size={11} />
+        </TrayButton>
         <TrayButton label="Expand panel" onClick={() => setExpanded(true)}>
           <Maximize2 size={11} />
         </TrayButton>
