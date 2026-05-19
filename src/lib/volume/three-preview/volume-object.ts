@@ -41,6 +41,12 @@ export function buildMaterial(
     u_shading: { value: 0 },
     u_camVoxel: { value: new THREE.Vector3() },
     u_rayDirVox: { value: new THREE.Vector3(0, 0, -1) },
+    /** 0 = off, 1 = active-only, 2 = all three planes. */
+    u_planeMode: { value: 0 },
+    /** Active plane index: 0 = coronal, 1 = sagittal, 2 = axial. */
+    u_activePlane: { value: 0 },
+    /** Cursor position in voxel / texture space. */
+    u_planePos: { value: new THREE.Vector3() },
   };
 
   return new THREE.ShaderMaterial({
@@ -72,8 +78,11 @@ export function buildVolumeMesh(
   const colormap = buildTransferFunction(preset);
   const material = buildMaterial(texture, colormap, prepared, preset);
 
-  // Geometry stays in voxel space; physical spacing applied via mesh.scale.
-  const geometry = new THREE.BoxGeometry(w, h, d);
+  // The render box is 10 % larger than the voxel dims (5 % padding each side)
+  // so cursor planes extend visibly past the volume boundary.  The centre
+  // translation stays the same; volume data is sampled only within [0, dims].
+  const PAD = 0.1;
+  const geometry = new THREE.BoxGeometry(w * (1 + PAD), h * (1 + PAD), d * (1 + PAD));
   geometry.translate(w / 2 - 0.5, h / 2 - 0.5, d / 2 - 0.5);
 
   const mesh = new THREE.Mesh(geometry, material);
