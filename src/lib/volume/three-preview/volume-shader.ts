@@ -167,7 +167,7 @@ export const VolumeShader = {
 
     varying vec3 vVoxelPos;
 
-    #define MAX_STEPS 512
+    #define MAX_STEPS 256
 
     // Phong constants (pre-normalised light direction for vec3(1,2,3))
     const vec3  LIGHT  = vec3(0.2673, 0.5345, 0.8018);

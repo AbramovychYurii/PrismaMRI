@@ -35,6 +35,12 @@ export class ThreePreview {
   /** Native device pixel ratio (capped at 2). Used to restore after interaction. */
   private readonly nativeDpr = Math.min(window.devicePixelRatio, 2);
 
+  // Pre-allocated scratch objects — avoid per-frame GC pressure.
+  private readonly _invModel = new THREE.Matrix4();
+  private readonly _camVoxel = new THREE.Vector3();
+  private readonly _fwdWorld = new THREE.Vector3();
+  private readonly _fwdVoxel = new THREE.Vector3();
+
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({
       canvas,
@@ -43,6 +49,7 @@ export class ThreePreview {
       powerPreference: 'high-performance',
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.sortObjects = false;
     this.scene.add(this.measurementLine.group);
     this.camera = buildCamera(1, 256);
     this.resize();
@@ -211,20 +218,19 @@ export class ThreePreview {
     // instead of the default identity — otherwise the first render is wrong.
     vol.mesh.updateMatrixWorld(true);
 
-    const invModel = vol.mesh.matrixWorld.clone().invert();
+    // Reuse pre-allocated scratch objects — no per-frame allocation / GC.
+    this._invModel.copy(vol.mesh.matrixWorld).invert();
 
     // Camera position in voxel space (point transform — includes translation).
-    const camVoxel = this.camera.position.clone().applyMatrix4(invModel);
-    vol.material.uniforms.u_camVoxel.value.copy(camVoxel);
+    this._camVoxel.copy(this.camera.position).applyMatrix4(this._invModel);
+    vol.material.uniforms.u_camVoxel.value.copy(this._camVoxel);
 
     // Camera forward direction in voxel space (direction transform — no translation).
     // THREE.js camera looks down -Z in camera space; transform that to world then to voxel.
-    const fwdWorld = new THREE.Vector3(0, 0, -1)
-      .applyQuaternion(this.camera.quaternion)
-      .normalize();
+    this._fwdWorld.set(0, 0, -1).applyQuaternion(this.camera.quaternion).normalize();
     // For a pure-scale model matrix (no rotation), transformDirection = element-wise /scale.
-    const fwdVoxel = fwdWorld.clone().transformDirection(invModel).normalize();
-    vol.material.uniforms.u_rayDirVox.value.copy(fwdVoxel);
+    this._fwdVoxel.copy(this._fwdWorld).transformDirection(this._invModel).normalize();
+    vol.material.uniforms.u_rayDirVox.value.copy(this._fwdVoxel);
   }
 
   private loop = (): void => {
