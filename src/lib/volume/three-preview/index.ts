@@ -17,7 +17,7 @@ import type {
 import * as THREE from 'three';
 import type { TrackballControls } from 'three/examples/jsm/controls/TrackballControls.js';
 
-/** Ray-march steps — constant quality, no LOD reduction during interaction. */
+/** Full-quality ray-march step count. */
 const RAY_STEPS = 256;
 
 export class ThreePreview {
@@ -32,6 +32,8 @@ export class ThreePreview {
   private raf = 0;
   private disposed = false;
   private dirty = true;
+  /** Native device pixel ratio (capped at 2). Used to restore after interaction. */
+  private readonly nativeDpr = Math.min(window.devicePixelRatio, 2);
 
   constructor(private readonly canvas: HTMLCanvasElement) {
     this.renderer = new THREE.WebGLRenderer({
@@ -41,7 +43,6 @@ export class ThreePreview {
       powerPreference: 'high-performance',
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    this.scene.add(this.cursorPlanes.group);
     this.scene.add(this.measurementLine.group);
     this.camera = buildCamera(1, 256);
     this.resize();
@@ -63,7 +64,6 @@ export class ThreePreview {
     const dims = prepared.dims;
     const [sx, sy, sz] = prepared.spacing;
     this.cursorPlanes.setDims(dims, prepared.sourceDims);
-    this.cursorPlanes.group.scale.set(sx, sy, sz);
 
     const center = new THREE.Vector3(
       (dims[0] / 2 - 0.5) * sx,
@@ -80,7 +80,20 @@ export class ThreePreview {
 
     this.controls?.dispose();
     this.controls = buildControls(this.camera, this.canvas, center);
+    this.controls.addEventListener('start', () => {
+      // Render at half device-pixel ratio while dragging — same algorithm,
+      // just fewer pixels, so the look doesn't change at all.
+      this.renderer.setPixelRatio(Math.max(0.75, this.nativeDpr * 0.5));
+      this.resize();
+      this.dirty = true;
+    });
     this.controls.addEventListener('change', () => {
+      this.dirty = true;
+    });
+    this.controls.addEventListener('end', () => {
+      // Restore full resolution once the drag is released
+      this.renderer.setPixelRatio(this.nativeDpr);
+      this.resize();
       this.dirty = true;
     });
 
@@ -116,6 +129,12 @@ export class ThreePreview {
 
   setCursor(cursor: VolumeCursor): void {
     this.cursorPlanes.update(cursor);
+    // Sync shader plane position (texture voxel space)
+    const m = this.volume?.material;
+    if (m) {
+      const [px, py, pz] = this.cursorPlanes.mapCursor(cursor);
+      m.uniforms.u_planePos.value.set(px, py, pz);
+    }
     this.dirty = true;
   }
 
@@ -155,6 +174,12 @@ export class ThreePreview {
 
   setPlaneMode(mode: PlanesMode, activePlane: SlicePlane): void {
     this.cursorPlanes.setMode(mode, activePlane);
+    const m = this.volume?.material;
+    if (m) {
+      m.uniforms.u_planeMode.value = mode === 'off' ? 0 : mode === 'active' ? 1 : 2;
+      m.uniforms.u_activePlane.value =
+        activePlane === 'coronal' ? 0 : activePlane === 'sagittal' ? 1 : 2;
+    }
     this.dirty = true;
   }
 

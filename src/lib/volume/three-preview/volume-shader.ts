@@ -128,6 +128,12 @@ export const VolumeShader = {
     /** Camera forward direction in voxel space (normalised) — updated every frame.
      *  Required for correct orthographic (parallel) ray casting. */
     u_rayDirVox: { value: new THREE.Vector3(0, 0, -1) },
+    /** 0 = off, 1 = active-only, 2 = all three planes. */
+    u_planeMode: { value: 0 },
+    /** Active plane index: 0 = coronal, 1 = sagittal, 2 = axial. */
+    u_activePlane: { value: 0 },
+    /** Cursor position in voxel / texture space (same coords as u_size). */
+    u_planePos: { value: new THREE.Vector3() },
   },
 
   // ── Vertex ────────────────────────────────────────────────────────────────
@@ -155,6 +161,9 @@ export const VolumeShader = {
     uniform int       u_shading;
     uniform vec3      u_camVoxel;
     uniform vec3      u_rayDirVox;
+    uniform int       u_planeMode;
+    uniform int       u_activePlane;
+    uniform vec3      u_planePos;
 
     varying vec3 vVoxelPos;
 
@@ -182,11 +191,15 @@ export const VolumeShader = {
       return vec3(dx, dy, dz);
     }
 
-    // Slab intersection for box [vec3(0), u_size], returns (tEntry, tExit).
+    // Slab intersection.  The render box extends 5 % beyond u_size on every
+    // side (10 % total) so cursor planes are visible past the volume boundary.
     vec2 hitBox(vec3 ro, vec3 rd) {
+      const float P = 0.05;          // 5 % padding each side
+      vec3 lo   = -P * u_size;
+      vec3 hi   = (1.0 + P) * u_size;
       vec3 inv  = 1.0 / rd;
-      vec3 t0   = -ro * inv;
-      vec3 t1   = (u_size - ro) * inv;
+      vec3 t0   = (lo - ro) * inv;
+      vec3 t1   = (hi - ro) * inv;
       vec3 tmin = min(t0, t1);
       vec3 tmax = max(t0, t1);
       return vec2(
@@ -226,6 +239,33 @@ export const VolumeShader = {
       // View vector for shading: opposite to ray direction (parallel rays)
       vec3 V = -rayDir;
 
+      // ── Plane intersection setup (shared by MIP and DVR) ─────────────────
+      // Colours match slice-panel accents (amber / violet / azure)
+      const vec3 P_COR = vec3(1.000, 0.710, 0.278);
+      const vec3 P_SAG = vec3(0.710, 0.616, 0.820);
+      const vec3 P_AXI = vec3(0.510, 0.659, 0.831);
+
+      bool showCor = u_planeMode == 2 || (u_planeMode == 1 && u_activePlane == 0);
+      bool showSag = u_planeMode == 2 || (u_planeMode == 1 && u_activePlane == 1);
+      bool showAxi = u_planeMode == 2 || (u_planeMode == 1 && u_activePlane == 2);
+
+      // Ray-plane t-values; 1e9 = "no intersection"
+      float tCor = 1.0e9;
+      float tSag = 1.0e9;
+      float tAxi = 1.0e9;
+      if (showCor && abs(rayDir.y) > 1.0e-4) {
+        float tc = (u_planePos.y - rayOrigin.y) / rayDir.y;
+        if (tc > tEntry && tc < tExit) tCor = tc;
+      }
+      if (showSag && abs(rayDir.x) > 1.0e-4) {
+        float tc = (u_planePos.x - rayOrigin.x) / rayDir.x;
+        if (tc > tEntry && tc < tExit) tSag = tc;
+      }
+      if (showAxi && abs(rayDir.z) > 1.0e-4) {
+        float tc = (u_planePos.z - rayOrigin.z) / rayDir.z;
+        if (tc > tEntry && tc < tExit) tAxi = tc;
+      }
+
       // ── MIP ───────────────────────────────────────────────────────────────
       if (u_mode == 1) {
         float maxI = 0.0;
@@ -235,18 +275,48 @@ export const VolumeShader = {
           if (any(lessThan(vox, vec3(0.0))) || any(greaterThan(vox, u_size))) continue;
           maxI = max(maxI, sampleVol(vox));
         }
-        if (maxI < u_clim.x + 0.001) { discard; }
-        gl_FragColor = sampleTF(maxI);
+        bool noTissue = maxI < u_clim.x + 0.001;
+        bool anyPlane = tCor < 1.0e8 || tSag < 1.0e8 || tAxi < 1.0e8;
+        if (noTissue && !anyPlane) { discard; }
+
+        vec4 col = noTissue ? vec4(0.0) : sampleTF(maxI);
+        // Blend planes uniformly over MIP (MIP has no depth ordering)
+        const float P_MIP = 0.35;
+        if (tCor < 1.0e8) { col.rgb = mix(col.rgb, P_COR, P_MIP); col.a = max(col.a, P_MIP); }
+        if (tSag < 1.0e8) { col.rgb = mix(col.rgb, P_SAG, P_MIP); col.a = max(col.a, P_MIP); }
+        if (tAxi < 1.0e8) { col.rgb = mix(col.rgb, P_AXI, P_MIP); col.a = max(col.a, P_MIP); }
+        gl_FragColor = col;
         return;
       }
 
       // ── DVR – front-to-back compositing ──────────────────────────────────
+      const float P_ALPHA = 0.45;
       vec4 acc = vec4(0.0);
+      bool doneCor = false;
+      bool doneSag = false;
+      bool doneAxi = false;
 
       for (int i = 0; i < MAX_STEPS; i++) {
         if (i >= u_steps) break;
 
-        float t   = tEntry + (float(i) + 0.5) * dt;
+        float t_lo = tEntry + float(i) * dt;
+        float t_hi = t_lo + dt;
+
+        // Blend any plane whose intersection t falls within this step interval
+        if (!doneCor && tCor >= t_lo && tCor < t_hi) {
+          float pa = (1.0 - acc.a) * P_ALPHA;
+          acc.rgb += pa * P_COR; acc.a += pa; doneCor = true;
+        }
+        if (!doneSag && tSag >= t_lo && tSag < t_hi) {
+          float pa = (1.0 - acc.a) * P_ALPHA;
+          acc.rgb += pa * P_SAG; acc.a += pa; doneSag = true;
+        }
+        if (!doneAxi && tAxi >= t_lo && tAxi < t_hi) {
+          float pa = (1.0 - acc.a) * P_ALPHA;
+          acc.rgb += pa * P_AXI; acc.a += pa; doneAxi = true;
+        }
+
+        float t   = t_lo + 0.5 * dt;
         vec3  vox = rayOrigin + t * rayDir;
         if (any(lessThan(vox, vec3(0.0))) || any(greaterThan(vox, u_size))) continue;
 
@@ -258,8 +328,8 @@ export const VolumeShader = {
         vec3  color = tf.rgb;
         float alpha = tf.a;
 
-        // Phong shading
-        if (u_shading == 1) {
+        // Phong shading — skip 6-fetch gradient for nearly-transparent voxels
+        if (u_shading == 1 && alpha > 0.08) {
           vec3  grad = gradient(vox);
           float gLen = length(grad);
           if (gLen > 0.003) {

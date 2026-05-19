@@ -109,7 +109,7 @@ const axisGlow = (a: Axis) => accentRgba(AXIS_ACCENT[a], 0.45);
 function crosshairAxes(plane: SlicePlane): { v: Axis; h: Axis } {
   if (plane === 'coronal') return { v: 'y', h: 'z' };
   if (plane === 'sagittal') return { v: 'x', h: 'z' };
-  return { v: 'x', h: 'y' };
+  return { v: 'y', h: 'x' };
 }
 
 // ── Styled components ──────────────────────────────────────────────────────
