@@ -232,9 +232,9 @@ export class ThreePreview {
 
     // Target camera direction (unit vector FROM center TO camera) and up vector.
     const dirMap: Record<SlicePlane, [THREE.Vector3, THREE.Vector3]> = {
-      coronal:  [new THREE.Vector3(0, -1,  0), new THREE.Vector3(0, 0,  1)],
-      sagittal: [new THREE.Vector3(1,  0,  0), new THREE.Vector3(0, 0,  1)],
-      axial:    [new THREE.Vector3(0,  0,  1), new THREE.Vector3(0, -1, 0)],
+      coronal: [new THREE.Vector3(0, -1, 0), new THREE.Vector3(0, 0, 1)],
+      sagittal: [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 1)],
+      axial: [new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, -1, 0)],
     };
     const [dir, up] = dirMap[plane];
 
@@ -318,9 +318,7 @@ export class ThreePreview {
       this._snapDirA.copy(this._snapFromPos).sub(this._snapCenter).normalize();
       this._snapDirB.copy(this._snapToPos).sub(this._snapCenter).normalize();
       this._snapDirA.lerpVectors(this._snapDirA, this._snapDirB, e).normalize();
-      this.camera.position
-        .copy(this._snapCenter)
-        .addScaledVector(this._snapDirA, this._snapRadius);
+      this.camera.position.copy(this._snapCenter).addScaledVector(this._snapDirA, this._snapRadius);
 
       // Lerp up vector and re-aim.
       this.camera.up.lerpVectors(this._snapFromUp, this._snapToUp, e).normalize();

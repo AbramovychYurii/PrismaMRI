@@ -556,10 +556,7 @@ function ExpandedSlicePanel({
         </PlaneLabel>
       </PanelHeader>
       <ButtonTray>
-        <TrayButton
-          label="Align 3D view to this plane"
-          onClick={() => requestSnapToView(plane)}
-        >
+        <TrayButton label="Align 3D view to this plane" onClick={() => requestSnapToView(plane)}>
           <Eye size={11} />
         </TrayButton>
         <TrayButton label="Collapse panel" onClick={onClose}>
@@ -794,10 +791,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
         </PlaneLabel>
       </PanelHeader>
       <ButtonTray>
-        <TrayButton
-          label="Align 3D view to this plane"
-          onClick={() => requestSnapToView(plane)}
-        >
+        <TrayButton label="Align 3D view to this plane" onClick={() => requestSnapToView(plane)}>
           <Eye size={11} />
         </TrayButton>
         <TrayButton label="Expand panel" onClick={() => setExpanded(true)}>
