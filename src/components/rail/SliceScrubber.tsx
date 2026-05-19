@@ -56,7 +56,11 @@ const ChevronBtn = styled.button<{
   transition: ${({ $reduced }) => ($reduced ? 'none' : 'transform 80ms ease')};
 `;
 
-const ScrubberContainer = styled.div<{ $visible: boolean; $reduced: boolean }>`
+const ScrubberContainer = styled.div<{
+  $visible: boolean;
+  $reduced: boolean;
+  $inline?: boolean;
+}>`
   position: absolute;
   top: 32px;
   right: 0;
@@ -73,6 +77,21 @@ const ScrubberContainer = styled.div<{ $visible: boolean; $reduced: boolean }>`
   transform: ${({ $visible }) => ($visible ? 'translateX(0)' : 'translateX(8px)')};
   pointer-events: ${({ $visible }) => ($visible ? 'auto' : 'none')};
   transition: ${({ $reduced }) => ($reduced ? 'none' : 'opacity 160ms ease, transform 160ms ease')};
+
+  ${({ $inline }) =>
+    $inline &&
+    `
+    /* Inline mode: lives inside a flex column, fills available space. */
+    position: relative;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    background: none;
+    padding: 0;
+  `}
 `;
 
 const TickSheet = styled.div`
@@ -145,6 +164,8 @@ export interface SliceScrubberProps {
   total: number;
   visible: boolean;
   onChange: (next: number) => void;
+  /** Render inside a flex column (mobile right rail) instead of absolute. */
+  inline?: boolean;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -221,7 +242,14 @@ function ChevronButton({
 
 // ── SliceScrubber ──────────────────────────────────────────────────────────
 
-export function SliceScrubber({ axis, slice, total, visible, onChange }: SliceScrubberProps) {
+export function SliceScrubber({
+  axis,
+  slice,
+  total,
+  visible,
+  onChange,
+  inline,
+}: SliceScrubberProps) {
   const accent = ACCENT[axis];
   const trackRef = useRef<HTMLDivElement>(null);
   const [trackH, setTrackH] = useState(0);
@@ -323,6 +351,7 @@ export function SliceScrubber({ axis, slice, total, visible, onChange }: SliceSc
     <ScrubberContainer
       $visible={visible}
       $reduced={reduced}
+      $inline={inline}
       onPointerDown={handleContainerPointerDown}
       onClick={handleContainerClick}
     >

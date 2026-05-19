@@ -6,11 +6,7 @@ import styled from 'styled-components';
 // ── Styled components ──────────────────────────────────────────────────────
 
 const Bar = styled.nav`
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 30;
+  flex-shrink: 0;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   background: var(--panel);
@@ -19,7 +15,7 @@ const Bar = styled.nav`
   padding-bottom: env(safe-area-inset-bottom, 0px);
 `;
 
-const TabBtn = styled.button<{ $active: boolean }>`
+const TabBtn = styled.button<{ $active: boolean; $accent: string }>`
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -29,7 +25,7 @@ const TabBtn = styled.button<{ $active: boolean }>`
   min-height: 56px;
   border: none;
   background: none;
-  color: ${({ $active }) => ($active ? 'var(--amber)' : 'var(--ink-4)')};
+  color: ${({ $active, $accent }) => ($active ? $accent : 'var(--ink-4)')};
   cursor: pointer;
   transition: color 100ms;
   -webkit-tap-highlight-color: transparent;
@@ -44,7 +40,15 @@ const TabLabel = styled.span`
 
 // ── Plane glyph icon ───────────────────────────────────────────────────────
 
-function PlaneGlyph({ letter, active }: { letter: string; active: boolean }) {
+function PlaneGlyph({
+  letter,
+  active,
+  accent,
+}: {
+  letter: string;
+  active: boolean;
+  accent: string;
+}) {
   return (
     <span
       style={{
@@ -52,7 +56,7 @@ function PlaneGlyph({ letter, active }: { letter: string; active: boolean }) {
         fontStyle: 'italic',
         fontSize: 20,
         lineHeight: 1,
-        color: active ? 'var(--amber)' : 'var(--ink-4)',
+        color: active ? accent : 'var(--ink-4)',
       }}
     >
       {letter}
@@ -65,17 +69,39 @@ function PlaneGlyph({ letter, active }: { letter: string; active: boolean }) {
 interface Tab {
   id: MobileTab;
   label: string;
-  icon: (active: boolean) => React.ReactNode;
+  accent: string;
+  icon: (active: boolean, accent: string) => React.ReactNode;
 }
 
 const TABS: Tab[] = [
-  { id: '3d', label: '3D', icon: (a) => <Box size={20} strokeWidth={a ? 1.8 : 1.4} /> },
-  { id: 'coronal', label: 'COR', icon: (a) => <PlaneGlyph letter="C" active={a} /> },
-  { id: 'sagittal', label: 'SAG', icon: (a) => <PlaneGlyph letter="S" active={a} /> },
-  { id: 'axial', label: 'AXI', icon: (a) => <PlaneGlyph letter="A" active={a} /> },
+  {
+    id: '3d',
+    label: '3D',
+    accent: 'var(--amber)',
+    icon: (a) => <Box size={20} strokeWidth={a ? 1.8 : 1.4} />,
+  },
+  {
+    id: 'coronal',
+    label: 'COR',
+    accent: 'var(--amber)',
+    icon: (a, acc) => <PlaneGlyph letter="C" active={a} accent={acc} />,
+  },
+  {
+    id: 'sagittal',
+    label: 'SAG',
+    accent: 'var(--violet)',
+    icon: (a, acc) => <PlaneGlyph letter="S" active={a} accent={acc} />,
+  },
+  {
+    id: 'axial',
+    label: 'AXI',
+    accent: 'var(--azure)',
+    icon: (a, acc) => <PlaneGlyph letter="A" active={a} accent={acc} />,
+  },
   {
     id: 'controls',
     label: 'CTRL',
+    accent: 'var(--amber)',
     icon: (a) => <Settings size={19} strokeWidth={a ? 1.8 : 1.4} />,
   },
 ];
@@ -92,8 +118,14 @@ export function MobileTabBar() {
         const active = mobileTab === tab.id;
         const handleClick = () => setMobileTab(tab.id);
         return (
-          <TabBtn key={tab.id} $active={active} type="button" onClick={handleClick}>
-            {tab.icon(active)}
+          <TabBtn
+            key={tab.id}
+            $active={active}
+            $accent={tab.accent}
+            type="button"
+            onClick={handleClick}
+          >
+            {tab.icon(active, tab.accent)}
             <TabLabel>{tab.label}</TabLabel>
           </TabBtn>
         );

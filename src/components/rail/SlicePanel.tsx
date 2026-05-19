@@ -291,6 +291,36 @@ const ButtonTray = styled.div`
   pointer-events: auto;
 `;
 
+/**
+ * Mobile-only right column: stacks Scrubber → Eye icon → Counter
+ * using flex-column + gap so no pixel math is needed.
+ */
+const MobileRightCol = styled.div`
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 46px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 6px 18px 4px;
+  background: linear-gradient(to left, rgba(10, 8, 5, 0.85), transparent 70%);
+  pointer-events: none;
+`;
+
+const MobileCounter = styled.span`
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+  pointer-events: none;
+`;
+
 const TrayBtn = styled.button<{ $active?: boolean; $hover: boolean }>`
   width: 22px;
   height: 22px;
@@ -299,7 +329,7 @@ const TrayBtn = styled.button<{ $active?: boolean; $hover: boolean }>`
   border: 1px solid
     ${({ $active, $hover }) =>
       $active ? 'var(--amber-dim)' : $hover ? 'var(--rule-2)' : 'var(--rule)'};
-  background: ${({ $active }) => ($active ? accentRgba('amber', 0.08) : 'transparent')};
+  background: ${({ $active }) => ($active ? accentRgba('amber', 0.08) : 'rgba(15,13,10,0.90)')};
   color: ${({ $active, $hover }) =>
     $active ? 'var(--amber)' : $hover ? 'var(--ink)' : 'var(--ink-3)'};
   display: flex;
@@ -307,6 +337,7 @@ const TrayBtn = styled.button<{ $active?: boolean; $hover: boolean }>`
   justify-content: center;
   cursor: pointer;
   padding: 0;
+  pointer-events: auto;
   -webkit-tap-highlight-color: transparent;
 
   @media (max-width: 767px) {
@@ -809,6 +840,16 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
   // On mobile the scrubber is always visible — no toggle needed.
   const scrubberVisible = isMobile || scrubVisible;
 
+  function handleSnapToView() {
+    requestSnapToView(plane);
+  }
+  function handleExpand() {
+    setExpanded(true);
+  }
+  function handleCloseExpanded() {
+    setExpanded(false);
+  }
+
   return (
     <PanelWrap
       onClick={handleClick}
@@ -837,40 +878,65 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
           {` · ${labelSecondary}`}
         </PlaneLabel>
       </PanelHeader>
-      <ButtonTray>
-        <TrayButton label="Align 3D view to this plane" onClick={() => requestSnapToView(plane)}>
-          <Eye size={11} />
-        </TrayButton>
-        {/* Expand is hidden on mobile — the panel is already full-screen. */}
-        {!isMobile && (
-          <TrayButton label="Expand panel" onClick={() => setExpanded(true)}>
-            <Maximize2 size={11} />
+      {/* ── Mobile: flex-column right rail (Scrubber → Eye → Counter) ── */}
+      {isMobile ? (
+        <MobileRightCol>
+          {total > 0 && (
+            <SliceScrubber
+              axis={plane}
+              slice={idx}
+              total={total}
+              visible
+              inline
+              onChange={handleScrub}
+            />
+          )}
+          <TrayButton label="Align 3D view to this plane" onClick={handleSnapToView}>
+            <Eye size={11} />
           </TrayButton>
-        )}
-        {total > 0 && !isMobile && (
-          <TrayButton
-            label="Toggle slice scrubber"
-            active={scrubVisible}
-            onClick={handleScrubToggle}
-          >
-            <ChevronsUpDown size={11} />
-          </TrayButton>
-        )}
-      </ButtonTray>
-      {total > 0 && (
-        <SliceScrubber
-          axis={plane}
-          slice={idx}
-          total={total}
-          visible={scrubberVisible}
-          onChange={handleScrub}
-        />
+          {total > 0 && (
+            <MobileCounter>
+              {idx}
+              <SliceDim> / {total}</SliceDim>
+            </MobileCounter>
+          )}
+        </MobileRightCol>
+      ) : (
+        /* ── Desktop: ButtonTray (top-right) + absolute Scrubber ── */
+        <>
+          <ButtonTray>
+            <TrayButton label="Align 3D view to this plane" onClick={handleSnapToView}>
+              <Eye size={11} />
+            </TrayButton>
+            <TrayButton label="Expand panel" onClick={handleExpand}>
+              <Maximize2 size={11} />
+            </TrayButton>
+            {total > 0 && (
+              <TrayButton
+                label="Toggle slice scrubber"
+                active={scrubVisible}
+                onClick={handleScrubToggle}
+              >
+                <ChevronsUpDown size={11} />
+              </TrayButton>
+            )}
+          </ButtonTray>
+          {total > 0 && (
+            <SliceScrubber
+              axis={plane}
+              slice={idx}
+              total={total}
+              visible={scrubVisible}
+              onChange={handleScrub}
+            />
+          )}
+        </>
       )}
       <PanelFooter $scrubVisible={scrubberVisible}>
         <span>
           {footer.hint} · {footer.code}
         </span>
-        {total > 0 && (
+        {!isMobile && total > 0 && (
           <SliceCounter>
             <span>{idx}</span>
             <SliceDim> / {total}</SliceDim>
@@ -893,7 +959,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
           onClose={closeMenu}
         />
       )}
-      {expanded && <ExpandedSlicePanel plane={plane} onClose={() => setExpanded(false)} />}
+      {expanded && <ExpandedSlicePanel plane={plane} onClose={handleCloseExpanded} />}
     </PanelWrap>
   );
 }

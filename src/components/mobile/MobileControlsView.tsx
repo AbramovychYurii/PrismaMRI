@@ -14,12 +14,12 @@ const ScrollWrap = styled.div`
 `;
 
 const Section = styled.section`
-  padding: 20px 20px 0;
+  padding: 20px 20px 20px;
   border-bottom: 1px solid var(--rule);
 
   &:last-child {
     border-bottom: none;
-    padding-bottom: 24px;
+    padding-bottom: 28px;
   }
 `;
 

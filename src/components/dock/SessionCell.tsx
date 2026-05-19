@@ -38,6 +38,10 @@ const KbdTag = styled.span`
   padding: 1px 5px;
   border-radius: 3px;
   letter-spacing: 0.05em;
+
+  @media (max-width: 767px) {
+    display: none;
+  }
 `;
 
 const Disclaimer = styled.div`
