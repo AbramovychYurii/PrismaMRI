@@ -6,10 +6,9 @@ import { MobileTabBar } from '@/components/mobile/MobileTabBar';
 import { Rail } from '@/components/rail/Rail';
 import { SlicePanel } from '@/components/rail/SlicePanel';
 import { Stage } from '@/components/stage/Stage';
-import { accentRgba } from '@/constants';
+import { accentRgba, isSlicePlane } from '@/constants';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useVolumeStore } from '@/store';
-import type { SlicePlane } from '@/types';
 import styled from 'styled-components';
 
 // ── Desktop layout ─────────────────────────────────────────────────────────
@@ -126,8 +125,6 @@ export function AppGrid() {
   }
 
   // ── Mobile ───────────────────────────────────────────────────────────────
-  const isSliceTab = mobileTab === 'coronal' || mobileTab === 'sagittal' || mobileTab === 'axial';
-
   return (
     <MobileRoot>
       <MobileHeader />
@@ -138,10 +135,10 @@ export function AppGrid() {
           <Stage />
         </StageWrap>
 
-        {/* Slice view — one panel, full-height. */}
-        {isSliceTab && (
+        {/* isSlicePlane narrows mobileTab → SlicePlane for the SlicePanel prop. */}
+        {isSlicePlane(mobileTab) && (
           <MobileSliceWrap>
-            <SlicePanel plane={mobileTab as SlicePlane} />
+            <SlicePanel plane={mobileTab} />
           </MobileSliceWrap>
         )}
 

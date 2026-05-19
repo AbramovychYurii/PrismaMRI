@@ -61,7 +61,8 @@ export function StudyCell() {
   const meta = volume?.meta;
 
   const voxelCount = meta?.dims ? meta.dims[0] * meta.dims[1] * meta.dims[2] : 0;
-  const bytes = voxelCount * 2;
+  const bytesPerVoxel = volume?.voxels.BYTES_PER_ELEMENT ?? 2;
+  const bytes = voxelCount * bytesPerVoxel;
 
   return (
     <StudyGrid>

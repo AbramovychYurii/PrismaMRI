@@ -5,3 +5,7 @@ export { useSliceScroll, useActivePlaneKeys } from './useSliceScroll';
 export { useThreePreview } from './useThreePreview';
 export { ViewerActionsProvider, useViewerActions } from './ViewerActionsContext';
 export { useMeasurementInteraction } from './useMeasurementInteraction';
+export { useHover } from './useHover';
+export { useIsMobile } from './useIsMobile';
+export { usePrefersReducedMotion } from './usePrefersReducedMotion';
+export { useSlicePanelCore, cursorFromClick, axisColor, axisGlow } from './useSlicePanelCore';

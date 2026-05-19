@@ -1,24 +1,12 @@
 import { MeasureMenu } from '@/components/rail/MeasureMenu';
 import { SliceScrubber } from '@/components/rail/SliceScrubber';
 import { Tooltip } from '@/components/ui/Tooltip';
-import {
-  ACCENT_VAR,
-  AXIS_ACCENT,
-  type Axis,
-  PLANE_ACCENT,
-  PLANE_FOOTER,
-  PLANE_GLYPH,
-  PLANE_LABEL,
-  accentRgba,
-} from '@/constants';
-import { useMeasurementInteraction, useSliceImage, useSliceScroll } from '@/hooks';
+import { PLANE_FOOTER, PLANE_GLYPH, accentRgba } from '@/constants';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import type { DrawFracs } from '@/hooks/useMeasurementInteraction';
-import { clamp } from '@/lib/volume/math';
-import { useVolumeStore } from '@/store';
-import type { SlicePlane, VolumeCursor } from '@/types';
+import { axisColor, axisGlow, cursorFromClick, useSlicePanelCore } from '@/hooks/useSlicePanelCore';
+import type { SlicePlane } from '@/types';
 import { ChevronsUpDown, Eye, Maximize2, Minimize2 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
 
@@ -26,93 +14,6 @@ import styled from 'styled-components';
 
 /** Fixed pixel size of measurement dots on 2-D slice panels. */
 const MEASURE_DOT_PX = 8;
-
-// ── Physical aspect helpers ────────────────────────────────────────────────
-
-function physicalAspect(
-  plane: SlicePlane,
-  dims: readonly [number, number, number],
-  spacing: readonly [number, number, number],
-): number {
-  const [sx, sy, sz] = spacing;
-  const [w, h, d] = dims;
-  if (plane === 'coronal') return (w * sx) / (d * sz);
-  if (plane === 'sagittal') return (h * sy) / (d * sz);
-  return (w * sx) / (h * sy);
-}
-
-/** Returns the letterboxed image rect as panel-space fractions. */
-function computeDrawFracs(physAspect: number, cw: number, ch: number): DrawFracs {
-  if (physAspect >= cw / ch) {
-    const drawH = cw / physAspect;
-    return { xF: 0, yF: (ch - drawH) / 2 / ch, wF: 1, hF: drawH / ch };
-  }
-  const drawW = ch * physAspect;
-  return { xF: (cw - drawW) / 2 / cw, yF: 0, wF: drawW / cw, hF: 1 };
-}
-
-function imageToPanel(imgFx: number, imgFy: number, df: DrawFracs) {
-  return { fx: df.xF + imgFx * df.wF, fy: df.yF + imgFy * df.hF };
-}
-
-function panelToImage(panelFx: number, panelFy: number, df: DrawFracs) {
-  return {
-    fx: clamp((panelFx - df.xF) / df.wF, 0, 1),
-    fy: clamp((panelFy - df.yF) / df.hF, 0, 1),
-  };
-}
-
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-function sliceIndexInfo(
-  plane: SlicePlane,
-  dims: readonly [number, number, number] | undefined,
-  cursor: VolumeCursor | null,
-) {
-  if (!dims || !cursor) return { idx: 0, total: 0 };
-  if (plane === 'coronal') return { idx: cursor.y + 1, total: dims[1] };
-  if (plane === 'sagittal') return { idx: cursor.x + 1, total: dims[0] };
-  return { idx: cursor.z + 1, total: dims[2] };
-}
-
-/**
- * Crosshair position as 0..1 fractions of the (stretched) slice image.
- * Coronal/Sagittal render z reversed (row 0 = z=depth-1).
- */
-function crosshairFrac(
-  plane: SlicePlane,
-  dims: readonly [number, number, number],
-  c: VolumeCursor,
-): { fx: number; fy: number } {
-  const [w, h, d] = dims;
-  if (plane === 'coronal') {
-    return {
-      fx: c.x / Math.max(1, w - 1),
-      fy: (d - 1 - c.z) / Math.max(1, d - 1),
-    };
-  }
-  if (plane === 'sagittal') {
-    return {
-      fx: c.y / Math.max(1, h - 1),
-      fy: (d - 1 - c.z) / Math.max(1, d - 1),
-    };
-  }
-  return { fx: c.x / Math.max(1, w - 1), fy: c.y / Math.max(1, h - 1) };
-}
-
-const axisColor = (a: Axis) => ACCENT_VAR[AXIS_ACCENT[a]];
-const axisGlow = (a: Axis) => accentRgba(AXIS_ACCENT[a], 0.45);
-
-/**
- * Which axis each crosshair line represents on a panel — the vertical line
- * carries the `fx` coordinate, the horizontal line the `fy`. Each panel shows
- * the two axes orthogonal to its own, tinted with their system colors.
- */
-function crosshairAxes(plane: SlicePlane): { v: Axis; h: Axis } {
-  if (plane === 'coronal') return { v: 'y', h: 'z' };
-  if (plane === 'sagittal') return { v: 'x', h: 'z' };
-  return { v: 'y', h: 'x' };
-}
 
 // ── Styled components ──────────────────────────────────────────────────────
 
@@ -395,6 +296,36 @@ function TrayButton({
   );
 }
 
+// ── Shared crosshair + measurement overlay ─────────────────────────────────
+
+function CrosshairAndDots({
+  cross,
+  axes,
+  adjustedDots,
+}: {
+  cross: { fx: number; fy: number } | null;
+  axes: { v: 'x' | 'y' | 'z'; h: 'x' | 'y' | 'z' };
+  adjustedDots: Array<{ fx: number; fy: number }>;
+}) {
+  return (
+    <>
+      {cross && (
+        <CrosshairOverlay>
+          <CrossH $top={cross.fy * 100} $color={axisColor(axes.h)} $glow={axisGlow(axes.h)} />
+          <CrossV $left={cross.fx * 100} $color={axisColor(axes.v)} $glow={axisGlow(axes.v)} />
+          <CrossCenter $left={cross.fx * 100} $top={cross.fy * 100}>
+            <CrossDot />
+          </CrossCenter>
+        </CrosshairOverlay>
+      )}
+      {adjustedDots.map((dot, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: stable index for static measurement dots
+        <MeasureDot key={i} $fx={dot.fx} $fy={dot.fy} $size={MEASURE_DOT_PX} />
+      ))}
+    </>
+  );
+}
+
 // ── ExpandedSlicePanel ──────────────────────────────────────────────────────
 
 function ExpandedSlicePanel({
@@ -404,110 +335,41 @@ function ExpandedSlicePanel({
   plane: SlicePlane;
   onClose: () => void;
 }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const offscreen = useRef<HTMLCanvasElement | null>(null);
-  const activePlane = useVolumeStore((s) => s.activePlane);
-  const setActivePlane = useVolumeStore((s) => s.setActivePlane);
-  const setCursor = useVolumeStore((s) => s.setCursor);
-  const requestSnapToView = useVolumeStore((s) => s.requestSnapToView);
-  const dims = useVolumeStore((s) => s.volume?.meta.dims);
-  const spacing = useVolumeStore((s) => s.volume?.meta.spacing);
-  const cursor = useVolumeStore((s) => s.cursor);
-  const scrubVisible = useVolumeStore((s) => s.scrubVisible[plane]);
-  const setScrubVisible = useVolumeStore((s) => s.setScrubVisible);
-  const [canvasSize, setCanvasSize] = useState({ w: 1, h: 1 });
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ro = new ResizeObserver((entries) => {
-      const { width, height } = entries[0].contentRect;
-      setCanvasSize({ w: Math.max(1, width), h: Math.max(1, height) });
-    });
-    ro.observe(canvas);
-    return () => ro.disconnect();
-  }, []);
-
-  const drawFracs = useMemo<DrawFracs | null>(() => {
-    if (!dims || !spacing) return null;
-    return computeDrawFracs(physicalAspect(plane, dims, spacing), canvasSize.w, canvasSize.h);
-  }, [plane, dims, spacing, canvasSize]);
-
   const {
+    canvasRef,
+    drawFracs,
+    idx,
+    total,
+    cross,
+    adjustedDots,
+    axes,
+    accentColor,
+    planeLabel,
+    isActive,
+    cursor,
+    dims,
+    scrubVisible,
+    setScrubVisible,
+    setActivePlane,
+    setCursor,
+    requestSnapToView,
+    onWheel,
+    handleScrub,
+    handleContextMenu,
     measurement,
-    measureDots,
     menu,
-    openMenu,
-    closeMenu,
     onMeasureFrom,
     onMeasureTo,
     onClear,
-  } = useMeasurementInteraction(plane, dims, cursor);
+    closeMenu,
+  } = useSlicePanelCore(plane);
 
-  const image = useSliceImage(plane);
-  const onWheel = useSliceScroll(plane);
-
-  const isActive = activePlane === plane;
-  const { idx, total } = sliceIndexInfo(plane, dims, cursor);
   const footer = PLANE_FOOTER[plane];
 
-  const cross = useMemo(() => {
-    if (!dims || !cursor) return null;
-    const imgFrac = crosshairFrac(plane, dims, cursor);
-    if (!drawFracs) return imgFrac;
-    return imageToPanel(imgFrac.fx, imgFrac.fy, drawFracs);
-  }, [plane, dims, cursor, drawFracs]);
-
-  const adjustedDots = useMemo(
-    () => (drawFracs ? measureDots.map((d) => imageToPanel(d.fx, d.fy, drawFracs)) : measureDots),
-    [measureDots, drawFracs],
-  );
-
-  const axes = crosshairAxes(plane);
-
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const dpr = window.devicePixelRatio || 1;
-    const cw = Math.max(1, Math.floor(canvasSize.w * dpr));
-    const ch = Math.max(1, Math.floor(canvasSize.h * dpr));
-    if (canvas.width !== cw) canvas.width = cw;
-    if (canvas.height !== ch) canvas.height = ch;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.fillStyle = '#080604';
-    ctx.fillRect(0, 0, cw, ch);
-    if (!image) return;
-    if (!offscreen.current) offscreen.current = document.createElement('canvas');
-    const off = offscreen.current;
-    off.width = image.width;
-    off.height = image.height;
-    const octx = off.getContext('2d');
-    if (!octx) return;
-    octx.putImageData(
-      new ImageData(image.data as Uint8ClampedArray<ArrayBuffer>, image.width, image.height),
-      0,
-      0,
-    );
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    if (drawFracs) {
-      ctx.drawImage(
-        off,
-        drawFracs.xF * cw,
-        drawFracs.yF * ch,
-        drawFracs.wF * cw,
-        drawFracs.hF * ch,
-      );
-    } else {
-      ctx.drawImage(off, 0, 0, cw, ch);
-    }
-  }, [image, drawFracs, canvasSize]);
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
+    const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
-    }
+    };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
@@ -518,42 +380,8 @@ function ExpandedSlicePanel({
       setActivePlane(plane);
       return;
     }
-    const canvas = canvasRef.current;
-    if (!canvas || !dims || !cursor) return;
-    const rect = canvas.getBoundingClientRect();
-    const panelFx = clamp((e.clientX - rect.left) / rect.width, 0, 1);
-    const panelFy = clamp((e.clientY - rect.top) / rect.height, 0, 1);
-    const { fx, fy } = drawFracs
-      ? panelToImage(panelFx, panelFy, drawFracs)
-      : { fx: panelFx, fy: panelFy };
-    const [w, h, d] = dims;
-    const next: VolumeCursor = { ...cursor };
-    if (plane === 'coronal') {
-      next.x = Math.round(fx * (w - 1));
-      next.z = Math.round((1 - fy) * (d - 1));
-    } else if (plane === 'sagittal') {
-      next.y = Math.round(fx * (h - 1));
-      next.z = Math.round((1 - fy) * (d - 1));
-    } else {
-      next.x = Math.round(fx * (w - 1));
-      next.y = Math.round(fy * (h - 1));
-    }
-    setCursor(next);
-  }
-
-  function handleScrub(nextSlice: number) {
-    if (!cursor) return;
-    const i = nextSlice - 1;
-    if (plane === 'coronal') setCursor({ ...cursor, y: i });
-    else if (plane === 'sagittal') setCursor({ ...cursor, x: i });
-    else setCursor({ ...cursor, z: i });
-  }
-
-  function handleContextMenu(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    setActivePlane(plane);
-    if (canvasRef.current) openMenu(e, canvasRef.current, drawFracs);
+    if (!canvasRef.current || !dims || !cursor) return;
+    setCursor(cursorFromClick(e, canvasRef.current, plane, dims, cursor, drawFracs));
   }
 
   function handleWheel(e: React.WheelEvent) {
@@ -561,43 +389,27 @@ function ExpandedSlicePanel({
     onWheel(e);
   }
 
-  function handlePointerDown(e: React.PointerEvent) {
-    e.stopPropagation();
-  }
-
-  function handlePointerUp(e: React.PointerEvent) {
-    e.stopPropagation();
-  }
-
-  const accentColor = PLANE_ACCENT[plane];
-  const [labelPrimary, labelSecondary] = PLANE_LABEL[plane].split(' · ');
-
   return createPortal(
     <FullscreenOverlay
       $isActive={isActive}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
       onWheel={handleWheel}
-      onPointerDown={handlePointerDown}
-      onPointerUp={handlePointerUp}
+      onPointerDown={(e) => e.stopPropagation()}
+      onPointerUp={(e) => e.stopPropagation()}
     >
-      <StyledCanvas ref={canvasRef} />
-      {cross && (
-        <CrosshairOverlay>
-          <CrossH $top={cross.fy * 100} $color={axisColor(axes.h)} $glow={axisGlow(axes.h)} />
-          <CrossV $left={cross.fx * 100} $color={axisColor(axes.v)} $glow={axisGlow(axes.v)} />
-          <CrossCenter $left={cross.fx * 100} $top={cross.fy * 100}>
-            <CrossDot />
-          </CrossCenter>
-        </CrosshairOverlay>
-      )}
+      <StyledCanvas ref={canvasRef as React.Ref<HTMLCanvasElement>} />
+
+      <CrosshairAndDots cross={cross} axes={axes} adjustedDots={adjustedDots} />
+
       <PanelHeader>
         <PlaneGlyph $color={accentColor}>{PLANE_GLYPH[plane]}</PlaneGlyph>
         <PlaneLabel>
-          <PlaneLabelAccent $color={accentColor}>{labelPrimary}</PlaneLabelAccent>
-          {` · ${labelSecondary}`}
+          <PlaneLabelAccent $color={accentColor}>{planeLabel.primary}</PlaneLabelAccent>
+          {` · ${planeLabel.secondary}`}
         </PlaneLabel>
       </PanelHeader>
+
       <ButtonTray>
         <TrayButton label="Align 3D view to this plane" onClick={() => requestSnapToView(plane)}>
           <Eye size={11} />
@@ -615,6 +427,7 @@ function ExpandedSlicePanel({
           </TrayButton>
         )}
       </ButtonTray>
+
       {total > 0 && (
         <SliceScrubber
           axis={plane}
@@ -624,6 +437,7 @@ function ExpandedSlicePanel({
           onChange={handleScrub}
         />
       )}
+
       <PanelFooter $scrubVisible={scrubVisible}>
         <span>
           {footer.hint} · {footer.code}
@@ -635,11 +449,9 @@ function ExpandedSlicePanel({
           </SliceCounter>
         )}
       </PanelFooter>
-      {adjustedDots.map((dot, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: stable index for static measurement dots
-        <MeasureDot key={i} $fx={dot.fx} $fy={dot.fy} $size={MEASURE_DOT_PX} />
-      ))}
+
       {isActive && <ActiveBorder />}
+
       {menu && (
         <MeasureMenu
           x={menu.screenX}
@@ -656,157 +468,58 @@ function ExpandedSlicePanel({
   );
 }
 
-// ── Component ──────────────────────────────────────────────────────────────
+// ── SlicePanel ─────────────────────────────────────────────────────────────
 
 export function SlicePanel({ plane }: { plane: SlicePlane }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const offscreen = useRef<HTMLCanvasElement | null>(null);
-  const activePlane = useVolumeStore((s) => s.activePlane);
-  const setActivePlane = useVolumeStore((s) => s.setActivePlane);
-  const setCursor = useVolumeStore((s) => s.setCursor);
-  const requestSnapToView = useVolumeStore((s) => s.requestSnapToView);
-  const dims = useVolumeStore((s) => s.volume?.meta.dims);
-  const spacing = useVolumeStore((s) => s.volume?.meta.spacing);
-  const cursor = useVolumeStore((s) => s.cursor);
-  const [canvasSize, setCanvasSize] = useState({ w: 1, h: 1 });
+  const {
+    canvasRef,
+    drawFracs,
+    idx,
+    total,
+    cross,
+    adjustedDots,
+    axes,
+    accentColor,
+    planeLabel,
+    isActive,
+    cursor,
+    dims,
+    scrubVisible,
+    setScrubVisible,
+    setActivePlane,
+    setCursor,
+    requestSnapToView,
+    onWheel,
+    handleScrub,
+    handleContextMenu,
+    measurement,
+    menu,
+    onMeasureFrom,
+    onMeasureTo,
+    onClear,
+    closeMenu,
+  } = useSlicePanelCore(plane);
+
   const [expanded, setExpanded] = useState(false);
   const isMobile = useIsMobile();
   // Touch-swipe slice navigation — tracks gesture start state.
   const touchRef = useRef<{ startY: number; startIdx: number } | null>(null);
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ro = new ResizeObserver((entries) => {
-      const { width, height } = entries[0].contentRect;
-      setCanvasSize({ w: Math.max(1, width), h: Math.max(1, height) });
-    });
-    ro.observe(canvas);
-    return () => ro.disconnect();
-  }, []);
-
-  const drawFracs = useMemo<DrawFracs | null>(() => {
-    if (!dims || !spacing) return null;
-    return computeDrawFracs(physicalAspect(plane, dims, spacing), canvasSize.w, canvasSize.h);
-  }, [plane, dims, spacing, canvasSize]);
-  const scrubVisible = useVolumeStore((s) => s.scrubVisible[plane]);
-  const setScrubVisible = useVolumeStore((s) => s.setScrubVisible);
-  const {
-    measurement,
-    measureDots,
-    menu,
-    openMenu,
-    closeMenu,
-    onMeasureFrom,
-    onMeasureTo,
-    onClear,
-  } = useMeasurementInteraction(plane, dims, cursor);
-
-  const image = useSliceImage(plane);
-  const onWheel = useSliceScroll(plane);
-
-  const isActive = activePlane === plane;
-  const { idx, total } = sliceIndexInfo(plane, dims, cursor);
-  const footer = PLANE_FOOTER[plane];
   const isLast = plane === 'axial';
-
-  const cross = useMemo(() => {
-    if (!dims || !cursor) return null;
-    const imgFrac = crosshairFrac(plane, dims, cursor);
-    if (!drawFracs) return imgFrac;
-    return imageToPanel(imgFrac.fx, imgFrac.fy, drawFracs);
-  }, [plane, dims, cursor, drawFracs]);
-
-  const adjustedDots = useMemo(
-    () => (drawFracs ? measureDots.map((d) => imageToPanel(d.fx, d.fy, drawFracs)) : measureDots),
-    [measureDots, drawFracs],
-  );
-
-  const axes = crosshairAxes(plane);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const dpr = window.devicePixelRatio || 1;
-    const cw = Math.max(1, Math.floor(canvasSize.w * dpr));
-    const ch = Math.max(1, Math.floor(canvasSize.h * dpr));
-    if (canvas.width !== cw) canvas.width = cw;
-    if (canvas.height !== ch) canvas.height = ch;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.fillStyle = '#080604';
-    ctx.fillRect(0, 0, cw, ch);
-    if (!image) return;
-
-    if (!offscreen.current) offscreen.current = document.createElement('canvas');
-    const off = offscreen.current;
-    off.width = image.width;
-    off.height = image.height;
-    const octx = off.getContext('2d');
-    if (!octx) return;
-    octx.putImageData(
-      new ImageData(image.data as Uint8ClampedArray<ArrayBuffer>, image.width, image.height),
-      0,
-      0,
-    );
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    if (drawFracs) {
-      ctx.drawImage(
-        off,
-        drawFracs.xF * cw,
-        drawFracs.yF * ch,
-        drawFracs.wF * cw,
-        drawFracs.hF * ch,
-      );
-    } else {
-      ctx.drawImage(off, 0, 0, cw, ch);
-    }
-  }, [image, drawFracs, canvasSize]);
+  // On mobile the scrubber is always visible — no toggle needed.
+  const scrubberVisible = isMobile || scrubVisible;
 
   function handleClick(e: React.MouseEvent) {
     if (!isActive) {
       setActivePlane(plane);
       return;
     }
-    const canvas = canvasRef.current;
-    if (!canvas || !dims || !cursor) return;
-    const rect = canvas.getBoundingClientRect();
-    const panelFx = clamp((e.clientX - rect.left) / rect.width, 0, 1);
-    const panelFy = clamp((e.clientY - rect.top) / rect.height, 0, 1);
-    const { fx, fy } = drawFracs
-      ? panelToImage(panelFx, panelFy, drawFracs)
-      : { fx: panelFx, fy: panelFy };
-    const [w, h, d] = dims;
-    const next: VolumeCursor = { ...cursor };
-    if (plane === 'coronal') {
-      next.x = Math.round(fx * (w - 1));
-      next.z = Math.round((1 - fy) * (d - 1));
-    } else if (plane === 'sagittal') {
-      next.y = Math.round(fx * (h - 1));
-      next.z = Math.round((1 - fy) * (d - 1));
-    } else {
-      next.x = Math.round(fx * (w - 1));
-      next.y = Math.round(fy * (h - 1));
-    }
-    setCursor(next);
+    if (!canvasRef.current || !dims || !cursor) return;
+    setCursor(cursorFromClick(e, canvasRef.current, plane, dims, cursor, drawFracs));
   }
 
-  function handleScrub(nextSlice: number) {
-    if (!cursor) return;
-    const i = nextSlice - 1;
-    if (plane === 'coronal') setCursor({ ...cursor, y: i });
-    else if (plane === 'sagittal') setCursor({ ...cursor, x: i });
-    else setCursor({ ...cursor, z: i });
-  }
-
-  const handleScrubToggle = () => setScrubVisible(plane, !scrubVisible);
-
-  // ── Touch swipe to scroll slices ─────────────────────────────────────────
   function handleTouchStart(e: React.TouchEvent) {
-    if (!isActive) {
-      setActivePlane(plane);
-    }
+    if (!isActive) setActivePlane(plane);
     const t = e.touches[0];
     touchRef.current = { startY: t.clientY, startIdx: idx };
   }
@@ -820,34 +533,11 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
     if (step === 0) return;
     const newIdx = Math.max(1, Math.min(total, touchRef.current.startIdx + step));
     handleScrub(newIdx);
-    // Update reference for continuous smooth scrubbing.
     touchRef.current = { startY: t.clientY, startIdx: newIdx };
   }
 
   function handleTouchEnd() {
     touchRef.current = null;
-  }
-
-  function handleContextMenu(e: React.MouseEvent) {
-    e.preventDefault();
-    setActivePlane(plane);
-    if (canvasRef.current) openMenu(e, canvasRef.current, drawFracs);
-  }
-
-  const accentColor = PLANE_ACCENT[plane];
-  const [labelPrimary, labelSecondary] = PLANE_LABEL[plane].split(' · ');
-
-  // On mobile the scrubber is always visible — no toggle needed.
-  const scrubberVisible = isMobile || scrubVisible;
-
-  function handleSnapToView() {
-    requestSnapToView(plane);
-  }
-  function handleExpand() {
-    setExpanded(true);
-  }
-  function handleCloseExpanded() {
-    setExpanded(false);
   }
 
   return (
@@ -861,23 +551,18 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
       $isLast={isLast}
       $isActive={isActive}
     >
-      <StyledCanvas ref={canvasRef} />
-      {cross && (
-        <CrosshairOverlay>
-          <CrossH $top={cross.fy * 100} $color={axisColor(axes.h)} $glow={axisGlow(axes.h)} />
-          <CrossV $left={cross.fx * 100} $color={axisColor(axes.v)} $glow={axisGlow(axes.v)} />
-          <CrossCenter $left={cross.fx * 100} $top={cross.fy * 100}>
-            <CrossDot />
-          </CrossCenter>
-        </CrosshairOverlay>
-      )}
+      <StyledCanvas ref={canvasRef as React.Ref<HTMLCanvasElement>} />
+
+      <CrosshairAndDots cross={cross} axes={axes} adjustedDots={adjustedDots} />
+
       <PanelHeader>
         <PlaneGlyph $color={accentColor}>{PLANE_GLYPH[plane]}</PlaneGlyph>
         <PlaneLabel>
-          <PlaneLabelAccent $color={accentColor}>{labelPrimary}</PlaneLabelAccent>
-          {` · ${labelSecondary}`}
+          <PlaneLabelAccent $color={accentColor}>{planeLabel.primary}</PlaneLabelAccent>
+          {` · ${planeLabel.secondary}`}
         </PlaneLabel>
       </PanelHeader>
+
       {/* ── Mobile: flex-column right rail (Scrubber → Eye → Counter) ── */}
       {isMobile ? (
         <MobileRightCol>
@@ -891,7 +576,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
               onChange={handleScrub}
             />
           )}
-          <TrayButton label="Align 3D view to this plane" onClick={handleSnapToView}>
+          <TrayButton label="Align 3D view to this plane" onClick={() => requestSnapToView(plane)}>
             <Eye size={11} />
           </TrayButton>
           {total > 0 && (
@@ -905,17 +590,20 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
         /* ── Desktop: ButtonTray (top-right) + absolute Scrubber ── */
         <>
           <ButtonTray>
-            <TrayButton label="Align 3D view to this plane" onClick={handleSnapToView}>
+            <TrayButton
+              label="Align 3D view to this plane"
+              onClick={() => requestSnapToView(plane)}
+            >
               <Eye size={11} />
             </TrayButton>
-            <TrayButton label="Expand panel" onClick={handleExpand}>
+            <TrayButton label="Expand panel" onClick={() => setExpanded(true)}>
               <Maximize2 size={11} />
             </TrayButton>
             {total > 0 && (
               <TrayButton
                 label="Toggle slice scrubber"
                 active={scrubVisible}
-                onClick={handleScrubToggle}
+                onClick={() => setScrubVisible(plane, !scrubVisible)}
               >
                 <ChevronsUpDown size={11} />
               </TrayButton>
@@ -932,9 +620,10 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
           )}
         </>
       )}
+
       <PanelFooter $scrubVisible={scrubberVisible}>
         <span>
-          {footer.hint} · {footer.code}
+          {PLANE_FOOTER[plane].hint} · {PLANE_FOOTER[plane].code}
         </span>
         {!isMobile && total > 0 && (
           <SliceCounter>
@@ -943,11 +632,9 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
           </SliceCounter>
         )}
       </PanelFooter>
-      {adjustedDots.map((dot, i) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: stable index for static measurement dots
-        <MeasureDot key={i} $fx={dot.fx} $fy={dot.fy} $size={MEASURE_DOT_PX} />
-      ))}
+
       {isActive && <ActiveBorder />}
+
       {menu && (
         <MeasureMenu
           x={menu.screenX}
@@ -959,7 +646,8 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
           onClose={closeMenu}
         />
       )}
-      {expanded && <ExpandedSlicePanel plane={plane} onClose={handleCloseExpanded} />}
+
+      {expanded && <ExpandedSlicePanel plane={plane} onClose={() => setExpanded(false)} />}
     </PanelWrap>
   );
 }

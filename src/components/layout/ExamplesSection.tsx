@@ -1,6 +1,6 @@
 import { useViewerActions } from '@/hooks';
+import { useHover } from '@/hooks/useHover';
 import { useVolumeStore } from '@/store';
-import { useState } from 'react';
 import styled from 'styled-components';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -245,20 +245,16 @@ function ExampleCard({
   onLoad: () => void;
   disabled: boolean;
 }) {
-  const [hover, setHover] = useState(false);
-  const interactive = !disabled;
-  const showHover = interactive && hover;
-
-  const handleMouseEnter = () => interactive && setHover(true);
-  const handleMouseLeave = () => setHover(false);
+  const { hover, onMouseEnter, onMouseLeave } = useHover();
+  const showHover = !disabled && hover;
 
   return (
     <CardButton
       type="button"
       disabled={disabled}
       onClick={onLoad}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
+      onMouseEnter={disabled ? undefined : onMouseEnter}
+      onMouseLeave={onMouseLeave}
       aria-label={`Load ${example.title} (${example.subtitle}) — ${example.dims} · ${example.spacing} · ${example.size}`}
       $disabled={disabled}
       $hover={showHover}

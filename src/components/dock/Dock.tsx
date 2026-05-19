@@ -4,18 +4,13 @@ import { RenderCell } from '@/components/dock/RenderCell';
 import { SessionCell } from '@/components/dock/SessionCell';
 import { StudyCell } from '@/components/dock/StudyCell';
 import { useTooltip } from '@/components/ui/Tooltip';
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { useVolumeStore } from '@/store';
 import { ChevronDown } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import styled from 'styled-components';
 
 const DOCK_H = 200;
-
-function prefersReduced() {
-  return (
-    typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-  );
-}
 
 // ── Styled components ──────────────────────────────────────────────────────
 
@@ -135,7 +130,7 @@ function PanelsToggle({
   onToggle: () => void;
 }) {
   const [hover, setHover] = useState(false);
-  const reduced = prefersReduced();
+  const reduced = usePrefersReducedMotion();
   const tip = useTooltip(open ? 'Hide controls' : 'Show controls', true);
 
   const handleMouseEnter = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -173,7 +168,7 @@ export function Dock() {
   const dockOpen = useVolumeStore((s) => s.toolbar.dock);
   const toggleToolbar = useVolumeStore((s) => s.toggleToolbar);
   const view = useVolumeStore((s) => s.view);
-  const reduced = prefersReduced();
+  const reduced = usePrefersReducedMotion();
 
   const handleToggle = () => toggleToolbar('dock');
 

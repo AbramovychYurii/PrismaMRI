@@ -1,5 +1,7 @@
+import { isSlicePlane } from '@/constants';
 import type {
   ActiveMeasurement,
+  AppView,
   ImportProgress,
   LoadedVolume,
   MeasurementPoint,
@@ -13,8 +15,6 @@ import type {
   VolumeCursor,
 } from '@/types';
 import { create } from 'zustand';
-
-export type AppView = 'import' | 'viewer';
 
 interface VolumeState {
   view: AppView;
@@ -58,6 +58,8 @@ interface VolumeActions {
   reset: () => void;
 }
 
+const DEFAULT_SPACING: [number, number, number] = [1, 1, 1];
+
 const initialState: VolumeState = {
   view: 'import',
   volume: null,
@@ -74,7 +76,7 @@ const initialState: VolumeState = {
   },
   error: null,
   toolbar: {
-    planes: 'off' satisfies PlanesMode,
+    planes: 'off',
     clip: false,
     rail: true,
     focus: false,
@@ -86,13 +88,15 @@ const initialState: VolumeState = {
   measurement: null,
   renderPreset: 'mip',
   snapSeq: 0,
-  snapPlane: 'coronal' satisfies SlicePlane,
-  mobileTab: '3d' satisfies MobileTab,
+  snapPlane: 'coronal',
+  mobileTab: '3d',
 };
 
 export const useVolumeStore = create<VolumeState & VolumeActions>((set) => ({
   ...initialState,
+
   setView: (view) => set({ view }),
+
   setVolume: (volume, prepared3D) =>
     set({
       volume,
@@ -112,39 +116,38 @@ export const useVolumeStore = create<VolumeState & VolumeActions>((set) => ({
       snapSeq: 0,
       error: null,
     }),
+
   setCursor: (cursor) =>
     set((state) => {
       const dims = state.volume?.meta.dims;
       if (!dims) return { cursor };
-      const cl = (v: number, max: number) => (v < 0 ? 0 : v > max - 1 ? max - 1 : v);
+      const clampAxis = (v: number, max: number) => Math.max(0, Math.min(max - 1, v));
       return {
         cursor: {
-          x: cl(cursor.x, dims[0]),
-          y: cl(cursor.y, dims[1]),
-          z: cl(cursor.z, dims[2]),
+          x: clampAxis(cursor.x, dims[0]),
+          y: clampAxis(cursor.y, dims[1]),
+          z: clampAxis(cursor.z, dims[2]),
         },
       };
     }),
+
   setActivePlane: (activePlane) => set({ activePlane }),
-  setLoading: (s) =>
-    set((state) => ({
-      loading: { ...state.loading, ...s },
-    })),
+
+  setLoading: (s) => set((state) => ({ loading: { ...state.loading, ...s } })),
+
   setError: (error) => set({ error }),
+
   toggleToolbar: (key) =>
     set((state) => {
-      const newVal = !state.toolbar[key];
-      const patch: Partial<ToolbarState> = { [key]: newVal };
+      const nextValue = !state.toolbar[key];
+      const patch: Partial<ToolbarState> = { [key]: nextValue };
       // Enabling clip requires at least one visible plane — auto-activate if off.
-      if (key === 'clip' && newVal && state.toolbar.planes === 'off') {
-        patch.planes = 'active';
-      }
+      if (key === 'clip' && nextValue && state.toolbar.planes === 'off') patch.planes = 'active';
       // Disabling clip removes the single-plane mode entirely.
-      if (key === 'clip' && !newVal) {
-        patch.planes = 'off';
-      }
+      if (key === 'clip' && !nextValue) patch.planes = 'off';
       return { toolbar: { ...state.toolbar, ...patch } };
     }),
+
   cyclePlanesMode: () =>
     set((state) => {
       const cycle: Record<PlanesMode, PlanesMode> = { off: 'active', active: 'all', all: 'off' };
@@ -154,17 +157,20 @@ export const useVolumeStore = create<VolumeState & VolumeActions>((set) => ({
       if (nextPlanes === 'off' && state.toolbar.clip) patch.clip = false;
       return { toolbar: { ...state.toolbar, ...patch } };
     }),
+
   setWL: (wl) => set((state) => ({ wl: { ...state.wl, ...wl } })),
+
   setWLDraft: (wl) => set((state) => ({ wlDraft: { ...state.wlDraft, ...wl } })),
+
   setScrubVisible: (axis, value) =>
-    set((state) => ({
-      scrubVisible: { ...state.scrubVisible, [axis]: value },
-    })),
+    set((state) => ({ scrubVisible: { ...state.scrubVisible, [axis]: value } })),
+
   setMeasurementFrom: (p) => set({ measurement: { from: p, to: null, distanceMm: null } }),
+
   setMeasurementTo: (p) =>
     set((state) => {
       if (!state.measurement) return {};
-      const spacing = state.volume?.meta.spacing ?? ([1, 1, 1] as [number, number, number]);
+      const spacing = state.volume?.meta.spacing ?? DEFAULT_SPACING;
       const { from } = state.measurement;
       const dx = (p.x - from.x) * spacing[0];
       const dy = (p.y - from.y) * spacing[1];
@@ -177,12 +183,15 @@ export const useVolumeStore = create<VolumeState & VolumeActions>((set) => ({
         },
       };
     }),
+
   clearMeasurement: () => set({ measurement: null }),
+
   setRenderPreset: (renderPreset) =>
     set((state) => {
       const defaultWL = state.volume?.windowLevel ?? state.wl;
       return { renderPreset, wl: defaultWL, wlDraft: defaultWL };
     }),
+
   requestSnapToView: (plane) =>
     set((state) => ({
       snapSeq: state.snapSeq + 1,
@@ -190,14 +199,13 @@ export const useVolumeStore = create<VolumeState & VolumeActions>((set) => ({
       // Sync the active plane so clip / plane-indicator match the snapped view.
       activePlane: plane,
     })),
+
   setMobileTab: (mobileTab) =>
     set((state) => ({
       mobileTab,
       // Sync activePlane when switching to a slice tab.
-      activePlane:
-        mobileTab === 'coronal' || mobileTab === 'sagittal' || mobileTab === 'axial'
-          ? mobileTab
-          : state.activePlane,
+      activePlane: isSlicePlane(mobileTab) ? mobileTab : state.activePlane,
     })),
+
   reset: () => set(initialState),
 }));

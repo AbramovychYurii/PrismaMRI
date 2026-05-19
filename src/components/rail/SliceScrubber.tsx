@@ -1,4 +1,5 @@
 import { PLANE_ACCENT } from '@/constants';
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import type { SlicePlane } from '@/types';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import {
@@ -13,8 +14,6 @@ import styled from 'styled-components';
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
-const ACCENT = PLANE_ACCENT;
-
 const PLANE_NAME: Record<SlicePlane, string> = {
   coronal: 'Coronal',
   sagittal: 'Sagittal',
@@ -25,12 +24,6 @@ const HOLD_DELAY_MS = 350;
 const HOLD_REPEAT_MS = 50;
 const INSET = 4;
 const THUMB_PILL_H = 16;
-
-function prefersReducedMotion(): boolean {
-  return (
-    typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-  );
-}
 
 // ── Styled components ──────────────────────────────────────────────────────
 
@@ -190,7 +183,7 @@ function ChevronButton({
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const interval = useRef<ReturnType<typeof setInterval> | null>(null);
   const delta = dir === 'up' ? 1 : -1;
-  const reduced = prefersReducedMotion();
+  const reduced = usePrefersReducedMotion();
 
   const stopRepeat = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
@@ -250,12 +243,12 @@ export function SliceScrubber({
   onChange,
   inline,
 }: SliceScrubberProps) {
-  const accent = ACCENT[axis];
+  const accent = PLANE_ACCENT[axis];
   const trackRef = useRef<HTMLDivElement>(null);
   const [trackH, setTrackH] = useState(0);
   const draggingRef = useRef(false);
   const rafRef = useRef<number | null>(null);
-  const reduced = prefersReducedMotion();
+  const reduced = usePrefersReducedMotion();
 
   const measure = useCallback(() => {
     if (trackRef.current) setTrackH(trackRef.current.clientHeight);

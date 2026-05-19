@@ -1,3 +1,5 @@
+import type { SlicePlane } from '@/types';
+
 export const APP_NAME = 'PrismaMRI';
 
 export const MAX_3D_TEXTURE_EDGE = 512;
@@ -52,36 +54,44 @@ export const AXIS_ACCENT: Record<Axis, Accent> = {
   z: 'azure',
 };
 
-/** Slice plane → accent (matches the panel headers). */
-export const PLANE_ACCENT_KEY: Record<'coronal' | 'sagittal' | 'axial', Accent> = {
+const SLICE_PLANES: ReadonlyArray<SlicePlane> = ['coronal', 'sagittal', 'axial'];
+
+/** Type guard — narrows an unknown string to SlicePlane. */
+export function isSlicePlane(value: string): value is SlicePlane {
+  return (SLICE_PLANES as ReadonlyArray<string>).includes(value);
+}
+
+/** Slice plane → accent name (matches the panel headers). */
+export const PLANE_ACCENT_KEY: Record<SlicePlane, Accent> = {
   coronal: 'amber',
   sagittal: 'violet',
   axial: 'azure',
 };
 
-export const PLANE_ACCENT: Record<'coronal' | 'sagittal' | 'axial', string> = {
+/** Slice plane → CSS accent variable. */
+export const PLANE_ACCENT: Record<SlicePlane, string> = {
   coronal: ACCENT_VAR[PLANE_ACCENT_KEY.coronal],
   sagittal: ACCENT_VAR[PLANE_ACCENT_KEY.sagittal],
   axial: ACCENT_VAR[PLANE_ACCENT_KEY.axial],
 };
 
-export const PLANE_GLYPH: Record<'coronal' | 'sagittal' | 'axial', string> = {
+/** Italic glyph rendered in slice panel headers. */
+export const PLANE_GLYPH: Record<SlicePlane, string> = {
   coronal: 'C',
   sagittal: 'S',
   axial: 'A',
 };
 
-export const PLANE_FOOTER: Record<
-  'coronal' | 'sagittal' | 'axial',
-  { hint: string; code: string }
-> = {
+/** Anatomical orientation hint and axis code shown in the slice panel footer. */
+export const PLANE_FOOTER: Record<SlicePlane, { hint: string; code: string }> = {
   coronal: { hint: 'R ← → L', code: 'XZ' },
   sagittal: { hint: 'A ← → P', code: 'YZ' },
   axial: { hint: 'R ← → L', code: 'XY' },
 };
 
-export const PLANE_LABEL: Record<'coronal' | 'sagittal' | 'axial', string> = {
-  coronal: 'Coronal · frontal',
-  sagittal: 'Sagittal · lateral',
-  axial: 'Axial · transverse',
+/** Human-readable plane label split into primary and secondary parts for styled rendering. */
+export const PLANE_LABEL: Record<SlicePlane, { primary: string; secondary: string }> = {
+  coronal: { primary: 'Coronal', secondary: 'frontal' },
+  sagittal: { primary: 'Sagittal', secondary: 'lateral' },
+  axial: { primary: 'Axial', secondary: 'transverse' },
 };

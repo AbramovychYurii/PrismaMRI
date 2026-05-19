@@ -1,12 +1,13 @@
 import { ExamplesSection } from '@/components/layout/ExamplesSection';
 import { APP_NAME } from '@/constants';
 import { useViewerActions } from '@/hooks';
+import { type FsEntry, collectFilesFromEntry } from '@/lib/import/scan-folder';
 import { useVolumeStore } from '@/store';
 import { FolderOpen } from 'lucide-react';
 import { useState } from 'react';
 import styled from 'styled-components';
 
-// ── Types ──────────────────────────────────────────────────────────────────
+// ── Data ───────────────────────────────────────────────────────────────────
 
 const FORMATS = [
   { token: 'DCM', rest: ' series' },
@@ -15,46 +16,6 @@ const FORMATS = [
   { token: 'NRRD', rest: '' },
   { token: 'ZIP', rest: '' },
 ];
-
-interface FsEntry {
-  isFile: boolean;
-  isDirectory: boolean;
-  file: (cb: (f: File) => void) => void;
-  createReader: () => {
-    readEntries: (cb: (entries: FsEntry[]) => void) => void;
-  };
-}
-
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-async function collectFromEntry(entry: FsEntry, path: string, out: File[]): Promise<void> {
-  if (entry.isFile) {
-    const file = await new Promise<File>((res) => entry.file(res));
-    Object.defineProperty(file, 'webkitRelativePath', {
-      value: path ? `${path}/${file.name}` : file.name,
-      configurable: true,
-    });
-    out.push(file);
-    return;
-  }
-  if (entry.isDirectory) {
-    const reader = entry.createReader();
-    const readBatch = () => new Promise<FsEntry[]>((res) => reader.readEntries(res));
-    let batch = await readBatch();
-    while (batch.length > 0) {
-      for (const e of batch) {
-        await collectFromEntry(
-          e,
-          path
-            ? `${path}/${(e as unknown as { name: string }).name}`
-            : (e as unknown as { name: string }).name,
-          out,
-        );
-      }
-      batch = await readBatch();
-    }
-  }
-}
 
 // ── Styled components ──────────────────────────────────────────────────────
 
@@ -307,30 +268,29 @@ export function ImportOverlay() {
   async function handleDrop(e: React.DragEvent) {
     e.preventDefault();
     setHover(false);
-    const items = Array.from(e.dataTransfer.items);
-    const entries = items
-      .map((it) => it.webkitGetAsEntry?.() as unknown as FsEntry | null)
-      .filter((x): x is FsEntry => !!x);
+
+    const entries = Array.from(e.dataTransfer.items)
+      .map((item) => item.webkitGetAsEntry?.() as unknown as FsEntry | null)
+      .filter((entry): entry is FsEntry => entry !== null);
+
     if (entries.length > 0) {
       const files: File[] = [];
       for (const entry of entries) {
-        await collectFromEntry(entry, '', files);
+        await collectFilesFromEntry(entry, '', files);
       }
       if (files.length > 0) {
         openFiles(files);
         return;
       }
     }
+
     if (e.dataTransfer.files.length > 0) openFiles(e.dataTransfer.files);
   }
 
-  const handleMouseEnter = () => setHover(true);
-  const handleMouseLeave = () => setHover(false);
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setHover(true);
   };
-  const handleDragLeave = () => setHover(false);
 
   return (
     <ImportMain aria-label="PrismaMRI — import a medical volume">
@@ -371,19 +331,19 @@ export function ImportOverlay() {
               No upload, no cloud, no telemetry. Data never leaves the browser.
             </DisclaimerText>
           </LeftCol>
+
           {/* ── Drop zone ── */}
           <div>
             <DropZone
               as="section"
               aria-label="Drag-and-drop target — drop a volume file here to open it"
-              onMouseEnter={handleMouseEnter}
-              onMouseLeave={handleMouseLeave}
+              onMouseEnter={() => setHover(true)}
+              onMouseLeave={() => setHover(false)}
               onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
+              onDragLeave={() => setHover(false)}
               onDrop={handleDrop}
               $hover={hover}
             >
-              {/* Decorative corner accents */}
               <CornerAccentTL aria-hidden="true" />
               <CornerAccentBR aria-hidden="true" />
 
@@ -395,7 +355,6 @@ export function ImportOverlay() {
                 style={{ color: 'var(--amber)', marginBottom: 22 }}
               />
 
-              {/* Loading status announced to screen readers */}
               <LoadingTitle aria-live="polite" aria-atomic="true">
                 {loading.active ? loading.message || 'Loading…' : 'Drop volume to begin'}
               </LoadingTitle>

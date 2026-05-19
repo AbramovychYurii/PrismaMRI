@@ -38,3 +38,51 @@ export async function fromDirectoryHandle(
   await walk(handle, '');
   return { rootName: handle.name, files };
 }
+
+// ── Drag-and-drop via the legacy FileSystem Entry API ──────────────────────
+
+/**
+ * Minimal surface of the FileSystem Entry API. Only the properties used by
+ * {@link collectFilesFromEntry} are declared — the full spec is not needed.
+ */
+export interface FsEntry {
+  isFile: boolean;
+  isDirectory: boolean;
+  name: string;
+  file: (cb: (f: File) => void) => void;
+  createReader: () => {
+    readEntries: (cb: (entries: FsEntry[]) => void) => void;
+  };
+}
+
+/**
+ * Recursively collects File objects from a drag-and-drop FileSystem Entry,
+ * stamping each file with a `webkitRelativePath`-compatible relative path.
+ */
+export async function collectFilesFromEntry(
+  entry: FsEntry,
+  path: string,
+  out: File[],
+): Promise<void> {
+  if (entry.isFile) {
+    const file = await new Promise<File>((resolve) => entry.file(resolve));
+    Object.defineProperty(file, 'webkitRelativePath', {
+      value: path ? `${path}/${file.name}` : file.name,
+      configurable: true,
+    });
+    out.push(file);
+    return;
+  }
+
+  if (entry.isDirectory) {
+    const reader = entry.createReader();
+    const readBatch = () => new Promise<FsEntry[]>((resolve) => reader.readEntries(resolve));
+    let batch = await readBatch();
+    while (batch.length > 0) {
+      for (const child of batch) {
+        await collectFilesFromEntry(child, path ? `${path}/${child.name}` : child.name, out);
+      }
+      batch = await readBatch();
+    }
+  }
+}

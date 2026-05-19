@@ -1,6 +1,6 @@
+import { useHover } from '@/hooks/useHover';
 import { useVolumeStore } from '@/store';
 import type { RenderPreset } from '@/types';
-import { useState } from 'react';
 import styled from 'styled-components';
 
 // ── Styled components ──────────────────────────────────────────────────────
@@ -82,15 +82,15 @@ function PresetButton({
   active: boolean;
   onClick: () => void;
 }) {
-  const [hover, setHover] = useState(false);
+  const { hover, onMouseEnter, onMouseLeave } = useHover();
   return (
     <PresetBtn
       type="button"
       $active={active}
       $hover={hover && !active}
       onClick={onClick}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       aria-pressed={active}
     >
       <PresetName $active={active}>{name}</PresetName>

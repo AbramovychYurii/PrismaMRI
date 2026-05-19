@@ -1,10 +1,10 @@
 import { Tooltip } from '@/components/ui/Tooltip';
 import { accentRgba } from '@/constants';
+import { useHover } from '@/hooks/useHover';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { useVolumeStore } from '@/store';
 import type { PlanesMode, ToolbarState } from '@/types';
 import { Maximize2, PanelRight } from 'lucide-react';
-import { useState } from 'react';
 import styled from 'styled-components';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -164,7 +164,7 @@ const PLANES_TIP: Record<PlanesMode, string> = {
 function PlanesButton() {
   const mode = useVolumeStore((s) => s.toolbar.planes);
   const cyclePlanesMode = useVolumeStore((s) => s.cyclePlanesMode);
-  const [hover, setHover] = useState(false);
+  const { hover, onMouseEnter, onMouseLeave } = useHover();
 
   const on = mode !== 'off';
   const icon: Record<PlanesMode, React.ReactNode> = {
@@ -172,18 +172,15 @@ function PlanesButton() {
     active: <IconLayerOne />,
     all: <IconLayersAll />,
   };
-  const handleClick = () => cyclePlanesMode();
-  const handleMouseEnter = () => setHover(true);
-  const handleMouseLeave = () => setHover(false);
 
   return (
     <Tooltip label={PLANES_TIP[mode]}>
       <ToolBtn
         type="button"
         aria-label={PLANES_TIP[mode]}
-        onClick={handleClick}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
+        onClick={cyclePlanesMode}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
         $on={on}
         $hover={hover}
       >
@@ -196,20 +193,16 @@ function PlanesButton() {
 function ClipButton() {
   const on = useVolumeStore((s) => s.toolbar.clip);
   const toggle = useVolumeStore((s) => s.toggleToolbar);
-  const [hover, setHover] = useState(false);
-
-  const handleClick = () => toggle('clip');
-  const handleMouseEnter = () => setHover(true);
-  const handleMouseLeave = () => setHover(false);
+  const { hover, onMouseEnter, onMouseLeave } = useHover();
 
   return (
     <Tooltip label={on ? 'Disable clip mode' : 'Clip volume at active slice'}>
       <ToolBtn
         type="button"
         aria-label={on ? 'Disable clip mode' : 'Clip volume at active slice'}
-        onClick={handleClick}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
+        onClick={() => toggle('clip')}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
         $on={on}
         $hover={hover}
       >
@@ -222,20 +215,16 @@ function ClipButton() {
 function ToolButton({ btn }: { btn: ToolbarButton }) {
   const on = useVolumeStore((s) => s.toolbar[btn.id]);
   const toggle = useVolumeStore((s) => s.toggleToolbar);
-  const [hover, setHover] = useState(false);
-
-  const handleClick = () => toggle(btn.id);
-  const handleMouseEnter = () => setHover(true);
-  const handleMouseLeave = () => setHover(false);
+  const { hover, onMouseEnter, onMouseLeave } = useHover();
 
   return (
     <Tooltip label={on ? btn.tipOn : btn.tipOff}>
       <ToolBtn
         type="button"
         aria-label={on ? btn.tipOn : btn.tipOff}
-        onClick={handleClick}
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
+        onClick={() => toggle(btn.id)}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
         $on={on}
         $hover={hover}
       >

@@ -109,12 +109,6 @@ export function useViewerApp() {
   const loadFromUrl = useCallback(
     async (url: string, filename: string) => {
       setError(null);
-      // setLoading({
-      //   active: true,
-      //   percent: 0,
-      //   stage: "scanning",
-      //   message: "Fetching…",
-      // });
       try {
         const blob = await fetchBlobWithProgress(url, (loaded, total) => {
           const percent = total > 0 ? Math.min(99, Math.round((loaded / total) * 100)) : 0;
