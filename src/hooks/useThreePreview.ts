@@ -12,6 +12,9 @@ export function useThreePreview(canvasRef: React.RefObject<HTMLCanvasElement | n
   const prepared3D = useVolumeStore((s) => s.prepared3D);
   const cursor = useVolumeStore((s) => s.cursor);
   const planesMode = useVolumeStore((s) => s.toolbar.planes);
+  const clipMode = useVolumeStore((s) => s.toolbar.clip);
+  const snapSeq = useVolumeStore((s) => s.snapSeq);
+  const snapPlane = useVolumeStore((s) => s.snapPlane);
   const activePlane = useVolumeStore((s) => s.activePlane);
   const railOpen = useVolumeStore((s) => s.toolbar.rail);
   const wlDraft = useVolumeStore((s) => s.wlDraft);
@@ -62,6 +65,17 @@ export function useThreePreview(canvasRef: React.RefObject<HTMLCanvasElement | n
   useEffect(() => {
     previewRef.current?.setPlaneMode(planesMode, activePlane ?? DEFAULT_PLANE);
   }, [planesMode, activePlane]);
+
+  // Clip mode
+  useEffect(() => {
+    previewRef.current?.setClipMode(clipMode);
+  }, [clipMode]);
+
+  // Snap camera to plane view — triggered by requestSnapToView in the store.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: snapSeq is the trigger, snapPlane is its payload
+  useEffect(() => {
+    if (snapSeq > 0) previewRef.current?.snapToPlane(snapPlane);
+  }, [snapSeq]);
 
   // Measurement line
   useEffect(() => {

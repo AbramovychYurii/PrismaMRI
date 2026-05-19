@@ -164,6 +164,8 @@ export const VolumeShader = {
     uniform int       u_planeMode;
     uniform int       u_activePlane;
     uniform vec3      u_planePos;
+    /** 0 = off, 1 = clip active plane (hide the camera-side half). */
+    uniform int       u_clipMode;
 
     varying vec3 vVoxelPos;
 
@@ -217,6 +219,22 @@ export const VolumeShader = {
       return texture(u_cmdata, vec2(mapped, 0.5));
     }
 
+    // Clip-mode cut face: faint plane tint so the extent is always visible, then
+    // real tissue colour on top where the volume has data.
+    void blendCutFace(vec3 cutVox, vec3 planeColor, inout vec4 acc) {
+      // Always paint a subtle tint — keeps the panel visible even in empty/air regions.
+      const float TINT = 0.10;
+      float ta = (1.0 - acc.a) * TINT;
+      acc.rgb += ta * planeColor; acc.a += ta;
+      // Overlay actual tissue on top (only inside volume bounds).
+      if (any(lessThan(cutVox, vec3(0.0))) || any(greaterThan(cutVox, u_size))) return;
+      vec4 ptf = sampleTF(sampleVol(cutVox));
+      if (ptf.a < 0.004) return;
+      float contrib = (1.0 - acc.a) * ptf.a;
+      acc.rgb += contrib * ptf.rgb;
+      acc.a   += contrib;
+    }
+
     void main() {
       // ── Orthographic ray setup ────────────────────────────────────────────
       // All rays are parallel (same direction). For the back-face fragment at
@@ -249,6 +267,13 @@ export const VolumeShader = {
       bool showSag = u_planeMode == 2 || (u_planeMode == 1 && u_activePlane == 1);
       bool showAxi = u_planeMode == 2 || (u_planeMode == 1 && u_activePlane == 2);
 
+      // Clip mode: always show the cut-face plane regardless of planeMode setting.
+      if (u_clipMode == 1) {
+        if (u_activePlane == 0) showCor = true;
+        else if (u_activePlane == 1) showSag = true;
+        else showAxi = true;
+      }
+
       // Ray-plane t-values; 1e9 = "no intersection"
       float tCor = 1.0e9;
       float tSag = 1.0e9;
@@ -273,6 +298,14 @@ export const VolumeShader = {
           if (i >= u_steps) break;
           vec3 vox = rayOrigin + (tEntry + (float(i) + 0.5) * dt) * rayDir;
           if (any(lessThan(vox, vec3(0.0))) || any(greaterThan(vox, u_size))) continue;
+          // Clip: skip voxels on the camera-side of the active plane.
+          if (u_clipMode == 1) {
+            float voxA  = u_activePlane == 0 ? vox.y  : u_activePlane == 1 ? vox.x  : vox.z;
+            float planA = u_activePlane == 0 ? u_planePos.y : u_activePlane == 1 ? u_planePos.x : u_planePos.z;
+            float camA  = u_activePlane == 0 ? u_camVoxel.y : u_activePlane == 1 ? u_camVoxel.x : u_camVoxel.z;
+            if (camA > planA && voxA > planA) continue;
+            if (camA < planA && voxA < planA) continue;
+          }
           maxI = max(maxI, sampleVol(vox));
         }
         bool noTissue = maxI < u_clim.x + 0.001;
@@ -280,11 +313,13 @@ export const VolumeShader = {
         if (noTissue && !anyPlane) { discard; }
 
         vec4 col = noTissue ? vec4(0.0) : sampleTF(maxI);
-        // Blend planes uniformly over MIP (MIP has no depth ordering)
-        const float P_MIP = 0.35;
-        if (tCor < 1.0e8) { col.rgb = mix(col.rgb, P_COR, P_MIP); col.a = max(col.a, P_MIP); }
-        if (tSag < 1.0e8) { col.rgb = mix(col.rgb, P_SAG, P_MIP); col.a = max(col.a, P_MIP); }
-        if (tAxi < 1.0e8) { col.rgb = mix(col.rgb, P_AXI, P_MIP); col.a = max(col.a, P_MIP); }
+        // Active plane in clip mode gets a subtle tint only (tissue is already visible).
+        // Non-active planes and normal mode keep the full accent colour.
+        const float P_MIP      = 0.35;
+        const float P_MIP_CLIP = 0.08;
+        if (tCor < 1.0e8) { float f = (u_clipMode == 1 && u_activePlane == 0) ? P_MIP_CLIP : P_MIP; col.rgb = mix(col.rgb, P_COR, f); col.a = max(col.a, f); }
+        if (tSag < 1.0e8) { float f = (u_clipMode == 1 && u_activePlane == 1) ? P_MIP_CLIP : P_MIP; col.rgb = mix(col.rgb, P_SAG, f); col.a = max(col.a, f); }
+        if (tAxi < 1.0e8) { float f = (u_clipMode == 1 && u_activePlane == 2) ? P_MIP_CLIP : P_MIP; col.rgb = mix(col.rgb, P_AXI, f); col.a = max(col.a, f); }
         gl_FragColor = col;
         return;
       }
@@ -302,23 +337,36 @@ export const VolumeShader = {
         float t_lo = tEntry + float(i) * dt;
         float t_hi = t_lo + dt;
 
-        // Blend any plane whose intersection t falls within this step interval
+        // Blend any plane whose intersection t falls within this step interval.
+        // Active plane in clip mode → real tissue cross-section (tint + sample).
+        // Every other plane (including non-active in clip mode) → flat accent colour.
         if (!doneCor && tCor >= t_lo && tCor < t_hi) {
-          float pa = (1.0 - acc.a) * P_ALPHA;
-          acc.rgb += pa * P_COR; acc.a += pa; doneCor = true;
+          if (u_clipMode == 1 && u_activePlane == 0) { blendCutFace(rayOrigin + tCor * rayDir, P_COR, acc); }
+          else { float pa = (1.0 - acc.a) * P_ALPHA; acc.rgb += pa * P_COR; acc.a += pa; }
+          doneCor = true;
         }
         if (!doneSag && tSag >= t_lo && tSag < t_hi) {
-          float pa = (1.0 - acc.a) * P_ALPHA;
-          acc.rgb += pa * P_SAG; acc.a += pa; doneSag = true;
+          if (u_clipMode == 1 && u_activePlane == 1) { blendCutFace(rayOrigin + tSag * rayDir, P_SAG, acc); }
+          else { float pa = (1.0 - acc.a) * P_ALPHA; acc.rgb += pa * P_SAG; acc.a += pa; }
+          doneSag = true;
         }
         if (!doneAxi && tAxi >= t_lo && tAxi < t_hi) {
-          float pa = (1.0 - acc.a) * P_ALPHA;
-          acc.rgb += pa * P_AXI; acc.a += pa; doneAxi = true;
+          if (u_clipMode == 1 && u_activePlane == 2) { blendCutFace(rayOrigin + tAxi * rayDir, P_AXI, acc); }
+          else { float pa = (1.0 - acc.a) * P_ALPHA; acc.rgb += pa * P_AXI; acc.a += pa; }
+          doneAxi = true;
         }
 
         float t   = t_lo + 0.5 * dt;
         vec3  vox = rayOrigin + t * rayDir;
         if (any(lessThan(vox, vec3(0.0))) || any(greaterThan(vox, u_size))) continue;
+        // Clip: skip voxels on the camera-side of the active plane.
+        if (u_clipMode == 1) {
+          float voxA  = u_activePlane == 0 ? vox.y  : u_activePlane == 1 ? vox.x  : vox.z;
+          float planA = u_activePlane == 0 ? u_planePos.y : u_activePlane == 1 ? u_planePos.x : u_planePos.z;
+          float camA  = u_activePlane == 0 ? u_camVoxel.y : u_activePlane == 1 ? u_camVoxel.x : u_camVoxel.z;
+          if (camA > planA && voxA > planA) continue;
+          if (camA < planA && voxA < planA) continue;
+        }
 
         float intensity = sampleVol(vox);
         vec4  tf        = sampleTF(intensity);

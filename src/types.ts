@@ -108,6 +108,7 @@ export type PlanesMode = 'off' | 'active' | 'all';
 
 export interface ToolbarState {
   planes: PlanesMode;
+  clip: boolean;
   rail: boolean;
   focus: boolean;
   dock: boolean;

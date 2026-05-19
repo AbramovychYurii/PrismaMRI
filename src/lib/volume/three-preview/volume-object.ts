@@ -47,6 +47,8 @@ export function buildMaterial(
     u_activePlane: { value: 0 },
     /** Cursor position in voxel / texture space. */
     u_planePos: { value: new THREE.Vector3() },
+    /** 0 = off, 1 = clip active plane (hide camera-side half). */
+    u_clipMode: { value: 0 },
   };
 
   return new THREE.ShaderMaterial({

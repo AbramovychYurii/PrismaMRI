@@ -29,6 +29,9 @@ interface VolumeState {
   scrubVisible: Record<SlicePlane, boolean>;
   measurement: ActiveMeasurement | null;
   renderPreset: RenderPreset;
+  /** Increments each time a snap-to-plane is requested. Hook watches for changes. */
+  snapSeq: number;
+  snapPlane: SlicePlane;
 }
 
 interface VolumeActions {
@@ -47,6 +50,7 @@ interface VolumeActions {
   setMeasurementTo: (p: MeasurementPoint) => void;
   clearMeasurement: () => void;
   setRenderPreset: (preset: RenderPreset) => void;
+  requestSnapToView: (plane: SlicePlane) => void;
   reset: () => void;
 }
 
@@ -65,12 +69,20 @@ const initialState: VolumeState = {
     message: '',
   },
   error: null,
-  toolbar: { planes: 'off' satisfies PlanesMode, rail: true, focus: false, dock: true },
+  toolbar: {
+    planes: 'off' satisfies PlanesMode,
+    clip: false,
+    rail: true,
+    focus: false,
+    dock: true,
+  },
   wl: { window: 3200, level: 1600 },
   wlDraft: { window: 3200, level: 1600 },
   scrubVisible: { coronal: true, sagittal: true, axial: true },
   measurement: null,
   renderPreset: 'mip',
+  snapSeq: 0,
+  snapPlane: 'coronal' satisfies SlicePlane,
 };
 
 export const useVolumeStore = create<VolumeState & VolumeActions>((set) => ({
@@ -90,6 +102,9 @@ export const useVolumeStore = create<VolumeState & VolumeActions>((set) => ({
       wlDraft: volume.windowLevel,
       measurement: null,
       renderPreset: 'mip',
+      toolbar: initialState.toolbar,
+      activePlane: initialState.activePlane,
+      snapSeq: 0,
       error: null,
     }),
   setCursor: (cursor) =>
@@ -112,11 +127,27 @@ export const useVolumeStore = create<VolumeState & VolumeActions>((set) => ({
     })),
   setError: (error) => set({ error }),
   toggleToolbar: (key) =>
-    set((state) => ({ toolbar: { ...state.toolbar, [key]: !state.toolbar[key] } })),
+    set((state) => {
+      const newVal = !state.toolbar[key];
+      const patch: Partial<ToolbarState> = { [key]: newVal };
+      // Enabling clip requires at least one visible plane — auto-activate if off.
+      if (key === 'clip' && newVal && state.toolbar.planes === 'off') {
+        patch.planes = 'active';
+      }
+      // Disabling clip removes the single-plane mode entirely.
+      if (key === 'clip' && !newVal) {
+        patch.planes = 'off';
+      }
+      return { toolbar: { ...state.toolbar, ...patch } };
+    }),
   cyclePlanesMode: () =>
     set((state) => {
       const cycle: Record<PlanesMode, PlanesMode> = { off: 'active', active: 'all', all: 'off' };
-      return { toolbar: { ...state.toolbar, planes: cycle[state.toolbar.planes] } };
+      const nextPlanes = cycle[state.toolbar.planes];
+      const patch: Partial<ToolbarState> = { planes: nextPlanes };
+      // Turning planes off while clip is on → also disable clip.
+      if (nextPlanes === 'off' && state.toolbar.clip) patch.clip = false;
+      return { toolbar: { ...state.toolbar, ...patch } };
     }),
   setWL: (wl) => set((state) => ({ wl: { ...state.wl, ...wl } })),
   setWLDraft: (wl) => set((state) => ({ wlDraft: { ...state.wlDraft, ...wl } })),
@@ -147,5 +178,12 @@ export const useVolumeStore = create<VolumeState & VolumeActions>((set) => ({
       const defaultWL = state.volume?.windowLevel ?? state.wl;
       return { renderPreset, wl: defaultWL, wlDraft: defaultWL };
     }),
+  requestSnapToView: (plane) =>
+    set((state) => ({
+      snapSeq: state.snapSeq + 1,
+      snapPlane: plane,
+      // Sync the active plane so clip / plane-indicator match the snapped view.
+      activePlane: plane,
+    })),
   reset: () => set(initialState),
 }));

@@ -39,6 +39,31 @@ function IconLayersAll() {
   );
 }
 
+/**
+ * Clip plane icon — hemisphere with a flat cut face.
+ * Left half: curved outer surface. Right half: flat inner face (ellipse rim).
+ */
+function IconClipPlane() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={20}
+      height={20}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.6}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {/* Outer curved half — open semicircle, no closing vertical line */}
+      <path d="M12 3 A9 9 0 1 0 12 21" />
+      {/* Cut-face ellipse — full brightness matching the rest of the icon */}
+      <ellipse cx="12" cy="12" rx="2.8" ry="9" />
+    </svg>
+  );
+}
+
 /** Single layer — "active plane only" */
 function IconLayerOne() {
   return (
@@ -129,6 +154,26 @@ function PlanesButton() {
   );
 }
 
+function ClipButton() {
+  const on = useVolumeStore((s) => s.toolbar.clip);
+  const toggle = useVolumeStore((s) => s.toggleToolbar);
+  const [hover, setHover] = useState(false);
+
+  return (
+    <ToolBtn
+      type="button"
+      aria-label={on ? 'Disable clip plane' : 'Enable clip plane'}
+      onClick={() => toggle('clip')}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      $on={on}
+      $hover={hover}
+    >
+      <IconClipPlane />
+    </ToolBtn>
+  );
+}
+
 function ToolButton({ btn }: { btn: ToolbarButton }) {
   const on = useVolumeStore((s) => s.toolbar[btn.id]);
   const toggle = useVolumeStore((s) => s.toggleToolbar);
@@ -157,6 +202,7 @@ export function ToolbarPill() {
   return (
     <PillWrap>
       <PlanesButton />
+      <ClipButton />
       {BUTTONS.map((b) => (
         <ToolButton key={b.id} btn={b} />
       ))}
