@@ -169,3 +169,35 @@ textarea {
 .wl-slider:focus-visible {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent);
 }
+
+/* ── Mobile overrides (≤ 767px) ────────────────────────────────────────────── */
+
+@media (max-width: 767px) {
+  body {
+    /* Prevent pull-to-refresh and other unwanted touch behaviours. */
+    overscroll-behavior: none;
+    touch-action: manipulation;
+  }
+
+  /* Larger, easier-to-hit slider thumb on touch screens. */
+  .wl-slider {
+    height: 6px;
+    cursor: default;
+  }
+  .wl-slider::-webkit-slider-thumb {
+    width: 26px;
+    height: 26px;
+    cursor: default;
+  }
+  .wl-slider::-moz-range-thumb {
+    width: 26px;
+    height: 26px;
+    cursor: default;
+  }
+
+  /* Thinner scrollbars — less visual noise on small screens. */
+  ::-webkit-scrollbar {
+    width: 3px;
+    height: 3px;
+  }
+}

@@ -29,6 +29,12 @@ const normalStyles = css`
   );
   overflow: hidden;
   border-right: 1px solid var(--rule);
+
+  @media (max-width: 767px) {
+    /* StageWrap is position:absolute;inset:0 — child needs explicit height to fill it. */
+    height: 100%;
+    border-right: none;
+  }
 `;
 
 const StageSection = styled.section<{ $focus: boolean }>`

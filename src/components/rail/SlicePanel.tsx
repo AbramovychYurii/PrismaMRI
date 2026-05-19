@@ -12,6 +12,7 @@ import {
   accentRgba,
 } from '@/constants';
 import { useMeasurementInteraction, useSliceImage, useSliceScroll } from '@/hooks';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import type { DrawFracs } from '@/hooks/useMeasurementInteraction';
 import { clamp } from '@/lib/volume/math';
 import { useVolumeStore } from '@/store';
@@ -123,6 +124,7 @@ const PanelWrap = styled.div<{ $isLast: boolean; $isActive: boolean }>`
   border-bottom: ${({ $isLast }) => ($isLast ? 'none' : '1px solid var(--rule)')};
   overflow: hidden;
   cursor: ${({ $isActive }) => ($isActive ? 'crosshair' : 'pointer')};
+  touch-action: none;
 `;
 
 const StyledCanvas = styled.canvas`
@@ -305,6 +307,13 @@ const TrayBtn = styled.button<{ $active?: boolean; $hover: boolean }>`
   justify-content: center;
   cursor: pointer;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
+
+  @media (max-width: 767px) {
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+  }
 `;
 
 const FullscreenOverlay = styled.div<{ $isActive: boolean }>`
@@ -630,6 +639,9 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
   const cursor = useVolumeStore((s) => s.cursor);
   const [canvasSize, setCanvasSize] = useState({ w: 1, h: 1 });
   const [expanded, setExpanded] = useState(false);
+  const isMobile = useIsMobile();
+  // Touch-swipe slice navigation — tracks gesture start state.
+  const touchRef = useRef<{ startY: number; startIdx: number } | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -759,6 +771,32 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
 
   const handleScrubToggle = () => setScrubVisible(plane, !scrubVisible);
 
+  // ── Touch swipe to scroll slices ─────────────────────────────────────────
+  function handleTouchStart(e: React.TouchEvent) {
+    if (!isActive) {
+      setActivePlane(plane);
+    }
+    const t = e.touches[0];
+    touchRef.current = { startY: t.clientY, startIdx: idx };
+  }
+
+  function handleTouchMove(e: React.TouchEvent) {
+    if (!touchRef.current) return;
+    const t = e.touches[0];
+    const dy = touchRef.current.startY - t.clientY;
+    // Sensitivity: traverse full range over 300 px of swipe.
+    const step = Math.round((dy / 300) * total);
+    if (step === 0) return;
+    const newIdx = Math.max(1, Math.min(total, touchRef.current.startIdx + step));
+    handleScrub(newIdx);
+    // Update reference for continuous smooth scrubbing.
+    touchRef.current = { startY: t.clientY, startIdx: newIdx };
+  }
+
+  function handleTouchEnd() {
+    touchRef.current = null;
+  }
+
   function handleContextMenu(e: React.MouseEvent) {
     e.preventDefault();
     setActivePlane(plane);
@@ -768,11 +806,17 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
   const accentColor = PLANE_ACCENT[plane];
   const [labelPrimary, labelSecondary] = PLANE_LABEL[plane].split(' · ');
 
+  // On mobile the scrubber is always visible — no toggle needed.
+  const scrubberVisible = isMobile || scrubVisible;
+
   return (
     <PanelWrap
       onClick={handleClick}
       onContextMenu={handleContextMenu}
       onWheel={onWheel}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
       $isLast={isLast}
       $isActive={isActive}
     >
@@ -797,10 +841,13 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
         <TrayButton label="Align 3D view to this plane" onClick={() => requestSnapToView(plane)}>
           <Eye size={11} />
         </TrayButton>
-        <TrayButton label="Expand panel" onClick={() => setExpanded(true)}>
-          <Maximize2 size={11} />
-        </TrayButton>
-        {total > 0 && (
+        {/* Expand is hidden on mobile — the panel is already full-screen. */}
+        {!isMobile && (
+          <TrayButton label="Expand panel" onClick={() => setExpanded(true)}>
+            <Maximize2 size={11} />
+          </TrayButton>
+        )}
+        {total > 0 && !isMobile && (
           <TrayButton
             label="Toggle slice scrubber"
             active={scrubVisible}
@@ -815,11 +862,11 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
           axis={plane}
           slice={idx}
           total={total}
-          visible={scrubVisible}
+          visible={scrubberVisible}
           onChange={handleScrub}
         />
       )}
-      <PanelFooter $scrubVisible={scrubVisible}>
+      <PanelFooter $scrubVisible={scrubberVisible}>
         <span>
           {footer.hint} · {footer.code}
         </span>

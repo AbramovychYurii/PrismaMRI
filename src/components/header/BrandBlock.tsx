@@ -8,6 +8,11 @@ const BrandWrap = styled.div`
   gap: 12px;
   padding: 0 22px;
   border-right: 1px solid var(--rule);
+
+  @media (max-width: 767px) {
+    border-right: none;
+    padding: 0 16px;
+  }
 `;
 
 const LogoBox = styled.div`

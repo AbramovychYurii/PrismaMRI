@@ -71,7 +71,7 @@ const EXAMPLES: ExampleMeta[] = [
 
 const ExamplesSectionWrap = styled.section`
   width: 100%;
-  margin-top: 48px;
+  margin-top: 36px;
   border-top: 1px solid var(--rule);
   padding-top: 24px;
 `;
@@ -90,6 +90,10 @@ const SectionTitle = styled.h2`
   font-weight: 400;
   color: var(--ink);
   margin: 0;
+
+  @media (max-width: 767px) {
+    font-style: normal;
+  }
 `;
 
 const SectionLabel = styled.span`
@@ -107,6 +111,15 @@ const CardList = styled.ul`
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
+
+  @media (max-width: 767px) {
+    grid-template-columns: repeat(3, 72vw);
+    overflow-x: auto;
+    padding-bottom: 8px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    &::-webkit-scrollbar { display: none; }
+  }
 `;
 
 const CardButton = styled.button<{ $disabled: boolean; $hover: boolean }>`

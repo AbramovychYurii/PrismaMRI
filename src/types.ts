@@ -2,6 +2,7 @@ export type Vec3 = [number, number, number];
 
 export type VolumeAxis = 'x' | 'y' | 'z';
 export type SlicePlane = 'coronal' | 'sagittal' | 'axial';
+export type MobileTab = '3d' | 'coronal' | 'sagittal' | 'axial' | 'controls';
 
 export interface SliceWindowLevel {
   window: number;

@@ -1,5 +1,6 @@
 import { Tooltip } from '@/components/ui/Tooltip';
 import { accentRgba } from '@/constants';
+import { useIsMobile } from '@/hooks/useIsMobile';
 import { useVolumeStore } from '@/store';
 import type { PlanesMode, ToolbarState } from '@/types';
 import { Maximize2, PanelRight } from 'lucide-react';
@@ -14,6 +15,8 @@ interface ToolbarButton {
   label?: string;
   tipOff: string;
   tipOn: string;
+  /** Hide this button on mobile — it's meaningless without the sidebar. */
+  mobileHidden?: boolean;
 }
 
 // ── Icons ──────────────────────────────────────────────────────────────────
@@ -89,12 +92,19 @@ function IconLayerOne() {
 // ── Constants ──────────────────────────────────────────────────────────────
 
 const BUTTONS: ToolbarButton[] = [
-  { id: 'focus', icon: <Maximize2 size={20} />, tipOff: 'Focus mode', tipOn: 'Exit focus mode' },
+  {
+    id: 'focus',
+    icon: <Maximize2 size={20} />,
+    tipOff: 'Focus mode',
+    tipOn: 'Exit focus mode',
+    mobileHidden: true,
+  },
   {
     id: 'rail',
     icon: <PanelRight size={20} />,
     tipOff: 'Show side panel',
     tipOn: 'Hide side panel',
+    mobileHidden: true,
   },
 ];
 
@@ -107,6 +117,12 @@ const PillWrap = styled.div`
   display: flex;
   gap: 8px;
   z-index: 5;
+
+  @media (max-width: 767px) {
+    top: 12px;
+    right: 12px;
+    gap: 6px;
+  }
 `;
 
 const ToolBtn = styled.button<{ $on: boolean; $hover: boolean }>`
@@ -126,6 +142,15 @@ const ToolBtn = styled.button<{ $on: boolean; $hover: boolean }>`
   align-items: center;
   gap: 6px;
   transition: 120ms;
+  -webkit-tap-highlight-color: transparent;
+
+  @media (max-width: 767px) {
+    /* Ensure minimum 44×44 px touch target. */
+    padding: 14px 14px;
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
+  }
 `;
 
 // ── Sub-components ─────────────────────────────────────────────────────────
@@ -222,11 +247,12 @@ function ToolButton({ btn }: { btn: ToolbarButton }) {
 }
 
 export function ToolbarPill() {
+  const isMobile = useIsMobile();
   return (
     <PillWrap>
       <PlanesButton />
       <ClipButton />
-      {BUTTONS.map((b) => (
+      {BUTTONS.filter((b) => !(isMobile && b.mobileHidden)).map((b) => (
         <ToolButton key={b.id} btn={b} />
       ))}
     </PillWrap>

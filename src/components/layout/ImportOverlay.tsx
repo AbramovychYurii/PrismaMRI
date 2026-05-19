@@ -69,6 +69,11 @@ const ImportMain = styled.main`
   justify-content: center;
   padding: 24px 40px 24px;
   overflow: auto;
+
+  @media (max-width: 767px) {
+    justify-content: flex-start;
+    padding: 24px 20px env(safe-area-inset-bottom, 24px);
+  }
 `;
 
 const ContentWrap = styled.div`
@@ -81,11 +86,21 @@ const TwoColGrid = styled.div`
   grid-template-columns: 1.3fr 1fr;
   gap: 40px;
   align-items: center;
+
+  @media (max-width: 767px) {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
 `;
 
 const LeftCol = styled.div`
-  border-left: 1px solid var(--rule);
   padding-left: 40px;
+
+  @media (max-width: 767px) {
+    border-left: none;
+    padding-left: 0;
+    padding-top: 24px;
+  }
 `;
 
 const TagLine = styled.div`
@@ -114,6 +129,10 @@ const MainTitle = styled.h1`
   font-weight: 400;
   letter-spacing: -0.01em;
   margin: 0 0 10px;
+
+  @media (max-width: 767px) {
+    font-size: 28px;
+  }
 `;
 
 const TitleAccent = styled.em`
@@ -186,6 +205,11 @@ const DropZone = styled.div<{ $hover: boolean }>`
   padding: 32px;
   transition: 200ms;
   overflow: hidden;
+
+  @media (max-width: 767px) {
+    min-height: 200px;
+    padding: 24px 20px;
+  }
 `;
 
 const CornerAccentTL = styled.span`
@@ -243,6 +267,14 @@ const PrimaryButton = styled.button`
   font-family: var(--sans);
   font-size: 12.5px;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+
+  @media (max-width: 767px) {
+    padding: 13px 24px;
+    font-size: 14px;
+    border-radius: 6px;
+    flex: 1;
+  }
 `;
 
 const SecondaryButton = styled.button`
@@ -254,6 +286,14 @@ const SecondaryButton = styled.button`
   font-family: var(--sans);
   font-size: 12.5px;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+
+  @media (max-width: 767px) {
+    padding: 13px 24px;
+    font-size: 14px;
+    border-radius: 6px;
+    flex: 1;
+  }
 `;
 
 // ── Component ──────────────────────────────────────────────────────────────
@@ -296,7 +336,6 @@ export function ImportOverlay() {
     <ImportMain aria-label="PrismaMRI — import a medical volume">
       <ContentWrap>
         <TwoColGrid>
-          {/* ── Left column: branding + description ── */}
           <LeftCol>
             <TagLine>
               <span>{APP_NAME}</span>
@@ -332,8 +371,7 @@ export function ImportOverlay() {
               No upload, no cloud, no telemetry. Data never leaves the browser.
             </DisclaimerText>
           </LeftCol>
-
-          {/* ── Right column: drop zone ── */}
+          {/* ── Drop zone ── */}
           <div>
             <DropZone
               as="section"

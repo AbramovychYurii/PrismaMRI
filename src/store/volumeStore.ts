@@ -3,6 +3,7 @@ import type {
   ImportProgress,
   LoadedVolume,
   MeasurementPoint,
+  MobileTab,
   PlanesMode,
   PreparedVolumeFor3D,
   RenderPreset,
@@ -32,6 +33,8 @@ interface VolumeState {
   /** Increments each time a snap-to-plane is requested. Hook watches for changes. */
   snapSeq: number;
   snapPlane: SlicePlane;
+  /** Active tab on mobile layout. */
+  mobileTab: MobileTab;
 }
 
 interface VolumeActions {
@@ -51,6 +54,7 @@ interface VolumeActions {
   clearMeasurement: () => void;
   setRenderPreset: (preset: RenderPreset) => void;
   requestSnapToView: (plane: SlicePlane) => void;
+  setMobileTab: (tab: MobileTab) => void;
   reset: () => void;
 }
 
@@ -83,6 +87,7 @@ const initialState: VolumeState = {
   renderPreset: 'mip',
   snapSeq: 0,
   snapPlane: 'coronal' satisfies SlicePlane,
+  mobileTab: '3d' satisfies MobileTab,
 };
 
 export const useVolumeStore = create<VolumeState & VolumeActions>((set) => ({
@@ -184,6 +189,15 @@ export const useVolumeStore = create<VolumeState & VolumeActions>((set) => ({
       snapPlane: plane,
       // Sync the active plane so clip / plane-indicator match the snapped view.
       activePlane: plane,
+    })),
+  setMobileTab: (mobileTab) =>
+    set((state) => ({
+      mobileTab,
+      // Sync activePlane when switching to a slice tab.
+      activePlane:
+        mobileTab === 'coronal' || mobileTab === 'sagittal' || mobileTab === 'axial'
+          ? mobileTab
+          : state.activePlane,
     })),
   reset: () => set(initialState),
 }));
