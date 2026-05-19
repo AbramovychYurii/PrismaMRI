@@ -1,3 +1,4 @@
+import { Tooltip } from '@/components/ui/Tooltip';
 import { accentRgba } from '@/constants';
 import { useVolumeStore } from '@/store';
 import type { PlanesMode, ToolbarState } from '@/types';
@@ -11,6 +12,8 @@ interface ToolbarButton {
   id: Exclude<keyof ToolbarState, 'planes'>;
   icon: React.ReactNode;
   label?: string;
+  tipOff: string;
+  tipOn: string;
 }
 
 // ── Icons ──────────────────────────────────────────────────────────────────
@@ -86,8 +89,13 @@ function IconLayerOne() {
 // ── Constants ──────────────────────────────────────────────────────────────
 
 const BUTTONS: ToolbarButton[] = [
-  { id: 'focus', icon: <Maximize2 size={20} /> },
-  { id: 'rail', icon: <PanelRight size={20} /> },
+  { id: 'focus', icon: <Maximize2 size={20} />, tipOff: 'Focus mode', tipOn: 'Exit focus mode' },
+  {
+    id: 'rail',
+    icon: <PanelRight size={20} />,
+    tipOff: 'Show side panel',
+    tipOn: 'Hide side panel',
+  },
 ];
 
 // ── Styled components ──────────────────────────────────────────────────────
@@ -122,6 +130,12 @@ const ToolBtn = styled.button<{ $on: boolean; $hover: boolean }>`
 
 // ── Sub-components ─────────────────────────────────────────────────────────
 
+const PLANES_TIP: Record<PlanesMode, string> = {
+  off: 'Show slice planes',
+  active: 'Show all 3 planes',
+  all: 'Hide slice planes',
+};
+
 function PlanesButton() {
   const mode = useVolumeStore((s) => s.toolbar.planes);
   const cyclePlanesMode = useVolumeStore((s) => s.cyclePlanesMode);
@@ -138,19 +152,19 @@ function PlanesButton() {
   const handleMouseLeave = () => setHover(false);
 
   return (
-    <ToolBtn
-      type="button"
-      aria-label={
-        mode === 'off' ? 'Hide planes' : mode === 'active' ? 'Show one plane' : 'Show all planes'
-      }
-      onClick={handleClick}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      $on={on}
-      $hover={hover}
-    >
-      {icon[mode]}
-    </ToolBtn>
+    <Tooltip label={PLANES_TIP[mode]}>
+      <ToolBtn
+        type="button"
+        aria-label={PLANES_TIP[mode]}
+        onClick={handleClick}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        $on={on}
+        $hover={hover}
+      >
+        {icon[mode]}
+      </ToolBtn>
+    </Tooltip>
   );
 }
 
@@ -159,18 +173,24 @@ function ClipButton() {
   const toggle = useVolumeStore((s) => s.toggleToolbar);
   const [hover, setHover] = useState(false);
 
+  const handleClick = () => toggle('clip');
+  const handleMouseEnter = () => setHover(true);
+  const handleMouseLeave = () => setHover(false);
+
   return (
-    <ToolBtn
-      type="button"
-      aria-label={on ? 'Disable clip plane' : 'Enable clip plane'}
-      onClick={() => toggle('clip')}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      $on={on}
-      $hover={hover}
-    >
-      <IconClipPlane />
-    </ToolBtn>
+    <Tooltip label={on ? 'Disable clip mode' : 'Clip volume at active slice'}>
+      <ToolBtn
+        type="button"
+        aria-label={on ? 'Disable clip mode' : 'Clip volume at active slice'}
+        onClick={handleClick}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        $on={on}
+        $hover={hover}
+      >
+        <IconClipPlane />
+      </ToolBtn>
+    </Tooltip>
   );
 }
 
@@ -184,17 +204,20 @@ function ToolButton({ btn }: { btn: ToolbarButton }) {
   const handleMouseLeave = () => setHover(false);
 
   return (
-    <ToolBtn
-      type="button"
-      onClick={handleClick}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      $on={on}
-      $hover={hover}
-    >
-      {btn.icon}
-      {btn.label}
-    </ToolBtn>
+    <Tooltip label={on ? btn.tipOn : btn.tipOff}>
+      <ToolBtn
+        type="button"
+        aria-label={on ? btn.tipOn : btn.tipOff}
+        onClick={handleClick}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        $on={on}
+        $hover={hover}
+      >
+        {btn.icon}
+        {btn.label}
+      </ToolBtn>
+    </Tooltip>
   );
 }
 

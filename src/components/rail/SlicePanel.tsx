@@ -1,5 +1,6 @@
 import { MeasureMenu } from '@/components/rail/MeasureMenu';
 import { SliceScrubber } from '@/components/rail/SliceScrubber';
+import { Tooltip } from '@/components/ui/Tooltip';
 import {
   ACCENT_VAR,
   AXIS_ACCENT,
@@ -333,22 +334,24 @@ function TrayButton({
 }) {
   const [hover, setHover] = useState(false);
   return (
-    <TrayBtn
-      type="button"
-      aria-label={label}
-      aria-pressed={active}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick();
-      }}
-      onPointerDown={(e) => e.stopPropagation()}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      $active={active}
-      $hover={hover}
-    >
-      {children}
-    </TrayBtn>
+    <Tooltip label={label}>
+      <TrayBtn
+        type="button"
+        aria-label={label}
+        aria-pressed={active}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
+        onPointerDown={(e) => e.stopPropagation()}
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        $active={active}
+        $hover={hover}
+      >
+        {children}
+      </TrayBtn>
+    </Tooltip>
   );
 }
 

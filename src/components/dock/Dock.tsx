@@ -3,6 +3,7 @@ import { NavigationCell } from '@/components/dock/NavigationCell';
 import { RenderCell } from '@/components/dock/RenderCell';
 import { SessionCell } from '@/components/dock/SessionCell';
 import { StudyCell } from '@/components/dock/StudyCell';
+import { useTooltip } from '@/components/ui/Tooltip';
 import { useVolumeStore } from '@/store';
 import { ChevronDown } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
@@ -26,7 +27,6 @@ const HeadLine = styled.span`
 
 const HeadTitle = styled.span`
   font-family: var(--serif);
-  font-style: italic;
   font-size: 15px;
   color: var(--ink);
   letter-spacing: 0.005em;
@@ -136,26 +136,36 @@ function PanelsToggle({
 }) {
   const [hover, setHover] = useState(false);
   const reduced = prefersReduced();
+  const tip = useTooltip(open ? 'Hide controls' : 'Show controls', true);
 
-  const handleMouseEnter = () => setHover(true);
-  const handleMouseLeave = () => setHover(false);
+  const handleMouseEnter = (e: React.MouseEvent<HTMLButtonElement>) => {
+    setHover(true);
+    tip.onMouseEnter(e);
+  };
+  const handleMouseLeave = () => {
+    setHover(false);
+    tip.onMouseLeave();
+  };
 
   return (
-    <ToggleButton
-      type="button"
-      aria-label={open ? 'Hide control panels' : 'Show control panels'}
-      aria-expanded={open}
-      onClick={onToggle}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      $open={open}
-      $hover={hover}
-      $reduced={reduced}
-    >
-      <ChevronWrap $open={open} $reduced={reduced}>
-        <ChevronDown size={12} aria-hidden="true" />
-      </ChevronWrap>
-    </ToggleButton>
+    <>
+      <ToggleButton
+        type="button"
+        aria-label={open ? 'Hide control panels' : 'Show control panels'}
+        aria-expanded={open}
+        onClick={onToggle}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        $open={open}
+        $hover={hover}
+        $reduced={reduced}
+      >
+        <ChevronWrap $open={open} $reduced={reduced}>
+          <ChevronDown size={12} aria-hidden="true" />
+        </ChevronWrap>
+      </ToggleButton>
+      {tip.portal}
+    </>
   );
 }
 
