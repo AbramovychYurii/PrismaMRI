@@ -66,7 +66,7 @@ const LeftCol = styled.div`
 
 const TagLine = styled.div`
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 14px;
   color: var(--amber);
   letter-spacing: 0.2em;
   text-transform: uppercase;
@@ -215,6 +215,8 @@ const LoadingSubText = styled.div`
 
 const ButtonsRow = styled.div`
   display: flex;
+  justify-content: center;
+  width: 100%;
   gap: 8px;
 `;
 
@@ -356,7 +358,7 @@ export function ImportOverlay() {
               />
 
               <LoadingTitle aria-live="polite" aria-atomic="true">
-                {loading.active ? loading.message || 'Loading…' : 'Drop volume to begin'}
+                {loading.active ? loading.message || 'Loading…' : 'Drop MRI to begin'}
               </LoadingTitle>
 
               <LoadingSubText aria-hidden="true">

@@ -85,8 +85,7 @@ const SectionHeader = styled.div`
 
 const SectionTitle = styled.h2`
   font-family: var(--serif);
-  font-style: italic;
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 400;
   color: var(--ink);
   margin: 0;
@@ -156,22 +155,24 @@ const CornerTL = styled.span<{ $hover: boolean }>`
   pointer-events: none;
 `;
 
-const CornerTR = styled.span`
+const CornerTR = styled.span<{ $hover: boolean }>`
   position: absolute;
   top: 8px;
   right: 8px;
   width: 14px;
   height: 14px;
-  border-top: 1px solid var(--rule-2);
-  border-right: 1px solid var(--rule-2);
+  border-top: 1px solid var(--amber);
+  border-right: 1px solid var(--amber);
+  opacity: ${({ $hover }) => ($hover ? 1 : 0.5)};
+  transition: opacity 150ms;
   z-index: 2;
   pointer-events: none;
 `;
 
 const ModalityBadge = styled.span`
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 16px;
+  right: 16px;
   font-family: var(--mono);
   font-size: 9px;
   letter-spacing: 0.12em;
@@ -261,7 +262,7 @@ function ExampleCard({
     >
       {/* Decorative corner brackets */}
       <CornerTL aria-hidden="true" $hover={showHover} />
-      <CornerTR aria-hidden="true" />
+      <CornerTR aria-hidden="true" $hover={showHover} />
 
       {/* Modality badge — ink-2 = 8.9:1 contrast on dark overlay → passes WCAG AA */}
       <ModalityBadge aria-label={`Modality: ${example.tag}`}>{example.tag}</ModalityBadge>
