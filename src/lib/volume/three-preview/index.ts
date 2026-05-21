@@ -103,20 +103,31 @@ export class ThreePreview {
 
     this.controls?.dispose();
     this.controls = buildControls(this.camera, this.canvas, center);
+
+    // Track whether the camera actually moved during this pointer session.
+    // A plain click fires start→end with no 'change' in between — we must
+    // NOT resize/downscale in that case or every click causes a visible flash.
+    let didMove = false;
+
     this.controls.addEventListener('start', () => {
-      // Render at half device-pixel ratio while dragging — same algorithm,
-      // just fewer pixels, so the look doesn't change at all.
-      this.renderer.setPixelRatio(Math.max(0.75, this.nativeDpr * 0.5));
-      this.resize();
-      this.dirty = true;
+      didMove = false;
     });
     this.controls.addEventListener('change', () => {
+      if (!didMove) {
+        // First real camera movement: drop to half DPR for responsiveness.
+        this.renderer.setPixelRatio(Math.max(0.75, this.nativeDpr * 0.5));
+        this.resize();
+        didMove = true;
+      }
       this.dirty = true;
     });
     this.controls.addEventListener('end', () => {
-      // Restore full resolution once the drag is released
-      this.renderer.setPixelRatio(this.nativeDpr);
-      this.resize();
+      if (didMove) {
+        // Restore full resolution only when we actually dragged.
+        this.renderer.setPixelRatio(this.nativeDpr);
+        this.resize();
+      }
+      didMove = false;
       this.dirty = true;
     });
 
