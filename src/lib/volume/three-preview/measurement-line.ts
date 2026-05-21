@@ -8,14 +8,9 @@ const DOT_COLOR = new THREE.Color(0xff4500);
 /** Sphere radius = sceneSize × this */
 const POINT_RADIUS_FACTOR = 0.003;
 
-/** Tick half-height floor = sceneSize × this (grows with distance too) */
+/** Tick half-height — used only for label offset above the line. */
 const TICK_SCENE_FACTOR = 0.007;
-/** Tick half-height = max(scene floor, distance × this) */
 const TICK_DIST_FACTOR = 0.018;
-/** mm ticks height = base tickH × this */
-const TICK_MM_SCALE = 0.3;
-/** cm ticks height = base tickH × this */
-const TICK_CM_SCALE = 0.5;
 
 /** Base label width floor = sceneSize × this */
 const LABEL_SCENE_FACTOR = 0.14;
@@ -37,12 +32,6 @@ function stablePerpendicular(dir: THREE.Vector3): THREE.Vector3 {
   return new THREE.Vector3().crossVectors(dir, ref).normalize();
 }
 
-function tickStep(distanceMm: number): number {
-  if (distanceMm < 50) return 1; // < 5 cm  → every 1 mm
-  if (distanceMm < 200) return 10; // < 20 cm → every 1 cm
-  return 10; // ≥ 20 cm → every 10 cm
-}
-
 function disposeObject(obj: THREE.Object3D): void {
   if (obj instanceof THREE.Sprite) {
     obj.material.map?.dispose();
@@ -56,40 +45,17 @@ function disposeObject(obj: THREE.Object3D): void {
 
 function buildMainLine(from: THREE.Vector3, to: THREE.Vector3): THREE.Line {
   const geo = new THREE.BufferGeometry().setFromPoints([from, to]);
-  const mat = new THREE.LineBasicMaterial({
+  const mat = new THREE.LineDashedMaterial({
     color: DOT_COLOR,
     depthTest: false,
+    depthWrite: false,
+    transparent: true,
+    dashSize: 2,
+    gapSize: 1.5,
   });
-  return new THREE.Line(geo, mat);
-}
-
-function buildTicks(
-  fromWorld: THREE.Vector3,
-  dir: THREE.Vector3,
-  len: number,
-  distanceMm: number,
-  tickH: number,
-  perp: THREE.Vector3,
-): THREE.LineSegments | null {
-  const step = tickStep(distanceMm);
-  const h = step === 1 ? tickH * TICK_MM_SCALE : tickH * TICK_CM_SCALE;
-  const pts: number[] = [];
-  for (let d = step; d < distanceMm - step * 0.4; d += step) {
-    const t = (d / distanceMm) * len;
-    const center = new THREE.Vector3().copy(fromWorld).addScaledVector(dir, t);
-    pts.push(
-      ...center.clone().addScaledVector(perp, h).toArray(),
-      ...center.clone().addScaledVector(perp, -h).toArray(),
-    );
-  }
-  if (pts.length === 0) return null;
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
-  const mat = new THREE.LineBasicMaterial({
-    color: DOT_COLOR,
-    depthTest: false,
-  });
-  return new THREE.LineSegments(geo, mat);
+  const line = new THREE.Line(geo, mat);
+  line.computeLineDistances();
+  return line;
 }
 
 function makeLabel(text: string): THREE.Sprite {
@@ -129,6 +95,8 @@ function makePointMarker(radius: number): THREE.Mesh {
   const mat = new THREE.MeshBasicMaterial({
     color: DOT_COLOR,
     depthTest: false,
+    depthWrite: false,
+    transparent: true,
   });
   return new THREE.Mesh(geo, mat);
 }
@@ -173,9 +141,6 @@ export class MeasurementLine {
       this.add(marker);
     }
 
-    const ticks = buildTicks(fromWorld, dir, len, distanceMm, tickH, perp);
-    if (ticks) this.add(ticks);
-
     const label = makeLabel(`${distanceMm.toFixed(1)} mm`);
     label.position
       .copy(new THREE.Vector3().lerpVectors(fromWorld, toWorld, 0.5))
@@ -193,6 +158,7 @@ export class MeasurementLine {
   }
 
   private add(obj: THREE.Object3D): void {
+    obj.renderOrder = 999;
     this.objects.push(obj);
     this.group.add(obj);
   }

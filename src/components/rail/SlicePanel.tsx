@@ -166,6 +166,16 @@ const ActiveBorder = styled.div`
   box-shadow: inset 0 0 0 1px ${accentRgba('amber', 0.15)};
 `;
 
+const MeasureLine = styled.svg`
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 6;
+  overflow: visible;
+`;
+
 const MeasureDot = styled.div<{ $fx: number; $fy: number; $size: number }>`
   position: absolute;
   left: ${({ $fx }) => $fx * 100}%;
@@ -317,6 +327,21 @@ function CrosshairAndDots({
             <CrossDot />
           </CrossCenter>
         </CrosshairOverlay>
+      )}
+      {adjustedDots.length === 2 && (
+        <MeasureLine aria-hidden="true">
+          <line
+            x1={`${adjustedDots[0].fx * 100}%`}
+            y1={`${adjustedDots[0].fy * 100}%`}
+            x2={`${adjustedDots[1].fx * 100}%`}
+            y2={`${adjustedDots[1].fy * 100}%`}
+            stroke="#ff4500"
+            strokeWidth="1.5"
+            strokeDasharray="5 4"
+            opacity="0.75"
+            filter="drop-shadow(0 0 4px rgba(255,69,0,0.5))"
+          />
+        </MeasureLine>
       )}
       {adjustedDots.map((dot, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: stable index for static measurement dots
