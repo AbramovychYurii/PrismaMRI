@@ -184,6 +184,13 @@ export const VolumeShader = {
       return texture(u_data, vox / u_size).r;
     }
 
+    // Pseudo-random hash on screen coords — drives ray-origin jitter.
+    // Each fragment gets a unique sub-step offset in [0, dt) so adjacent
+    // rays start at different depths, eliminating concentric-ring banding.
+    float rand(vec2 co) {
+      return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
+    }
+
     // Central-difference gradient (voxel units).
     vec3 gradient(vec3 vox) {
       const float D = 1.5;
@@ -293,10 +300,11 @@ export const VolumeShader = {
 
       // ── MIP ───────────────────────────────────────────────────────────────
       if (u_mode == 1) {
-        float maxI = 0.0;
+        float maxI  = 0.0;
+        float jitter = rand(gl_FragCoord.xy) * dt;
         for (int i = 0; i < MAX_STEPS; i++) {
           if (i >= u_steps) break;
-          vec3 vox = rayOrigin + (tEntry + (float(i) + 0.5) * dt) * rayDir;
+          vec3 vox = rayOrigin + (tEntry + jitter + (float(i) + 0.5) * dt) * rayDir;
           if (any(lessThan(vox, vec3(0.0))) || any(greaterThan(vox, u_size))) continue;
           // Clip: skip voxels on the camera-side of the active plane.
           if (u_clipMode == 1) {
@@ -331,10 +339,14 @@ export const VolumeShader = {
       bool doneSag = false;
       bool doneAxi = false;
 
+      // Jitter the ray start by a random sub-step so each pixel begins
+      // marching at a different depth — eliminates wood-ring banding.
+      float tStart = tEntry + rand(gl_FragCoord.xy) * dt;
+
       for (int i = 0; i < MAX_STEPS; i++) {
         if (i >= u_steps) break;
 
-        float t_lo = tEntry + float(i) * dt;
+        float t_lo = tStart + float(i) * dt;
         float t_hi = t_lo + dt;
 
         // Blend any plane whose intersection t falls within this step interval.

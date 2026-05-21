@@ -38,7 +38,6 @@ export function buildMaterial(
     u_clim: { value: new THREE.Vector2(0, 1) },
     u_steps: { value: 256 },
     u_mode: { value: preset === 'mip' ? 1 : 0 },
-    u_shading: { value: 0 },
     u_camVoxel: { value: new THREE.Vector3() },
     u_rayDirVox: { value: new THREE.Vector3(0, 0, -1) },
     /** 0 = off, 1 = active-only, 2 = all three planes. */
@@ -47,6 +46,8 @@ export function buildMaterial(
     u_activePlane: { value: 0 },
     /** Cursor position in voxel / texture space. */
     u_planePos: { value: new THREE.Vector3() },
+    /** 0 = no shading, 1 = Phong — on by default for DVR depth cues. */
+    u_shading: { value: 1 },
     /** 0 = off, 1 = clip active plane (hide camera-side half). */
     u_clipMode: { value: 0 },
   };
