@@ -265,7 +265,7 @@ export function ImportOverlay() {
   const [hover, setHover] = useState(false);
   const error = useVolumeStore((s) => s.error);
   const loading = useVolumeStore((s) => s.loading);
-  const { openFiles, openFolder, openFile } = useViewerActions();
+  const { openFiles, openFolder, openFile, cancelLoad } = useViewerActions();
 
   async function handleDrop(e: React.DragEvent) {
     e.preventDefault();
@@ -366,20 +366,28 @@ export function ImportOverlay() {
               </LoadingSubText>
 
               <ButtonsRow>
-                <PrimaryButton
-                  type="button"
-                  onClick={openFile}
-                  aria-label="Open file — browse for a DICOM, NIfTI, MHA, NRRD or ZIP file"
-                >
-                  Open file
-                </PrimaryButton>
-                <SecondaryButton
-                  type="button"
-                  onClick={openFolder}
-                  aria-label="Open folder — browse for a DICOM series folder"
-                >
-                  Open folder
-                </SecondaryButton>
+                {loading.active ? (
+                  <SecondaryButton type="button" onClick={cancelLoad} aria-label="Cancel loading">
+                    Cancel
+                  </SecondaryButton>
+                ) : (
+                  <>
+                    <PrimaryButton
+                      type="button"
+                      onClick={openFile}
+                      aria-label="Open file — browse for a DICOM, NIfTI, MHA, NRRD or ZIP file"
+                    >
+                      Open file
+                    </PrimaryButton>
+                    <SecondaryButton
+                      type="button"
+                      onClick={openFolder}
+                      aria-label="Open folder — browse for a DICOM series folder"
+                    >
+                      Open folder
+                    </SecondaryButton>
+                  </>
+                )}
               </ButtonsRow>
             </DropZone>
           </div>

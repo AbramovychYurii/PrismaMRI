@@ -5,7 +5,7 @@ import { fromDirectoryHandle, fromFileList } from '@/lib/import/scan-folder';
 import type { ImportSource } from '@/lib/import/types';
 import { loadVolumeInWorker } from '@/lib/import/volume-client';
 import { useVolumeStore } from '@/store';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 
 interface DirPickerWindow {
   showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>;
@@ -25,8 +25,15 @@ export function useViewerApp() {
   useWindowLevel();
   useActivePlaneKeys();
 
+  const abortRef = useRef<AbortController | null>(null);
+
   const loadFromSource = useCallback(
     async (source: ImportSource) => {
+      // Cancel any in-progress load before starting a new one.
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
       setError(null);
       setLoading({
         active: true,
@@ -35,31 +42,41 @@ export function useViewerApp() {
         message: 'Reading…',
       });
       try {
-        const { volume, prepared3D, histogram } = await loadVolumeInWorker(source, (p, percent) => {
-          setLoading({
-            active: true,
-            percent,
-            stage: p.stage,
-            current: p.current,
-            total: p.total,
-            message: p.message,
-          });
-        });
+        const { volume, prepared3D, histogram } = await loadVolumeInWorker(
+          source,
+          (p, percent) => {
+            setLoading({
+              active: true,
+              percent,
+              stage: p.stage,
+              current: p.current,
+              total: p.total,
+              message: p.message,
+            });
+          },
+          controller.signal,
+        );
         setVolume(volume, prepared3D, histogram);
-        setLoading({
-          active: false,
-          percent: 100,
-          stage: 'done',
-          message: 'Ready',
-        });
+        setLoading({ active: false, percent: 100, stage: 'done', message: 'Ready' });
       } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          setLoading({ active: false, percent: 0, stage: 'idle', message: '' });
+          return;
+        }
         const message = err instanceof Error ? err.message : 'Failed to load volume.';
         setError(message);
         setLoading({ active: false, percent: 0, stage: 'error', message });
+      } finally {
+        abortRef.current = null;
       }
     },
     [setError, setLoading, setVolume],
   );
+
+  const cancelLoad = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+  }, []);
 
   const openFiles = useCallback(
     (files: FileList | File[]) => {
@@ -108,23 +125,33 @@ export function useViewerApp() {
 
   const loadFromUrl = useCallback(
     async (url: string, filename: string) => {
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
       setError(null);
+      setLoading({ active: true, percent: 0, stage: 'scanning', message: 'Fetching…' });
       try {
-        const blob = await fetchBlobWithProgress(url, (loaded, total) => {
-          const percent = total > 0 ? Math.min(99, Math.round((loaded / total) * 100)) : 0;
-          setLoading({
-            active: true,
-            percent,
-            stage: 'scanning',
-            message: 'Fetching…',
-          });
-        });
+        const blob = await fetchBlobWithProgress(
+          url,
+          (loaded, total) => {
+            const percent = total > 0 ? Math.min(99, Math.round((loaded / total) * 100)) : 0;
+            setLoading({ active: true, percent, stage: 'scanning', message: 'Fetching…' });
+          },
+          controller.signal,
+        );
         const file = new File([blob], filename);
         openFiles([file]);
       } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          setLoading({ active: false, percent: 0, stage: 'idle', message: '' });
+          return;
+        }
         const message = err instanceof Error ? err.message : 'Failed to fetch example.';
         setError(message);
         setLoading({ active: false, percent: 0, stage: 'error', message });
+      } finally {
+        if (abortRef.current === controller) abortRef.current = null;
       }
     },
     [openFiles, setError, setLoading],
@@ -144,5 +171,5 @@ export function useViewerApp() {
     return () => window.removeEventListener('keydown', onKey);
   }, [openFolder, setView]);
 
-  return { loadFromSource, openFiles, openFolder, openFile, loadFromUrl };
+  return { loadFromSource, openFiles, openFolder, openFile, loadFromUrl, cancelLoad };
 }

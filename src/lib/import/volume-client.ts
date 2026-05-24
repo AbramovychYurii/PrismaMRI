@@ -16,11 +16,25 @@ export interface LoadResult {
 export function loadVolumeInWorker(
   source: ImportSource,
   onProgress: (p: ImportProgress, percent: number) => void,
+  signal?: AbortSignal,
 ): Promise<LoadResult> {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new DOMException('Load cancelled.', 'AbortError'));
+      return;
+    }
+
     const worker = new Worker(new URL('@/workers/volume.worker.ts', import.meta.url), {
       type: 'module',
     });
+
+    const cleanup = () => signal?.removeEventListener('abort', onAbort);
+
+    const onAbort = () => {
+      worker.terminate();
+      reject(new DOMException('Load cancelled.', 'AbortError'));
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
 
     worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
       const msg = e.data;
@@ -29,6 +43,7 @@ export function loadVolumeInWorker(
         return;
       }
       if (msg.type === 'error') {
+        cleanup();
         worker.terminate();
         reject(new Error(msg.message));
         return;
@@ -57,11 +72,13 @@ export function loadVolumeInWorker(
         max: msg.histogram.max,
         count: msg.histogram.count,
       };
+      cleanup();
       worker.terminate();
       resolve({ volume, prepared3D, histogram });
     };
 
     worker.onerror = (e) => {
+      cleanup();
       worker.terminate();
       reject(new Error(e.message || 'Volume worker crashed.'));
     };

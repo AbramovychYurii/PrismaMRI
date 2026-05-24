@@ -28,33 +28,57 @@ function throttleProgress(onProgress: (loaded: number, total: number) => void) {
 export function fetchBlobWithProgress(
   url: string,
   onProgress: (loaded: number, total: number) => void,
+  signal?: AbortSignal,
 ): Promise<Blob> {
-  return probeContentLength(url).then(
-    (probedTotal) =>
-      new Promise((resolve, reject) => {
-        const report = throttleProgress(onProgress);
-        const xhr = new XMLHttpRequest();
-        xhr.open('GET', url);
-        xhr.responseType = 'blob';
+  if (signal?.aborted) {
+    return Promise.reject(new DOMException('Load cancelled.', 'AbortError'));
+  }
 
-        xhr.onprogress = (event) => {
-          const total = event.lengthComputable ? event.total : (probedTotal ?? 0);
-          report(event.loaded, total);
-        };
+  return probeContentLength(url).then((probedTotal) => {
+    if (signal?.aborted) {
+      return Promise.reject(new DOMException('Load cancelled.', 'AbortError'));
+    }
 
-        xhr.onload = () => {
-          if (xhr.status < 200 || xhr.status >= 300) {
-            reject(new Error(`HTTP ${xhr.status}`));
-            return;
-          }
-          const blob = xhr.response as Blob;
-          const total = probedTotal ?? blob.size;
-          report(total, total, true);
-          resolve(blob);
-        };
+    return new Promise<Blob>((resolve, reject) => {
+      const report = throttleProgress(onProgress);
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', url);
+      xhr.responseType = 'blob';
 
-        xhr.onerror = () => reject(new Error('Failed to fetch'));
-        xhr.send();
-      }),
-  );
+      const onAbort = () => {
+        xhr.abort();
+        reject(new DOMException('Load cancelled.', 'AbortError'));
+      };
+      signal?.addEventListener('abort', onAbort, { once: true });
+
+      const cleanup = () => signal?.removeEventListener('abort', onAbort);
+
+      xhr.onprogress = (event) => {
+        const total = event.lengthComputable ? event.total : (probedTotal ?? 0);
+        report(event.loaded, total);
+      };
+
+      xhr.onload = () => {
+        cleanup();
+        if (xhr.status < 200 || xhr.status >= 300) {
+          reject(new Error(`HTTP ${xhr.status}`));
+          return;
+        }
+        const blob = xhr.response as Blob;
+        const total = probedTotal ?? blob.size;
+        report(total, total, true);
+        resolve(blob);
+      };
+
+      xhr.onerror = () => {
+        cleanup();
+        reject(new Error('Failed to fetch'));
+      };
+
+      // xhr.abort() was already handled by onAbort — no double-reject needed.
+      xhr.onabort = cleanup;
+
+      xhr.send();
+    });
+  });
 }
