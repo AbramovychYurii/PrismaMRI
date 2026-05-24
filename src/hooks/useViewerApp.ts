@@ -35,7 +35,7 @@ export function useViewerApp() {
         message: 'Reading…',
       });
       try {
-        const { volume, prepared3D } = await loadVolumeInWorker(source, (p, percent) => {
+        const { volume, prepared3D, histogram } = await loadVolumeInWorker(source, (p, percent) => {
           setLoading({
             active: true,
             percent,
@@ -45,7 +45,7 @@ export function useViewerApp() {
             message: p.message,
           });
         });
-        setVolume(volume, prepared3D);
+        setVolume(volume, prepared3D, histogram);
         setLoading({
           active: false,
           percent: 100,

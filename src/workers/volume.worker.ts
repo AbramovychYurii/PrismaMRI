@@ -38,6 +38,7 @@ ctx.onmessage = async (e: MessageEvent<WorkerRequest>) => {
 
     const voxelsBuf = volume.voxels.buffer;
     const preparedBuf = prepared.data.buffer;
+    const histBuf = hist.bins.buffer;
 
     post(
       {
@@ -58,8 +59,14 @@ ctx.onmessage = async (e: MessageEvent<WorkerRequest>) => {
           sourceRange: prepared.sourceRange,
           sourceDims: prepared.sourceDims,
         },
+        histogram: {
+          bins: histBuf as ArrayBuffer,
+          min: hist.min,
+          max: hist.max,
+          count: hist.count,
+        },
       },
-      [voxelsBuf as ArrayBuffer, preparedBuf as ArrayBuffer],
+      [voxelsBuf as ArrayBuffer, preparedBuf as ArrayBuffer, histBuf as ArrayBuffer],
     );
   } catch (err) {
     post({

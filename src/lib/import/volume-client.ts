@@ -1,10 +1,11 @@
 import type { ImportSource } from '@/lib/import/types';
-import type { ImportProgress, LoadedVolume, PreparedVolumeFor3D } from '@/types';
+import type { ImportProgress, LoadedVolume, PreparedVolumeFor3D, VolumeHistogram } from '@/types';
 import type { WorkerResponse } from '@/workers/volume/types';
 
 export interface LoadResult {
   volume: LoadedVolume;
   prepared3D: PreparedVolumeFor3D;
+  histogram: VolumeHistogram;
 }
 
 /**
@@ -50,8 +51,14 @@ export function loadVolumeInWorker(
         sourceRange: msg.prepared.sourceRange,
         sourceDims: msg.prepared.sourceDims,
       };
+      const histogram: VolumeHistogram = {
+        bins: new Uint32Array(msg.histogram.bins),
+        min: msg.histogram.min,
+        max: msg.histogram.max,
+        count: msg.histogram.count,
+      };
       worker.terminate();
-      resolve({ volume, prepared3D });
+      resolve({ volume, prepared3D, histogram });
     };
 
     worker.onerror = (e) => {

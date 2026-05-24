@@ -6,6 +6,7 @@
     "./src/types.ts",
     "./src/components/dock/displaycell.tsx",
     "./src/components/dock/dock.tsx",
+    "./src/components/dock/histogrambar.tsx",
     "./src/components/dock/navigationcell.tsx",
     "./src/components/dock/rendercell.tsx",
     "./src/components/dock/sessioncell.tsx",

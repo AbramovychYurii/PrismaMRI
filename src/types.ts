@@ -131,3 +131,11 @@ export interface ActiveMeasurement {
 
 /** 3-D volume rendering preset. */
 export type RenderPreset = 'mip' | 'tissue' | 'bone';
+
+/** Scalar-intensity histogram returned by the volume worker. */
+export interface VolumeHistogram {
+  bins: Uint32Array;
+  min: number;
+  max: number;
+  count: number;
+}

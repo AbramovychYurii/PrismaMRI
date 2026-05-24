@@ -13,6 +13,7 @@ import type {
   SliceWindowLevel,
   ToolbarState,
   VolumeCursor,
+  VolumeHistogram,
 } from '@/types';
 import { create } from 'zustand';
 
@@ -20,6 +21,7 @@ interface VolumeState {
   view: AppView;
   volume: LoadedVolume | null;
   prepared3D: PreparedVolumeFor3D | null;
+  histogram: VolumeHistogram | null;
   cursor: VolumeCursor | null;
   activePlane: SlicePlane | null;
   loading: ImportProgress & { active: boolean; percent: number };
@@ -39,7 +41,7 @@ interface VolumeState {
 
 interface VolumeActions {
   setView: (v: AppView) => void;
-  setVolume: (v: LoadedVolume, p: PreparedVolumeFor3D) => void;
+  setVolume: (v: LoadedVolume, p: PreparedVolumeFor3D, h: VolumeHistogram) => void;
   setCursor: (c: VolumeCursor) => void;
   setActivePlane: (p: SlicePlane) => void;
   setLoading: (s: Partial<VolumeState['loading']>) => void;
@@ -64,6 +66,7 @@ const initialState: VolumeState = {
   view: 'import',
   volume: null,
   prepared3D: null,
+  histogram: null,
   cursor: null,
   activePlane: 'coronal',
   loading: {
@@ -97,10 +100,11 @@ export const useVolumeStore = create<VolumeState & VolumeActions>((set) => ({
 
   setView: (view) => set({ view }),
 
-  setVolume: (volume, prepared3D) =>
+  setVolume: (volume, prepared3D, histogram) =>
     set({
       volume,
       prepared3D,
+      histogram,
       view: 'viewer',
       cursor: {
         x: Math.floor(volume.meta.dims[0] / 2),

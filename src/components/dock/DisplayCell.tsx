@@ -1,3 +1,4 @@
+import { HistogramBar } from '@/components/dock/HistogramBar';
 import { useVolumeStore } from '@/store';
 import styled from 'styled-components';
 
@@ -6,14 +7,14 @@ import styled from 'styled-components';
 const DisplayCellWrap = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   flex: 1;
 `;
 
 const SliderRowWrap = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 4px;
 `;
 
 const SliderLabelRow = styled.div`
@@ -109,6 +110,7 @@ export function DisplayCell() {
   const wlDraft = useVolumeStore((s) => s.wlDraft);
   const setWLDraft = useVolumeStore((s) => s.setWLDraft);
   const volume = useVolumeStore((s) => s.volume);
+  const histogram = useVolumeStore((s) => s.histogram);
 
   const scalarMin = volume ? Math.floor(volume.scalarMin) : -1000;
   const scalarMax = volume ? Math.ceil(volume.scalarMax) : 3000;
@@ -125,6 +127,7 @@ export function DisplayCell() {
 
   return (
     <DisplayCellWrap>
+      {histogram && <HistogramBar histogram={histogram} wl={wlDraft} />}
       <SliderRow
         name="Window"
         value={wlDraft.window}

@@ -39,6 +39,12 @@ export interface WorkerDoneMsg {
     sourceRange: PreparedVolumeFor3D['sourceRange'];
     sourceDims: PreparedVolumeFor3D['sourceDims'];
   };
+  histogram: {
+    bins: ArrayBuffer;
+    min: number;
+    max: number;
+    count: number;
+  };
 }
 
 export interface WorkerErrorMsg {
