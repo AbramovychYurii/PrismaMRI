@@ -5,7 +5,7 @@ import { PLANE_FOOTER, PLANE_GLYPH, accentRgba } from '@/constants';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { axisColor, axisGlow, cursorFromClick, useSlicePanelCore } from '@/hooks/useSlicePanelCore';
 import type { SlicePlane } from '@/types';
-import { ChevronsUpDown, Eye, Maximize2, Minimize2 } from 'lucide-react';
+import { ChevronsUpDown, Download, Eye, Maximize2, Minimize2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
@@ -414,6 +414,20 @@ function ExpandedSlicePanel({
     onWheel(e);
   }
 
+  function downloadSlice() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `prismamri-${plane}-${idx}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+  }
+
   return createPortal(
     <FullscreenOverlay
       $isActive={isActive}
@@ -438,6 +452,9 @@ function ExpandedSlicePanel({
       <ButtonTray>
         <TrayButton label="Align 3D view to this plane" onClick={() => requestSnapToView(plane)}>
           <Eye size={11} />
+        </TrayButton>
+        <TrayButton label="Export slice as PNG" onClick={downloadSlice}>
+          <Download size={11} />
         </TrayButton>
         <TrayButton label="Collapse panel" onClick={onClose}>
           <Minimize2 size={11} />
