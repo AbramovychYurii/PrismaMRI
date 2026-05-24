@@ -50,6 +50,9 @@ export function buildMaterial(
     u_shading: { value: 1 },
     /** 0 = off, 1 = clip active plane (hide camera-side half). */
     u_clipMode: { value: 0 },
+    /** +1 = clip the positive-axis side, -1 = clip the negative-axis side.
+     *  Snapped when clip mode is enabled and frozen until next enable/plane change. */
+    u_clipDir: { value: 1.0 },
   };
 
   return new THREE.ShaderMaterial({

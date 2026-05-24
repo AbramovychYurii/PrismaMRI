@@ -166,6 +166,9 @@ export const VolumeShader = {
     uniform vec3      u_planePos;
     /** 0 = off, 1 = clip active plane (hide the camera-side half). */
     uniform int       u_clipMode;
+    /** +1 = clip positive-axis side, -1 = clip negative-axis side.
+     *  Frozen at enable time so the clip direction never jumps while orbiting. */
+    uniform float     u_clipDir;
 
     varying vec3 vVoxelPos;
 
@@ -306,13 +309,12 @@ export const VolumeShader = {
           if (i >= u_steps) break;
           vec3 vox = rayOrigin + (tEntry + jitter + (float(i) + 0.5) * dt) * rayDir;
           if (any(lessThan(vox, vec3(0.0))) || any(greaterThan(vox, u_size))) continue;
-          // Clip: skip voxels on the camera-side of the active plane.
+          // Clip: skip voxels on the frozen clip-direction side of the active plane.
           if (u_clipMode == 1) {
             float voxA  = u_activePlane == 0 ? vox.y  : u_activePlane == 1 ? vox.x  : vox.z;
             float planA = u_activePlane == 0 ? u_planePos.y : u_activePlane == 1 ? u_planePos.x : u_planePos.z;
-            float camA  = u_activePlane == 0 ? u_camVoxel.y : u_activePlane == 1 ? u_camVoxel.x : u_camVoxel.z;
-            if (camA > planA && voxA > planA) continue;
-            if (camA < planA && voxA < planA) continue;
+            if (u_clipDir > 0.0 && voxA > planA) continue;
+            if (u_clipDir < 0.0 && voxA < planA) continue;
           }
           maxI = max(maxI, sampleVol(vox));
         }
@@ -371,13 +373,12 @@ export const VolumeShader = {
         float t   = t_lo + 0.5 * dt;
         vec3  vox = rayOrigin + t * rayDir;
         if (any(lessThan(vox, vec3(0.0))) || any(greaterThan(vox, u_size))) continue;
-        // Clip: skip voxels on the camera-side of the active plane.
+        // Clip: skip voxels on the frozen clip-direction side of the active plane.
         if (u_clipMode == 1) {
           float voxA  = u_activePlane == 0 ? vox.y  : u_activePlane == 1 ? vox.x  : vox.z;
           float planA = u_activePlane == 0 ? u_planePos.y : u_activePlane == 1 ? u_planePos.x : u_planePos.z;
-          float camA  = u_activePlane == 0 ? u_camVoxel.y : u_activePlane == 1 ? u_camVoxel.x : u_camVoxel.z;
-          if (camA > planA && voxA > planA) continue;
-          if (camA < planA && voxA < planA) continue;
+          if (u_clipDir > 0.0 && voxA > planA) continue;
+          if (u_clipDir < 0.0 && voxA < planA) continue;
         }
 
         float intensity = sampleVol(vox);
