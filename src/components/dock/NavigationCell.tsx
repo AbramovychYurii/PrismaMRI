@@ -12,7 +12,7 @@ const CursorSection = styled.div`
 
 const CursorLabel = styled.span`
   font-size: 10px;
-  color: var(--ink-4);
+  color: var(--ink-3);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   margin-bottom: 4px;

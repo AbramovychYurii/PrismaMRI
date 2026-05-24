@@ -140,17 +140,6 @@ const Kbd = styled.kbd`
   white-space: nowrap;
 `;
 
-const Footer = styled.div`
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid var(--rule);
-  font-family: var(--mono);
-  font-size: 10px;
-  color: var(--ink-4);
-  letter-spacing: 0.08em;
-  text-align: center;
-`;
-
 // ── Component ──────────────────────────────────────────────────────────────
 
 interface Props {
@@ -188,7 +177,6 @@ export function KeyboardShortcutsModal({ onClose }: Props) {
           </Section>
         ))}
 
-        <Footer>press ? to toggle</Footer>
       </Modal>
     </Backdrop>,
     document.body,

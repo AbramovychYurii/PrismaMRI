@@ -137,7 +137,7 @@ const SliceCounter = styled.span`
 `;
 
 const SliceDim = styled.span`
-  color: var(--ink-4);
+  color: var(--ink-3);
 `;
 
 const PanelFooter = styled.div<{ $scrubVisible: boolean }>`
@@ -150,7 +150,7 @@ const PanelFooter = styled.div<{ $scrubVisible: boolean }>`
   justify-content: space-between;
   font-family: var(--mono);
   font-size: 9.5px;
-  color: var(--ink-4);
+  color: var(--ink-3);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   pointer-events: none;
@@ -233,8 +233,8 @@ const MobileCounter = styled.span`
 `;
 
 const TrayBtn = styled.button<{ $active?: boolean; $hover: boolean }>`
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   flex-shrink: 0;
   border-radius: 3px;
   border: 1px solid

@@ -45,7 +45,7 @@ const SliderValue = styled.div`
 const HuLabel = styled.span`
   font-family: var(--mono);
   font-size: 10px;
-  color: var(--ink-4);
+  color: var(--ink-3);
   font-weight: 400;
   margin-left: 4px;
   letter-spacing: 0.1em;

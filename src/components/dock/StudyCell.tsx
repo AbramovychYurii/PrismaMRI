@@ -15,7 +15,7 @@ const StudyGrid = styled.div`
 const RowKey = styled.div`
   font-family: var(--mono);
   font-size: 10px;
-  color: var(--ink-4);
+  color: var(--ink-3);
   text-transform: uppercase;
   letter-spacing: 0.14em;
 `;

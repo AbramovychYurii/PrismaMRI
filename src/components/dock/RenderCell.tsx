@@ -49,14 +49,14 @@ const PresetName = styled.span<{ $active: boolean }>`
 const PresetDesc = styled.span`
   font-family: var(--sans);
   font-size: 10px;
-  color: var(--ink-4);
+  color: var(--ink-3);
   line-height: 1.3;
 `;
 
 const Hint = styled.p`
   font-family: var(--sans);
   font-size: 11px;
-  color: var(--ink-4);
+  color: var(--ink-3);
   line-height: 1.4;
   margin: 0;
 `;

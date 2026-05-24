@@ -22,7 +22,7 @@ const RunCellWrap = styled.div<{ $last?: boolean }>`
 const RunKey = styled.div`
   font-family: var(--mono);
   font-size: 9.5px;
-  color: var(--ink-4);
+  color: var(--ink-3);
   letter-spacing: 0.18em;
   text-transform: uppercase;
   margin-bottom: 3px;

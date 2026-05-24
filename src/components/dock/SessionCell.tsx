@@ -33,7 +33,7 @@ const BackButtonInner = styled.span`
 const KbdTag = styled.span`
   font-family: var(--mono);
   font-size: 10px;
-  color: var(--ink-4);
+  color: var(--ink-3);
   border: 1px solid var(--rule-2);
   padding: 1px 5px;
   border-radius: 3px;

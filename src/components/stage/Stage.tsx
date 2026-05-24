@@ -54,7 +54,7 @@ const NoVolumePlaceholder = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--ink-4);
+  color: var(--ink-3);
   font-family: var(--mono);
   font-size: 11px;
   letter-spacing: 0.16em;

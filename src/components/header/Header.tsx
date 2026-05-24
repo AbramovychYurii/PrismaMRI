@@ -27,8 +27,8 @@ const HeaderRight = styled.div`
 `;
 
 const HelpBtn = styled.button`
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   border: 1px solid var(--rule-2);
   background: transparent;
