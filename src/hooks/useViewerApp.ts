@@ -5,7 +5,7 @@ import { fromDirectoryHandle, fromFileList } from '@/lib/import/scan-folder';
 import type { ImportSource } from '@/lib/import/types';
 import { loadVolumeInWorker } from '@/lib/import/volume-client';
 import { useVolumeStore } from '@/store';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface DirPickerWindow {
   showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>;
@@ -157,11 +157,21 @@ export function useViewerApp() {
     [openFiles, setError, setLoading],
   );
 
-  // Global shortcuts: Esc → import, ⌘/Ctrl+O → open folder
+  const [showShortcuts, setShowShortcuts] = useState(false);
+
+  // Global shortcuts: Esc → import / close shortcuts, ⌘/Ctrl+O → open folder, ? → shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setView('import');
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (e.key === '?') {
+        setShowShortcuts((v) => !v);
+      } else if (e.key === 'Escape') {
+        setShowShortcuts((v) => {
+          if (v) return false;
+          setView('import');
+          return false;
+        });
       } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'o') {
         e.preventDefault();
         void openFolder();
@@ -171,5 +181,14 @@ export function useViewerApp() {
     return () => window.removeEventListener('keydown', onKey);
   }, [openFolder, setView]);
 
-  return { loadFromSource, openFiles, openFolder, openFile, loadFromUrl, cancelLoad };
+  return {
+    loadFromSource,
+    openFiles,
+    openFolder,
+    openFile,
+    loadFromUrl,
+    cancelLoad,
+    showShortcuts,
+    setShowShortcuts,
+  };
 }
