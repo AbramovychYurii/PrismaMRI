@@ -210,7 +210,22 @@ export class ThreePreview {
     const m = this.volume?.material;
     if (!m) return;
     m.uniforms.u_clipMode.value = enabled ? 1 : 0;
+    if (enabled) this._snapClipDir(m);
     this.dirty = true;
+  }
+
+  /**
+   * Freeze the clip direction based on the current camera position so the
+   * clipped half never flips while the user orbits around the volume.
+   */
+  private _snapClipDir(m: THREE.ShaderMaterial): void {
+    // Ensure _camVoxel reflects the current camera state before reading it.
+    this.updateCameraUniform();
+    const ap = m.uniforms.u_activePlane.value as number;
+    const pp = m.uniforms.u_planePos.value as THREE.Vector3;
+    const camA = ap === 0 ? this._camVoxel.y : ap === 1 ? this._camVoxel.x : this._camVoxel.z;
+    const planA = ap === 0 ? pp.y : ap === 1 ? pp.x : pp.z;
+    m.uniforms.u_clipDir.value = camA >= planA ? 1.0 : -1.0;
   }
 
   setPlaneMode(mode: PlanesMode, activePlane: SlicePlane): void {
@@ -220,6 +235,8 @@ export class ThreePreview {
       m.uniforms.u_planeMode.value = mode === 'off' ? 0 : mode === 'active' ? 1 : 2;
       m.uniforms.u_activePlane.value =
         activePlane === 'coronal' ? 0 : activePlane === 'sagittal' ? 1 : 2;
+      // Re-snap clip direction for the new plane while clip mode is active.
+      if (m.uniforms.u_clipMode.value === 1) this._snapClipDir(m);
     }
     this.dirty = true;
   }
@@ -347,6 +364,9 @@ export class ThreePreview {
           this.controls.enabled = true;
           this.controls.update();
         }
+        // Re-snap clip direction now that the camera is at its final position.
+        const m = this.volume?.material;
+        if (m && m.uniforms.u_clipMode.value === 1) this._snapClipDir(m);
       }
 
       this.dirty = true;
