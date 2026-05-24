@@ -17,6 +17,27 @@ const FORMATS = [
   { token: 'ZIP', rest: '' },
 ];
 
+const STAGE_LABEL: Record<string, string> = {
+  scanning: 'Scanning',
+  'parsing-headers': 'Parsing headers',
+  'reading-files': 'Reading files',
+  assembling: 'Assembling',
+  'preparing-3d': 'Building 3D',
+};
+
+function formatLoadingTitle(loading: {
+  stage: string;
+  current: number;
+  total: number;
+  message: string;
+}): string {
+  if (loading.total > 1 && loading.current > 0) {
+    const label = STAGE_LABEL[loading.stage] ?? 'Loading';
+    return `${label} (${loading.current} / ${loading.total})`;
+  }
+  return loading.message || 'Loading…';
+}
+
 // ── Styled components ──────────────────────────────────────────────────────
 
 const ImportMain = styled.main`
@@ -358,7 +379,7 @@ export function ImportOverlay() {
               />
 
               <LoadingTitle aria-live="polite" aria-atomic="true">
-                {loading.active ? loading.message || 'Loading…' : 'Drop MRI to begin'}
+                {loading.active ? formatLoadingTitle(loading) : 'Drop MRI to begin'}
               </LoadingTitle>
 
               <LoadingSubText aria-hidden="true">
