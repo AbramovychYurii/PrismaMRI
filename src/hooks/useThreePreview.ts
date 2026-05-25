@@ -6,8 +6,14 @@ import { useEffect, useRef } from 'react';
 /** Fallback plane when no panel has been clicked yet. */
 const DEFAULT_PLANE: SlicePlane = 'coronal';
 
-/** Binds a ThreePreview instance to a canvas and syncs it with the store. */
-export function useThreePreview(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
+/**
+ * Binds a ThreePreview instance to a canvas and syncs it with the store.
+ * Returns a stable ref to the live instance so callers can invoke imperative
+ * methods (e.g. exportPNG) without routing through the store.
+ */
+export function useThreePreview(
+  canvasRef: React.RefObject<HTMLCanvasElement | null>,
+): React.MutableRefObject<ThreePreview | null> {
   const previewRef = useRef<ThreePreview | null>(null);
   const prepared3D = useVolumeStore((s) => s.prepared3D);
   const cursor = useVolumeStore((s) => s.cursor);
@@ -95,4 +101,6 @@ export function useThreePreview(canvasRef: React.RefObject<HTMLCanvasElement | n
     const id = requestAnimationFrame(() => previewRef.current?.resize());
     return () => cancelAnimationFrame(id);
   }, [railOpen]);
+
+  return previewRef;
 }

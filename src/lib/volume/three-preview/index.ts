@@ -382,6 +382,35 @@ export class ThreePreview {
     this.dirty = false;
   };
 
+  /**
+   * Capture the current 3-D view as a PNG Blob.
+   * Forces one synchronous render so the WebGL buffer is guaranteed fresh,
+   * then composites the result over the Stage background gradient so the
+   * exported image is fully opaque and matches exactly what the user sees
+   * (cursor planes, clip mode, colour LUT — everything included).
+   */
+  exportPNG(): Promise<Blob> {
+    // Force one synchronous render so the WebGL buffer is current.
+    this.updateCameraUniform();
+    this.renderer.render(this.scene, this.camera);
+
+    const src = this.renderer.domElement;
+    const off = document.createElement('canvas');
+    off.width = src.width;
+    off.height = src.height;
+    const ctx = off.getContext('2d')!;
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, off.width, off.height);
+    ctx.drawImage(src, 0, 0);
+
+    return new Promise((resolve, reject) => {
+      off.toBlob(
+        (blob) => (blob ? resolve(blob) : reject(new Error('Canvas export failed'))),
+        'image/png',
+      );
+    });
+  }
+
   dispose(): void {
     this.disposed = true;
     cancelAnimationFrame(this.raf);

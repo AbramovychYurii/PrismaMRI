@@ -176,7 +176,6 @@ export function KeyboardShortcutsModal({ onClose }: Props) {
             ))}
           </Section>
         ))}
-
       </Modal>
     </Backdrop>,
     document.body,

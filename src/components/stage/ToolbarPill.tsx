@@ -1,7 +1,9 @@
+import { StageMenu } from '@/components/stage/StageMenu';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { accentRgba } from '@/constants';
 import { useHover } from '@/hooks/useHover';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import type { ThreePreview } from '@/lib/volume/three-preview';
 import { useVolumeStore } from '@/store';
 import type { PlanesMode, ToolbarState } from '@/types';
 import { Maximize2, PanelRight } from 'lucide-react';
@@ -235,13 +237,25 @@ function ToolButton({ btn }: { btn: ToolbarButton }) {
   );
 }
 
-export function ToolbarPill() {
+interface ToolbarPillProps {
+  previewRef: React.MutableRefObject<ThreePreview | null>;
+}
+
+export function ToolbarPill({ previewRef }: ToolbarPillProps) {
   const isMobile = useIsMobile();
+  const visible = BUTTONS.filter((b) => !(isMobile && b.mobileHidden));
+  // Rail is always the last button — StageMenu sits just before it.
+  const beforeMenu = visible.filter((b) => b.id !== 'rail');
+  const afterMenu = visible.filter((b) => b.id === 'rail');
   return (
     <PillWrap>
       <PlanesButton />
       <ClipButton />
-      {BUTTONS.filter((b) => !(isMobile && b.mobileHidden)).map((b) => (
+      {beforeMenu.map((b) => (
+        <ToolButton key={b.id} btn={b} />
+      ))}
+      <StageMenu previewRef={previewRef} />
+      {afterMenu.map((b) => (
         <ToolButton key={b.id} btn={b} />
       ))}
     </PillWrap>

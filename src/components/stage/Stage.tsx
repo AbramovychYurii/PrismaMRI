@@ -86,7 +86,7 @@ const VolumeSubLabel = styled.div`
 
 export function Stage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  useThreePreview(canvasRef);
+  const previewRef = useThreePreview(canvasRef);
   const focus = useVolumeStore((s) => s.toolbar.focus);
   const hasVolume = useVolumeStore((s) => s.prepared3D !== null);
 
@@ -97,7 +97,7 @@ export function Stage() {
       <TitleGroup>
         <VolumeSubLabel>Ray-cast · native res</VolumeSubLabel>
       </TitleGroup>
-      <ToolbarPill />
+      <ToolbarPill previewRef={previewRef} />
       <TickScale />
     </StageSection>
   );
