@@ -6,7 +6,7 @@ import { useIsMobile } from '@/hooks/useIsMobile';
 import { axisColor, axisGlow, cursorFromClick, useSlicePanelCore } from '@/hooks/useSlicePanelCore';
 import { useVolumeStore } from '@/store';
 import type { SlicePlane } from '@/types';
-import { ChevronsUpDown, Download, Eye, Maximize2, Minimize2 } from 'lucide-react';
+import { ChevronsUpDown, Download, Maximize2, Minimize2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
@@ -449,7 +449,6 @@ function ExpandedSlicePanel({
     dims,
     scrubVisible,
     setScrubVisible,
-    setActivePlane,
     setCursor,
     requestSnapToView,
     onWheel,
@@ -476,7 +475,7 @@ function ExpandedSlicePanel({
   function handleClick(e: React.MouseEvent) {
     e.stopPropagation();
     if (!isActive) {
-      setActivePlane(plane);
+      requestSnapToView(plane);
       return;
     }
     if (!canvasRef.current || !dims || !cursor) return;
@@ -524,13 +523,6 @@ function ExpandedSlicePanel({
       </PanelHeader>
 
       <ButtonTray>
-        <TrayButton
-          large
-          label="Align 3D view to this plane"
-          onClick={() => requestSnapToView(plane)}
-        >
-          <Eye size={13} />
-        </TrayButton>
         <TrayButton large label="Export slice as PNG" onClick={downloadSlice}>
           <Download size={13} />
         </TrayButton>
@@ -640,7 +632,6 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
     dims,
     scrubVisible,
     setScrubVisible,
-    setActivePlane,
     setCursor,
     requestSnapToView,
     onWheel,
@@ -662,7 +653,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
 
   function handleClick(e: React.MouseEvent) {
     if (!isActive) {
-      setActivePlane(plane);
+      requestSnapToView(plane);
       return;
     }
     if (!canvasRef.current || !dims || !cursor) return;
@@ -670,7 +661,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
   }
 
   function handleTouchStart(e: React.TouchEvent) {
-    if (!isActive) setActivePlane(plane);
+    if (!isActive) requestSnapToView(plane);
     const t = e.touches[0];
     touchRef.current = { startY: t.clientY, startIdx: idx };
   }
@@ -728,7 +719,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
         </PlaneLabel>
       </PanelHeader>
 
-      {/* ── Mobile: flex-column right rail (Scrubber → Eye → Counter) ── */}
+      {/* ── Mobile: flex-column right rail (Scrubber → Download → Counter) ── */}
       {isMobile ? (
         <>
           <MobileRightCol>
@@ -742,12 +733,6 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
                 onChange={handleScrub}
               />
             )}
-            <TrayButton
-              label="Align 3D view to this plane"
-              onClick={() => requestSnapToView(plane)}
-            >
-              <Eye size={11} />
-            </TrayButton>
             <TrayButton label="Export slice as PNG" onClick={downloadSlice}>
               <Download size={11} />
             </TrayButton>
@@ -780,12 +765,6 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
         /* ── Desktop: ButtonTray (top-right) + absolute Scrubber ── */
         <>
           <ButtonTray>
-            <TrayButton
-              label="Align 3D view to this plane"
-              onClick={() => requestSnapToView(plane)}
-            >
-              <Eye size={11} />
-            </TrayButton>
             <TrayButton label="Expand panel" onClick={() => setExpanded(true)}>
               <Maximize2 size={11} />
             </TrayButton>

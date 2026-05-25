@@ -191,7 +191,7 @@ export function StageMenu({ previewRef }: Props) {
         <Dropdown>
           <MenuItem
             icon={<IconDownload />}
-            label="Export 3D view (.png)"
+            label="Export 3D view as PNG"
             onClick={handleExport3D}
           />
         </Dropdown>

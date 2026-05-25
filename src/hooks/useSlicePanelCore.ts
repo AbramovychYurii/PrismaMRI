@@ -299,12 +299,12 @@ export function useSlicePanelCore(plane: SlicePlane, halfSlabs = 0): SlicePanelC
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      setActivePlane(plane);
+      requestSnapToView(plane);
       if (canvasRef.current) {
         measureInteraction.openMenu(e, canvasRef.current, drawFracs);
       }
     },
-    [setActivePlane, plane, measureInteraction.openMenu, drawFracs],
+    [requestSnapToView, plane, measureInteraction.openMenu, drawFracs],
   );
 
   return {
