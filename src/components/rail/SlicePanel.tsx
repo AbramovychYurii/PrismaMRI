@@ -42,32 +42,28 @@ const CrosshairOverlay = styled.div`
   z-index: 3;
 `;
 
-const CrossH = styled.div<{ $top: number; $color: string; $glow: string }>`
+const CrossH = styled.div<{ $color: string; $glow: string }>`
   position: absolute;
   left: 0;
   right: 0;
-  top: ${({ $top }) => $top}%;
   height: 1px;
   background: ${({ $color }) => $color};
   opacity: 0.7;
   box-shadow: 0 0 4px ${({ $glow }) => $glow};
 `;
 
-const CrossV = styled.div<{ $left: number; $color: string; $glow: string }>`
+const CrossV = styled.div<{ $color: string; $glow: string }>`
   position: absolute;
   top: 0;
   bottom: 0;
-  left: ${({ $left }) => $left}%;
   width: 1px;
   background: ${({ $color }) => $color};
   opacity: 0.7;
   box-shadow: 0 0 4px ${({ $glow }) => $glow};
 `;
 
-const CrossCenter = styled.div<{ $left: number; $top: number }>`
+const CrossCenter = styled.div`
   position: absolute;
-  left: ${({ $left }) => $left}%;
-  top: ${({ $top }) => $top}%;
   width: 14px;
   height: 14px;
   transform: translate(-50%, -50%);
@@ -372,9 +368,17 @@ function CrosshairAndDots({
     <>
       {cross && (
         <CrosshairOverlay>
-          <CrossH $top={cross.fy * 100} $color={axisColor(axes.h)} $glow={axisGlow(axes.h)} />
-          <CrossV $left={cross.fx * 100} $color={axisColor(axes.v)} $glow={axisGlow(axes.v)} />
-          <CrossCenter $left={cross.fx * 100} $top={cross.fy * 100}>
+          <CrossH
+            $color={axisColor(axes.h)}
+            $glow={axisGlow(axes.h)}
+            style={{ top: `${cross.fy * 100}%` }}
+          />
+          <CrossV
+            $color={axisColor(axes.v)}
+            $glow={axisGlow(axes.v)}
+            style={{ left: `${cross.fx * 100}%` }}
+          />
+          <CrossCenter style={{ left: `${cross.fx * 100}%`, top: `${cross.fy * 100}%` }}>
             <CrossDot />
           </CrossCenter>
         </CrosshairOverlay>

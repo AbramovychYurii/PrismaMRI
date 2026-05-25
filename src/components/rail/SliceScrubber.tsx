@@ -124,21 +124,19 @@ const RailLine = styled.div`
   border-radius: 999px;
 `;
 
-const FillBar = styled.div<{ $height: number; $accent: string }>`
+const FillBar = styled.div<{ $accent: string }>`
   position: absolute;
   left: 50%;
   bottom: ${INSET}px;
   width: 2px;
-  height: ${({ $height }) => $height}px;
   transform: translateX(-50%);
   background: ${({ $accent }) => $accent};
   border-radius: 999px;
 `;
 
-const ThumbPill = styled.div<{ $top: number; $accent: string }>`
+const ThumbPill = styled.div<{ $accent: string }>`
   position: absolute;
   left: 50%;
-  top: ${({ $top }) => $top}px;
   width: 26px;
   height: ${THUMB_PILL_H}px;
   transform: translate(-50%, -50%);
@@ -395,9 +393,9 @@ export function SliceScrubber({
         {/* RAIL */}
         <RailLine aria-hidden />
         {/* FILL */}
-        <FillBar aria-hidden $height={fillHeight} $accent={accent} />
+        <FillBar aria-hidden $accent={accent} style={{ height: `${fillHeight}px` }} />
         {/* THUMB */}
-        <ThumbPill aria-hidden $top={thumbY} $accent={accent}>
+        <ThumbPill aria-hidden $accent={accent} style={{ top: `${thumbY}px` }}>
           {slice}
         </ThumbPill>
       </div>

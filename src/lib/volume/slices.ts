@@ -142,6 +142,21 @@ export function extractSagittalImage(
 // ── Slab MIP helpers ───────────────────────────────────────────────────────
 
 /**
+ * Module-level reusable accumulation buffer for slab MIP.
+ * Avoids allocating a fresh Float32Array (up to ~1 MB for 512×512) on every
+ * scroll tick, which would cause heavy GC pressure at 60 fps.
+ * Safe because JS is single-threaded — each call completes before the next.
+ */
+let _mipBuf: Float32Array | null = null;
+function getMipBuf(size: number): Float32Array {
+  if (!_mipBuf || _mipBuf.length < size) {
+    _mipBuf = new Float32Array(size);
+  }
+  _mipBuf.fill(Number.NEGATIVE_INFINITY, 0, size);
+  return _mipBuf;
+}
+
+/**
  * Maximum Intensity Projection across a slab of `halfSlabs` slices on each
  * side of `centerIndex`. Per-pixel max is computed in raw scalar space before
  * the W/L LUT is applied, so the result faithfully represents peak intensity.
@@ -161,7 +176,7 @@ export function extractSlabMipImage(
     const z0 = Math.max(0, centerIndex - halfSlabs);
     const z1 = Math.min(d - 1, centerIndex + halfSlabs);
     const total = w * h;
-    const maxVals = new Float32Array(total).fill(Number.NEGATIVE_INFINITY);
+    const maxVals = getMipBuf(total);
     for (let z = z0; z <= z1; z++) {
       const base = w * h * z;
       for (let i = 0; i < total; i++) {
@@ -189,7 +204,7 @@ export function extractSlabMipImage(
     const y0 = Math.max(0, centerIndex - halfSlabs);
     const y1 = Math.min(h - 1, centerIndex + halfSlabs);
     const total = w * d;
-    const maxVals = new Float32Array(total).fill(Number.NEGATIVE_INFINITY);
+    const maxVals = getMipBuf(total);
     for (let y = y0; y <= y1; y++) {
       for (let row = 0; row < d; row++) {
         const base = w * (y + h * (d - 1 - row));
@@ -221,7 +236,7 @@ export function extractSlabMipImage(
   const x0 = Math.max(0, centerIndex - halfSlabs);
   const x1 = Math.min(w - 1, centerIndex + halfSlabs);
   const total = h * d;
-  const maxVals = new Float32Array(total).fill(Number.NEGATIVE_INFINITY);
+  const maxVals = getMipBuf(total);
   for (let x = x0; x <= x1; x++) {
     for (let row = 0; row < d; row++) {
       const zBase = w * h * (d - 1 - row);
