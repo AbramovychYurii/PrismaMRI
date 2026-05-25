@@ -33,8 +33,8 @@ const ChevronBtn = styled.button<{
   $reduced: boolean;
   $large: boolean;
 }>`
-  width: ${({ $large }) => ($large ? '36px' : '22px')};
-  height: ${({ $large }) => ($large ? '36px' : '22px')};
+  width: ${({ $large }) => ($large ? '36px' : '24px')};
+  height: ${({ $large }) => ($large ? '36px' : '24px')};
   flex-shrink: 0;
   border-radius: ${({ $large }) => ($large ? '6px' : '3px')};
   border: 1px solid
@@ -66,7 +66,7 @@ const ScrubberContainer = styled.div<{
   top: ${({ $large }) => ($large ? '52px' : '32px')};
   right: 0;
   bottom: 0;
-  width: ${({ $large }) => ($large ? '48px' : '38px')};
+  width: ${({ $large }) => ($large ? '48px' : '40px')};
   z-index: 5;
   display: flex;
   flex-direction: column;
@@ -241,7 +241,7 @@ function ChevronButton({
       $reduced={reduced}
       $large={!!large}
     >
-      {dir === 'up' ? <ChevronUp size={large ? 14 : 10} /> : <ChevronDown size={large ? 14 : 10} />}
+      {dir === 'up' ? <ChevronUp size={large ? 14 : 11} /> : <ChevronDown size={large ? 14 : 11} />}
     </ChevronBtn>
   );
 }

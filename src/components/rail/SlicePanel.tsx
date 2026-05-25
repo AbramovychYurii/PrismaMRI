@@ -146,7 +146,7 @@ const PanelFooter = styled.div<{ $scrubVisible: boolean }>`
   position: absolute;
   bottom: 8px;
   left: 14px;
-  right: ${({ $scrubVisible }) => ($scrubVisible ? '46px' : '14px')};
+  right: ${({ $scrubVisible }) => ($scrubVisible ? '48px' : '14px')};
   z-index: 4;
   display: flex;
   justify-content: space-between;

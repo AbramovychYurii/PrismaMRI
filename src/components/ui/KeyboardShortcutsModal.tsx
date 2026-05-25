@@ -4,7 +4,14 @@ import styled from 'styled-components';
 
 // ── Data ───────────────────────────────────────────────────────────────────
 
-const SECTIONS = [
+interface ShortcutRow {
+  action: string;
+  keys: string[];
+  /** Alternative gesture shown after a "/" — e.g. touch equivalent. */
+  altKeys?: string[];
+}
+
+const SECTIONS: Array<{ label: string; rows: ShortcutRow[] }> = [
   {
     label: 'File',
     rows: [
@@ -25,7 +32,7 @@ const SECTIONS = [
     label: '2D Panels',
     rows: [
       { keys: ['Click'], action: 'Activate plane / move crosshair' },
-      { keys: ['Right-click'], action: 'Open measure menu' },
+      { keys: ['Right-click'], altKeys: ['Long press'], action: 'Open measure menu' },
     ],
   },
   {
@@ -140,6 +147,13 @@ const Kbd = styled.kbd`
   white-space: nowrap;
 `;
 
+const KeyDivider = styled.span`
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-4);
+  user-select: none;
+`;
+
 // ── Component ──────────────────────────────────────────────────────────────
 
 interface Props {
@@ -171,6 +185,14 @@ export function KeyboardShortcutsModal({ onClose }: Props) {
                   {r.keys.map((k) => (
                     <Kbd key={k}>{k}</Kbd>
                   ))}
+                  {r.altKeys && (
+                    <>
+                      <KeyDivider>/</KeyDivider>
+                      {r.altKeys.map((k) => (
+                        <Kbd key={k}>{k}</Kbd>
+                      ))}
+                    </>
+                  )}
                 </Keys>
               </Row>
             ))}
