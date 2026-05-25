@@ -176,8 +176,11 @@ export interface SlicePanelCore {
  * Both `SlicePanel` (rail) and `ExpandedSlicePanel` (fullscreen portal)
  * use this hook so canvas setup, rendering, scrubbing, and measurement
  * logic live in exactly one place.
+ *
+ * @param halfSlabs  When > 0, renders a Slab MIP of this many slices on each
+ *                   side of the current slice (expanded panel only).
  */
-export function useSlicePanelCore(plane: SlicePlane): SlicePanelCore {
+export function useSlicePanelCore(plane: SlicePlane, halfSlabs = 0): SlicePanelCore {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const offscreen = useRef<HTMLCanvasElement | null>(null);
   const [canvasSize, setCanvasSize] = useState({ w: 1, h: 1 });
@@ -213,7 +216,7 @@ export function useSlicePanelCore(plane: SlicePlane): SlicePanelCore {
 
   // ── Sub-hooks ─────────────────────────────────────────────────────────
   const measureInteraction = useMeasurementInteraction(plane, dims, cursor);
-  const image = useSliceImage(plane);
+  const image = useSliceImage(plane, halfSlabs);
   const onWheel = useSliceScroll(plane);
 
   // ── Derived values ────────────────────────────────────────────────────

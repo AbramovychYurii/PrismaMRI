@@ -13,8 +13,8 @@ interface CacheEntry {
 
 const cache = new WeakMap<LoadedVolume, CacheEntry>();
 
-function cacheKey(plane: SlicePlane, index: number, wl: SliceWindowLevel): string {
-  return `${plane}:${index}:${wl.window.toFixed(2)}:${wl.level.toFixed(2)}`;
+function cacheKey(plane: SlicePlane, index: number, wl: SliceWindowLevel, halfSlabs = 0): string {
+  return `${plane}:${index}:${wl.window.toFixed(2)}:${wl.level.toFixed(2)}:s${halfSlabs}`;
 }
 
 function getEntry(volume: LoadedVolume): CacheEntry {
@@ -139,19 +139,136 @@ export function extractSagittalImage(
   return { width: h, height: d, data };
 }
 
+// ── Slab MIP helpers ───────────────────────────────────────────────────────
+
+/**
+ * Maximum Intensity Projection across a slab of `halfSlabs` slices on each
+ * side of `centerIndex`. Per-pixel max is computed in raw scalar space before
+ * the W/L LUT is applied, so the result faithfully represents peak intensity.
+ */
+export function extractSlabMipImage(
+  volume: LoadedVolume,
+  plane: SlicePlane,
+  centerIndex: number,
+  halfSlabs: number,
+  wl: SliceWindowLevel,
+): SliceImage {
+  const [w, h, d] = volume.meta.dims;
+  const vox = volume.voxels;
+  const lut = getLut(volume, wl);
+
+  if (plane === 'axial') {
+    const z0 = Math.max(0, centerIndex - halfSlabs);
+    const z1 = Math.min(d - 1, centerIndex + halfSlabs);
+    const total = w * h;
+    const maxVals = new Float32Array(total).fill(Number.NEGATIVE_INFINITY);
+    for (let z = z0; z <= z1; z++) {
+      const base = w * h * z;
+      for (let i = 0; i < total; i++) {
+        const v = vox[base + i] as number;
+        if (v > maxVals[i]) maxVals[i] = v;
+      }
+    }
+    const data = new Uint8ClampedArray(total * 4);
+    if (lut) {
+      for (let i = 0; i < total; i++) {
+        const g = lut[Math.round(maxVals[i]) + 32768];
+        const o = i * 4;
+        data[o] = data[o + 1] = data[o + 2] = g;
+        data[o + 3] = 255;
+      }
+    } else {
+      for (let i = 0; i < total; i++) {
+        grayToRgba(mapIntensityToGray(maxVals[i], wl), data, i * 4);
+      }
+    }
+    return { width: w, height: h, data };
+  }
+
+  if (plane === 'coronal') {
+    const y0 = Math.max(0, centerIndex - halfSlabs);
+    const y1 = Math.min(h - 1, centerIndex + halfSlabs);
+    const total = w * d;
+    const maxVals = new Float32Array(total).fill(Number.NEGATIVE_INFINITY);
+    for (let y = y0; y <= y1; y++) {
+      for (let row = 0; row < d; row++) {
+        const base = w * (y + h * (d - 1 - row));
+        const dstRow = w * row;
+        for (let x = 0; x < w; x++) {
+          const v = vox[base + x] as number;
+          const idx = dstRow + x;
+          if (v > maxVals[idx]) maxVals[idx] = v;
+        }
+      }
+    }
+    const data = new Uint8ClampedArray(total * 4);
+    if (lut) {
+      for (let i = 0; i < total; i++) {
+        const g = lut[Math.round(maxVals[i]) + 32768];
+        const o = i * 4;
+        data[o] = data[o + 1] = data[o + 2] = g;
+        data[o + 3] = 255;
+      }
+    } else {
+      for (let i = 0; i < total; i++) {
+        grayToRgba(mapIntensityToGray(maxVals[i], wl), data, i * 4);
+      }
+    }
+    return { width: w, height: d, data };
+  }
+
+  // sagittal
+  const x0 = Math.max(0, centerIndex - halfSlabs);
+  const x1 = Math.min(w - 1, centerIndex + halfSlabs);
+  const total = h * d;
+  const maxVals = new Float32Array(total).fill(Number.NEGATIVE_INFINITY);
+  for (let x = x0; x <= x1; x++) {
+    for (let row = 0; row < d; row++) {
+      const zBase = w * h * (d - 1 - row);
+      const dstRow = h * row;
+      for (let y = 0; y < h; y++) {
+        const v = vox[x + w * y + zBase] as number;
+        const idx = dstRow + y;
+        if (v > maxVals[idx]) maxVals[idx] = v;
+      }
+    }
+  }
+  const data = new Uint8ClampedArray(total * 4);
+  if (lut) {
+    for (let i = 0; i < total; i++) {
+      const g = lut[Math.round(maxVals[i]) + 32768];
+      const o = i * 4;
+      data[o] = data[o + 1] = data[o + 2] = g;
+      data[o + 3] = 255;
+    }
+  } else {
+    for (let i = 0; i < total; i++) {
+      grayToRgba(mapIntensityToGray(maxVals[i], wl), data, i * 4);
+    }
+  }
+  return { width: h, height: d, data };
+}
+
 export function extractSliceGrayImage(
   volume: LoadedVolume,
   plane: SlicePlane,
   index: number,
   wl: SliceWindowLevel,
+  halfSlabs = 0,
 ): SliceImage {
-  const key = cacheKey(plane, index, wl);
+  const key = cacheKey(plane, index, wl, halfSlabs);
   const e = getEntry(volume);
   const hit = e.map.get(key);
   if (hit) return hit;
   let img: SliceImage;
-  if (plane === 'axial') img = extractAxialImage(volume, index, wl);
-  else if (plane === 'coronal') img = extractCoronalImage(volume, index, wl);
-  else img = extractSagittalImage(volume, index, wl);
+  if (halfSlabs > 0) {
+    img = extractSlabMipImage(volume, plane, index, halfSlabs, wl);
+  } else if (plane === 'axial') {
+    img = extractAxialImage(volume, index, wl);
+  } else if (plane === 'coronal') {
+    img = extractCoronalImage(volume, index, wl);
+  } else {
+    img = extractSagittalImage(volume, index, wl);
+  }
   return store(volume, key, img);
 }

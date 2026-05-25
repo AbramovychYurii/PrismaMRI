@@ -4,9 +4,10 @@ import { Tooltip } from '@/components/ui/Tooltip';
 import { PLANE_FOOTER, PLANE_GLYPH, accentRgba } from '@/constants';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { axisColor, axisGlow, cursorFromClick, useSlicePanelCore } from '@/hooks/useSlicePanelCore';
+import { useVolumeStore } from '@/store';
 import type { SlicePlane } from '@/types';
 import { ChevronsUpDown, Download, Eye, Maximize2, Minimize2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
 
@@ -134,6 +135,7 @@ const SliceCounter = styled.span`
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.04em;
   flex-shrink: 0;
+  margin-right: 3px;
 `;
 
 const SliceDim = styled.span`
@@ -198,7 +200,7 @@ const ButtonTray = styled.div`
   right: 8px;
   z-index: 6;
   display: flex;
-  gap: 4px;
+  gap: 7px;
   pointer-events: auto;
 `;
 
@@ -232,11 +234,11 @@ const MobileCounter = styled.span`
   pointer-events: none;
 `;
 
-const TrayBtn = styled.button<{ $active?: boolean; $hover: boolean }>`
-  width: 24px;
-  height: 24px;
+const TrayBtn = styled.button<{ $active?: boolean; $hover: boolean; $large?: boolean }>`
+  width: ${({ $large }) => ($large ? '36px' : '24px')};
+  height: ${({ $large }) => ($large ? '36px' : '24px')};
   flex-shrink: 0;
-  border-radius: 3px;
+  border-radius: ${({ $large }) => ($large ? '6px' : '3px')};
   border: 1px solid
     ${({ $active, $hover }) =>
       $active ? 'var(--amber-dim)' : $hover ? 'var(--rule-2)' : 'var(--rule)'};
@@ -258,6 +260,52 @@ const TrayBtn = styled.button<{ $active?: boolean; $hover: boolean }>`
   }
 `;
 
+const SlabBar = styled.div`
+  position: absolute;
+  bottom: 36px;
+  left: 14px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: auto;
+`;
+
+const SlabLabel = styled.span`
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+`;
+
+const SlabBtn = styled.button<{ $active: boolean }>`
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  padding: 5px 10px;
+  border-radius: 4px;
+  border: 1px solid
+    ${({ $active }) => ($active ? 'var(--amber-dim)' : 'var(--rule)')};
+  background: ${({ $active }) => ($active ? '#3a2a0a' : '#1a1710')};
+  color: ${({ $active }) => ($active ? 'var(--amber)' : 'var(--ink-3)')};
+  cursor: pointer;
+  transition:
+    background 80ms,
+    border-color 80ms,
+    color 80ms;
+
+  ${({ $active }) =>
+    !$active &&
+    `
+    &:hover {
+      background: #232017;
+      border-color: var(--rule-2);
+      color: var(--ink);
+    }
+  `}
+`;
+
 const FullscreenOverlay = styled.div<{ $isActive: boolean }>`
   position: fixed;
   top: 56px;
@@ -275,11 +323,13 @@ const FullscreenOverlay = styled.div<{ $isActive: boolean }>`
 function TrayButton({
   label,
   active,
+  large,
   children,
   onClick,
 }: {
   label: string;
   active?: boolean;
+  large?: boolean;
   children: React.ReactNode;
   onClick: () => void;
 }) {
@@ -299,6 +349,7 @@ function TrayButton({
         onMouseLeave={() => setHover(false)}
         $active={active}
         $hover={hover}
+        $large={large}
       >
         {children}
       </TrayBtn>
@@ -353,6 +404,14 @@ function CrosshairAndDots({
 
 // ── ExpandedSlicePanel ──────────────────────────────────────────────────────
 
+/** Slab thickness presets: [label, mm] — 0 = off */
+const SLAB_PRESETS: Array<[string, number]> = [
+  ['Off', 0],
+  ['3 mm', 3],
+  ['5 mm', 5],
+  ['10 mm', 10],
+];
+
 function ExpandedSlicePanel({
   plane,
   onClose,
@@ -360,6 +419,17 @@ function ExpandedSlicePanel({
   plane: SlicePlane;
   onClose: () => void;
 }) {
+  const [slabMm, setSlabMm] = useState(0);
+  const spacing = useVolumeStore((s) => s.volume?.meta.spacing);
+
+  /** Half-slab in slices — converts mm thickness to slice count for this plane. */
+  const halfSlabs = useMemo(() => {
+    if (!spacing || slabMm === 0) return 0;
+    const mmPerSlice =
+      plane === 'axial' ? spacing[2] : plane === 'coronal' ? spacing[1] : spacing[0];
+    return Math.max(1, Math.round(slabMm / 2 / mmPerSlice));
+  }, [slabMm, spacing, plane]);
+
   const {
     canvasRef,
     drawFracs,
@@ -387,7 +457,7 @@ function ExpandedSlicePanel({
     onMeasureTo,
     onClear,
     closeMenu,
-  } = useSlicePanelCore(plane);
+  } = useSlicePanelCore(plane, halfSlabs);
 
   const footer = PLANE_FOOTER[plane];
 
@@ -450,28 +520,34 @@ function ExpandedSlicePanel({
       </PanelHeader>
 
       <ButtonTray>
-        <TrayButton label="Align 3D view to this plane" onClick={() => requestSnapToView(plane)}>
-          <Eye size={11} />
+        <TrayButton
+          large
+          label="Align 3D view to this plane"
+          onClick={() => requestSnapToView(plane)}
+        >
+          <Eye size={13} />
         </TrayButton>
-        <TrayButton label="Export slice as PNG" onClick={downloadSlice}>
-          <Download size={11} />
+        <TrayButton large label="Export slice as PNG" onClick={downloadSlice}>
+          <Download size={13} />
         </TrayButton>
-        <TrayButton label="Collapse panel" onClick={onClose}>
-          <Minimize2 size={11} />
+        <TrayButton large label="Collapse panel" onClick={onClose}>
+          <Minimize2 size={13} />
         </TrayButton>
         {total > 0 && (
           <TrayButton
+            large
             label="Toggle slice scrubber"
             active={scrubVisible}
             onClick={() => setScrubVisible(plane, !scrubVisible)}
           >
-            <ChevronsUpDown size={11} />
+            <ChevronsUpDown size={13} />
           </TrayButton>
         )}
       </ButtonTray>
 
       {total > 0 && (
         <SliceScrubber
+          large
           axis={plane}
           slice={idx}
           total={total}
@@ -479,6 +555,24 @@ function ExpandedSlicePanel({
           onChange={handleScrub}
         />
       )}
+
+      <SlabBar>
+        <SlabLabel>Slab MIP</SlabLabel>
+        {SLAB_PRESETS.map(([label, mm]) => (
+          <SlabBtn
+            key={label}
+            type="button"
+            $active={slabMm === mm}
+            onClick={(e) => {
+              e.stopPropagation();
+              setSlabMm(mm);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            {label}
+          </SlabBtn>
+        ))}
+      </SlabBar>
 
       <PanelFooter $scrubVisible={scrubVisible}>
         <span>
@@ -513,6 +607,20 @@ function ExpandedSlicePanel({
 // ── SlicePanel ─────────────────────────────────────────────────────────────
 
 export function SlicePanel({ plane }: { plane: SlicePlane }) {
+  const [expanded, setExpanded] = useState(false);
+  const [slabMm, setSlabMm] = useState(0);
+  const isMobile = useIsMobile();
+  const spacing = useVolumeStore((s) => s.volume?.meta.spacing);
+
+  const halfSlabs = useMemo(() => {
+    if (!spacing || slabMm === 0) return 0;
+    const mmPerSlice =
+      plane === 'axial' ? spacing[2] : plane === 'coronal' ? spacing[1] : spacing[0];
+    return Math.max(1, Math.round(slabMm / 2 / mmPerSlice));
+  }, [slabMm, spacing, plane]);
+
+  // On mobile, slab is controlled from the regular panel (no expand mode).
+  // On desktop, slab is only available in ExpandedSlicePanel.
   const {
     canvasRef,
     drawFracs,
@@ -540,10 +648,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
     onMeasureTo,
     onClear,
     closeMenu,
-  } = useSlicePanelCore(plane);
-
-  const [expanded, setExpanded] = useState(false);
-  const isMobile = useIsMobile();
+  } = useSlicePanelCore(plane, isMobile ? halfSlabs : 0);
   // Touch-swipe slice navigation — tracks gesture start state.
   const touchRef = useRef<{ startY: number; startIdx: number } | null>(null);
 
@@ -582,6 +687,20 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
     touchRef.current = null;
   }
 
+  function downloadSlice() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `prismamri-${plane}-${idx}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+  }
+
   return (
     <PanelWrap
       onClick={handleClick}
@@ -607,27 +726,52 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
 
       {/* ── Mobile: flex-column right rail (Scrubber → Eye → Counter) ── */}
       {isMobile ? (
-        <MobileRightCol>
-          {total > 0 && (
-            <SliceScrubber
-              axis={plane}
-              slice={idx}
-              total={total}
-              visible
-              inline
-              onChange={handleScrub}
-            />
-          )}
-          <TrayButton label="Align 3D view to this plane" onClick={() => requestSnapToView(plane)}>
-            <Eye size={11} />
-          </TrayButton>
-          {total > 0 && (
-            <MobileCounter>
-              {idx}
-              <SliceDim> / {total}</SliceDim>
-            </MobileCounter>
-          )}
-        </MobileRightCol>
+        <>
+          <MobileRightCol>
+            {total > 0 && (
+              <SliceScrubber
+                axis={plane}
+                slice={idx}
+                total={total}
+                visible
+                inline
+                onChange={handleScrub}
+              />
+            )}
+            <TrayButton
+              label="Align 3D view to this plane"
+              onClick={() => requestSnapToView(plane)}
+            >
+              <Eye size={11} />
+            </TrayButton>
+            <TrayButton label="Export slice as PNG" onClick={downloadSlice}>
+              <Download size={11} />
+            </TrayButton>
+            {total > 0 && (
+              <MobileCounter>
+                {idx}
+                <SliceDim> / {total}</SliceDim>
+              </MobileCounter>
+            )}
+          </MobileRightCol>
+          <SlabBar>
+            <SlabLabel>Slab MIP</SlabLabel>
+            {SLAB_PRESETS.map(([label, mm]) => (
+              <SlabBtn
+                key={label}
+                type="button"
+                $active={slabMm === mm}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSlabMm(mm);
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+              >
+                {label}
+              </SlabBtn>
+            ))}
+          </SlabBar>
+        </>
       ) : (
         /* ── Desktop: ButtonTray (top-right) + absolute Scrubber ── */
         <>

@@ -31,11 +31,12 @@ const ChevronBtn = styled.button<{
   $hover: boolean;
   $pressed: boolean;
   $reduced: boolean;
+  $large: boolean;
 }>`
-  width: 22px;
-  height: 22px;
+  width: ${({ $large }) => ($large ? '36px' : '22px')};
+  height: ${({ $large }) => ($large ? '36px' : '22px')};
   flex-shrink: 0;
-  border-radius: 3px;
+  border-radius: ${({ $large }) => ($large ? '6px' : '3px')};
   border: 1px solid
     ${({ $hover }) => ($hover ? 'var(--ink-4)' : 'var(--rule-2)')};
   background: ${({ $hover }) => ($hover ? 'rgba(28,24,18,0.95)' : 'rgba(15,13,10,0.85)')};
@@ -47,18 +48,25 @@ const ChevronBtn = styled.button<{
   padding: 0;
   transform: ${({ $pressed }) => ($pressed ? 'scale(0.94)' : 'none')};
   transition: ${({ $reduced }) => ($reduced ? 'none' : 'transform 80ms ease')};
+
+  @media (max-width: 767px) {
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+  }
 `;
 
 const ScrubberContainer = styled.div<{
   $visible: boolean;
   $reduced: boolean;
   $inline?: boolean;
+  $large?: boolean;
 }>`
   position: absolute;
-  top: 32px;
+  top: ${({ $large }) => ($large ? '52px' : '32px')};
   right: 0;
   bottom: 0;
-  width: 38px;
+  width: ${({ $large }) => ($large ? '48px' : '38px')};
   z-index: 5;
   display: flex;
   flex-direction: column;
@@ -159,6 +167,8 @@ export interface SliceScrubberProps {
   onChange: (next: number) => void;
   /** Render inside a flex column (mobile right rail) instead of absolute. */
   inline?: boolean;
+  /** Use larger chevron buttons (36px) — for expanded/fullscreen panel. */
+  large?: boolean;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -172,10 +182,12 @@ function clampSlice(n: number, total: number): number {
 function ChevronButton({
   dir,
   label,
+  large,
   onStep,
 }: {
   dir: 'up' | 'down';
   label: string;
+  large?: boolean;
   onStep: (delta: number) => void;
 }) {
   const [hover, setHover] = useState(false);
@@ -227,8 +239,9 @@ function ChevronButton({
       $hover={hover}
       $pressed={pressed}
       $reduced={reduced}
+      $large={!!large}
     >
-      {dir === 'up' ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+      {dir === 'up' ? <ChevronUp size={large ? 14 : 10} /> : <ChevronDown size={large ? 14 : 10} />}
     </ChevronBtn>
   );
 }
@@ -242,6 +255,7 @@ export function SliceScrubber({
   visible,
   onChange,
   inline,
+  large,
 }: SliceScrubberProps) {
   const accent = PLANE_ACCENT[axis];
   const trackRef = useRef<HTMLDivElement>(null);
@@ -345,10 +359,11 @@ export function SliceScrubber({
       $visible={visible}
       $reduced={reduced}
       $inline={inline}
+      $large={large}
       onPointerDown={handleContainerPointerDown}
       onClick={handleContainerClick}
     >
-      <ChevronButton dir="up" label="Next slice" onStep={step} />
+      <ChevronButton dir="up" label="Next slice" large={large} onStep={step} />
 
       {/* TRACK */}
       <div
@@ -387,7 +402,7 @@ export function SliceScrubber({
         </ThumbPill>
       </div>
 
-      <ChevronButton dir="down" label="Previous slice" onStep={step} />
+      <ChevronButton dir="down" label="Previous slice" large={large} onStep={step} />
     </ScrubberContainer>
   );
 }

@@ -10,7 +10,7 @@ function sliceIndexFor(plane: SlicePlane, cursor: { x: number; y: number; z: num
 }
 
 /** Memoized 2D slice image for a plane at the current cursor + committed W/L. */
-export function useSliceImage(plane: SlicePlane): SliceImage | null {
+export function useSliceImage(plane: SlicePlane, halfSlabs = 0): SliceImage | null {
   const volume = useVolumeStore((s) => s.volume);
   const cursor = useVolumeStore((s) => s.cursor);
   const wl = useVolumeStore((s) => s.wl);
@@ -18,6 +18,6 @@ export function useSliceImage(plane: SlicePlane): SliceImage | null {
   return useMemo(() => {
     if (!volume || !cursor) return null;
     const index = sliceIndexFor(plane, cursor);
-    return extractSliceGrayImage(volume, plane, index, wl);
-  }, [volume, cursor, wl, plane]);
+    return extractSliceGrayImage(volume, plane, index, wl, halfSlabs);
+  }, [volume, cursor, wl, plane, halfSlabs]);
 }
