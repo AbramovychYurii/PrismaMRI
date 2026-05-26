@@ -6,9 +6,12 @@ import { MobileTabBar } from '@/components/mobile/MobileTabBar';
 import { Rail } from '@/components/rail/Rail';
 import { SlicePanel } from '@/components/rail/SlicePanel';
 import { Stage } from '@/components/stage/Stage';
+import { Tooltip } from '@/components/ui/Tooltip';
 import { accentRgba, isSlicePlane } from '@/constants';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { usePwaInstall } from '@/hooks/usePwaInstall';
 import { useVolumeStore } from '@/store';
+import { MonitorDown } from 'lucide-react';
 import styled from 'styled-components';
 
 // ── Desktop layout ─────────────────────────────────────────────────────────
@@ -48,6 +51,33 @@ const MobileHeaderBar = styled.header`
   /* Account for notch on left (landscape) */
   padding-left: env(safe-area-inset-left, 0px);
   padding-right: env(safe-area-inset-right, 0px);
+`;
+
+/** Pushes install button to the right edge of the mobile header. */
+const MobileHeaderSpacer = styled.div`
+  flex: 1;
+`;
+
+const MobileInstallBtn = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-right: 12px;
+  border-radius: 4px;
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink-3);
+  cursor: pointer;
+  flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
+
+  &:active {
+    background: ${accentRgba('amber', 0.08)};
+    border-color: var(--amber-dim);
+    color: var(--amber);
+  }
 `;
 
 const MobileLoadingBar = styled.div<{ $width: number }>`
@@ -96,9 +126,18 @@ const MobileControlsWrap = styled.div`
 
 function MobileHeader() {
   const loading = useVolumeStore((s) => s.loading);
+  const { canInstall, install } = usePwaInstall();
   return (
     <MobileHeaderBar>
       <BrandBlock />
+      <MobileHeaderSpacer />
+      {canInstall && (
+        <Tooltip label="Install PrismaMRI as an app">
+          <MobileInstallBtn type="button" aria-label="Install app" onClick={install}>
+            <MonitorDown size={16} />
+          </MobileInstallBtn>
+        </Tooltip>
+      )}
       {loading.active && <MobileLoadingBar $width={loading.percent} />}
     </MobileHeaderBar>
   );

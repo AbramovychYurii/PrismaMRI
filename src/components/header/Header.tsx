@@ -3,7 +3,9 @@ import { RunStrip } from '@/components/header/RunStrip';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { accentRgba } from '@/constants';
 import { useViewerActions } from '@/hooks/ViewerActionsContext';
+import { usePwaInstall } from '@/hooks/usePwaInstall';
 import { useVolumeStore } from '@/store';
+import { MonitorDown } from 'lucide-react';
 import styled from 'styled-components';
 
 // ── Styled components ──────────────────────────────────────────────────────
@@ -13,17 +15,51 @@ const StyledHeader = styled.header`
   border-bottom: 1px solid var(--rule);
   background: var(--panel);
   display: grid;
-  grid-template-columns: 280px 1fr auto;
+  grid-template-columns: 280px 1fr auto auto;
   align-items: stretch;
   position: relative;
 `;
 
-const HeaderRight = styled.div`
+const HeaderSection = styled.div`
   display: flex;
   align-items: center;
+  padding: 0 18px;
+  border-left: 1px solid var(--rule);
+`;
+
+const HeaderRight = styled(HeaderSection)`
   gap: 18px;
   padding: 0 22px;
-  border-left: 1px solid var(--rule);
+`;
+
+const InstallBtn = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 4px;
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--ink-3);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 80ms, border-color 80ms, color 80ms;
+
+  &:hover {
+    background: ${accentRgba('amber', 0.08)};
+    border-color: var(--amber-dim);
+    color: var(--amber);
+  }
+
+  @media (max-width: 767px) {
+    padding: 0 8px;
+    font-size: 0; /* hide text on mobile, keep icon */
+    gap: 0;
+  }
 `;
 
 const HelpBtn = styled.button`
@@ -62,11 +98,21 @@ const LoadingBar = styled.div<{ $width: number }>`
 export function Header() {
   const loading = useVolumeStore((s) => s.loading);
   const { setShowShortcuts } = useViewerActions();
+  const { canInstall, install } = usePwaInstall();
 
   return (
     <StyledHeader>
       <BrandBlock />
       <RunStrip />
+      {canInstall && (
+        <HeaderSection>
+          <Tooltip label="Install PrismaMRI as an app">
+            <InstallBtn type="button" aria-label="Install app" onClick={install}>
+              <MonitorDown size={16} />
+            </InstallBtn>
+          </Tooltip>
+        </HeaderSection>
+      )}
       <HeaderRight>
         <Tooltip label="Keyboard shortcuts (?)">
           <HelpBtn
