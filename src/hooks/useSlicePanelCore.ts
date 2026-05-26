@@ -153,7 +153,6 @@ export interface SlicePanelCore {
   dims: readonly [number, number, number] | undefined;
   scrubVisible: boolean;
   // Store actions
-  setActivePlane: (p: SlicePlane) => void;
   setCursor: (c: VolumeCursor) => void;
   setScrubVisible: (axis: SlicePlane, value: boolean) => void;
   requestSnapToView: (plane: SlicePlane) => void;
@@ -164,7 +163,6 @@ export interface SlicePanelCore {
   // Measurement
   measurement: ReturnType<typeof useMeasurementInteraction>['measurement'];
   menu: ReturnType<typeof useMeasurementInteraction>['menu'];
-  openMenu: ReturnType<typeof useMeasurementInteraction>['openMenu'];
   closeMenu: ReturnType<typeof useMeasurementInteraction>['closeMenu'];
   onMeasureFrom: ReturnType<typeof useMeasurementInteraction>['onMeasureFrom'];
   onMeasureTo: ReturnType<typeof useMeasurementInteraction>['onMeasureTo'];
@@ -187,7 +185,6 @@ export function useSlicePanelCore(plane: SlicePlane, halfSlabs = 0): SlicePanelC
 
   // ── Store selectors ───────────────────────────────────────────────────
   const activePlane = useVolumeStore((s) => s.activePlane);
-  const setActivePlane = useVolumeStore((s) => s.setActivePlane);
   const setCursor = useVolumeStore((s) => s.setCursor);
   const requestSnapToView = useVolumeStore((s) => s.requestSnapToView);
   const dims = useVolumeStore((s) => s.volume?.meta.dims);
@@ -321,7 +318,6 @@ export function useSlicePanelCore(plane: SlicePlane, halfSlabs = 0): SlicePanelC
     cursor,
     dims,
     scrubVisible,
-    setActivePlane,
     setCursor,
     setScrubVisible,
     requestSnapToView,
@@ -330,7 +326,6 @@ export function useSlicePanelCore(plane: SlicePlane, halfSlabs = 0): SlicePanelC
     handleContextMenu,
     measurement: measureInteraction.measurement,
     menu: measureInteraction.menu,
-    openMenu: measureInteraction.openMenu,
     closeMenu: measureInteraction.closeMenu,
     onMeasureFrom: measureInteraction.onMeasureFrom,
     onMeasureTo: measureInteraction.onMeasureTo,
