@@ -67,7 +67,7 @@ const ScrubberContainer = styled.div<{
   right: 0;
   bottom: 0;
   width: ${({ $large }) => ($large ? '48px' : '40px')};
-  z-index: 5;
+  z-index: var(--z-panel-chrome);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -143,7 +143,7 @@ const ThumbPill = styled.div<{ $accent: string }>`
   border-radius: 3px;
   background: color-mix(in srgb, ${({ $accent }) => $accent} 90%, transparent);
   border: 1px solid ${({ $accent }) => $accent};
-  z-index: 1;
+  z-index: var(--z-layout);
   color: var(--bg);
   display: flex;
   align-items: center;

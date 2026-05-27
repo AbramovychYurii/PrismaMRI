@@ -49,8 +49,8 @@ const SECTIONS: Array<{ label: string; rows: ShortcutRow[] }> = [
 const Backdrop = styled.div`
   position: fixed;
   inset: 0;
-  z-index: 9990;
-  background: rgba(0, 0, 0, 0.65);
+  z-index: var(--z-modal);
+  background: var(--surface-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -59,7 +59,7 @@ const Backdrop = styled.div`
 
 const Modal = styled.div`
   position: static;
-  background: rgba(12, 10, 7, 0.98);
+  background: var(--surface-glass);
   border: 1px solid var(--rule-2);
   border-radius: 6px;
   padding: 22px 26px 18px;
@@ -68,7 +68,7 @@ const Modal = styled.div`
   overflow-y: auto;
   box-shadow:
     0 16px 48px rgba(0, 0, 0, 0.8),
-    0 0 0 1px rgba(255, 255, 255, 0.04);
+    0 0 0 1px var(--highlight-xs);
 `;
 
 const ModalHead = styled.div`
@@ -139,7 +139,7 @@ const Kbd = styled.kbd`
   font-family: var(--mono);
   font-size: 10.5px;
   color: var(--ink);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--highlight-sm);
   border: 1px solid var(--rule-2);
   border-radius: 3px;
   padding: 2px 7px;

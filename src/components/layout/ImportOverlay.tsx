@@ -43,7 +43,7 @@ function formatLoadingTitle(loading: {
 const ImportMain = styled.main`
   position: fixed;
   inset: 0;
-  z-index: 50;
+  z-index: var(--z-fullscreen);
   background: var(--bg);
   display: flex;
   flex-direction: column;
@@ -246,7 +246,7 @@ const PrimaryButton = styled.button`
   border: 1px solid var(--amber);
   border-radius: 4px;
   background: var(--amber);
-  color: #1a140a;
+  color: var(--amber-text);
   font-weight: 600;
   font-family: var(--sans);
   font-size: 12.5px;

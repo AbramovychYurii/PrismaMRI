@@ -1,3 +1,4 @@
+import { accentRgba } from '@/constants';
 import { MapPin, Ruler, Trash2 } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -7,15 +8,15 @@ import styled from 'styled-components';
 
 const Menu = styled.div`
   position: fixed;
-  z-index: 9999;
-  background: rgba(12, 10, 7, 0.97);
+  z-index: var(--z-popover);
+  background: var(--surface-glass);
   border: 1px solid var(--rule);
   border-radius: 6px;
   padding: 3px 0;
   min-width: 196px;
   box-shadow:
     0 8px 28px rgba(0, 0, 0, 0.7),
-    0 0 0 1px rgba(255, 255, 255, 0.04);
+    0 0 0 1px var(--highlight-xs);
   backdrop-filter: blur(12px);
 `;
 
@@ -36,7 +37,7 @@ const Item = styled.button`
   white-space: nowrap;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--highlight-sm);
     color: var(--ink);
   }
 `;
@@ -45,7 +46,7 @@ const DangerItem = styled(Item)`
   color: var(--ink-3);
 
   &:hover {
-    background: rgba(212, 160, 23, 0.08);
+    background: ${accentRgba('amber', 0.08)};
     color: var(--amber);
   }
 `;

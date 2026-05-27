@@ -35,13 +35,13 @@ const Dropdown = styled.div`
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  background: rgba(18, 16, 10, 0.97);
+  background: var(--surface-glass);
   backdrop-filter: blur(16px);
   border: 1px solid var(--rule-2);
   border-radius: 8px;
   padding: 4px;
   min-width: 200px;
-  z-index: 20;
+  z-index: var(--z-dock-ui);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.65);
 `;
 
@@ -51,7 +51,7 @@ const ItemBtn = styled.button<{ $hover: boolean }>`
   gap: 10px;
   width: 100%;
   padding: 8px 11px;
-  background: ${({ $hover }) => ($hover ? 'rgba(255,255,255,0.05)' : 'transparent')};
+  background: ${({ $hover }) => ($hover ? 'var(--highlight-sm)' : 'transparent')};
   border: none;
   border-radius: 5px;
   color: ${({ $hover }) => ($hover ? 'var(--ink)' : 'var(--ink-2)')};

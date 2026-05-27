@@ -2,6 +2,7 @@ import {
   ACCENT_VAR,
   AXIS_ACCENT,
   type Axis,
+  CANVAS_BG,
   PLANE_ACCENT,
   PLANE_LABEL,
   accentRgba,
@@ -249,7 +250,7 @@ export function useSlicePanelCore(plane: SlicePlane, halfSlabs = 0): SlicePanelC
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    ctx.fillStyle = '#080604';
+    ctx.fillStyle = CANVAS_BG;
     ctx.fillRect(0, 0, cw, ch);
     if (!image) return;
 

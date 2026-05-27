@@ -17,7 +17,7 @@ import styled from 'styled-components';
 const MEASURE_DOT_PX = 8;
 
 /** Pre-computed box-shadow for measurement dots (constant size). */
-const MEASURE_DOT_SHADOW = `0 0 ${MEASURE_DOT_PX * 0.7}px #ff4500, 0 0 ${MEASURE_DOT_PX * 1.6}px rgba(255, 69, 0, 0.45)`;
+const MEASURE_DOT_SHADOW = `0 0 ${MEASURE_DOT_PX * 0.7}px var(--measure), 0 0 ${MEASURE_DOT_PX * 1.6}px var(--measure-glow)`;
 
 /** Downloads the current canvas slice as a PNG file. */
 function downloadSlice(canvas: HTMLCanvasElement | null, plane: SlicePlane, idx: number): void {
@@ -39,7 +39,7 @@ const PanelWrap = styled.div<{ $isLast: boolean; $isActive: boolean }>`
   position: relative;
   flex: 1;
   min-height: 0;
-  background: #050403;
+  background: var(--surface-deep);
   border-bottom: ${({ $isLast }) => ($isLast ? 'none' : '1px solid var(--rule)')};
   overflow: hidden;
   cursor: ${({ $isActive }) => ($isActive ? 'crosshair' : 'pointer')};
@@ -56,7 +56,7 @@ const CrosshairOverlay = styled.div`
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 3;
+  z-index: var(--z-overlay-local);
 `;
 
 const CrossH = styled.div<{ $color: string; $glow: string }>`
@@ -109,7 +109,7 @@ const PanelHeader = styled.div`
     rgba(8, 7, 5, 0.55) 70%,
     transparent
   );
-  z-index: 4;
+  z-index: var(--z-panel-header);
   gap: 12px;
   min-width: 0;
 `;
@@ -160,7 +160,7 @@ const PanelFooter = styled.div<{ $scrubVisible: boolean }>`
   bottom: 8px;
   left: 14px;
   right: ${({ $scrubVisible }) => ($scrubVisible ? '48px' : '14px')};
-  z-index: 4;
+  z-index: var(--z-panel-header);
   display: flex;
   justify-content: space-between;
   font-family: var(--mono);
@@ -175,7 +175,7 @@ const PanelFooter = styled.div<{ $scrubVisible: boolean }>`
 const ActiveBorder = styled.div`
   position: absolute;
   inset: 0;
-  z-index: 5;
+  z-index: var(--z-panel-chrome);
   border: 1.5px solid var(--amber);
   pointer-events: none;
   box-shadow: inset 0 0 0 1px ${accentRgba('amber', 0.15)};
@@ -187,7 +187,7 @@ const MeasureLine = styled.svg`
   width: 100%;
   height: 100%;
   pointer-events: none;
-  z-index: 6;
+  z-index: var(--z-panel-top);
   overflow: visible;
 `;
 
@@ -195,16 +195,16 @@ const MeasureDot = styled.div`
   position: absolute;
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  background: #ff4500;
+  background: var(--measure);
   pointer-events: none;
-  z-index: 6;
+  z-index: var(--z-panel-top);
 `;
 
 const ButtonTray = styled.div`
   position: absolute;
   top: 5px;
   right: 8px;
-  z-index: 6;
+  z-index: var(--z-panel-top);
   display: flex;
   gap: 7px;
   pointer-events: auto;
@@ -220,7 +220,7 @@ const MobileRightCol = styled.div`
   right: 0;
   bottom: 0;
   width: 46px;
-  z-index: 5;
+  z-index: var(--z-panel-chrome);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -274,7 +274,7 @@ const SlabBar = styled.div`
   position: absolute;
   bottom: 36px;
   left: 14px;
-  z-index: 6;
+  z-index: var(--z-panel-top);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -297,7 +297,7 @@ const SlabBtn = styled.button<{ $active: boolean }>`
   border-radius: 4px;
   border: 1px solid
     ${({ $active }) => ($active ? 'var(--amber-dim)' : 'var(--rule)')};
-  background: ${({ $active }) => ($active ? '#3a2a0a' : '#1a1710')};
+  background: ${({ $active }) => ($active ? 'var(--amber-tint-active)' : 'var(--amber-tint-base)')};
   color: ${({ $active }) => ($active ? 'var(--amber)' : 'var(--ink-3)')};
   cursor: pointer;
   transition:
@@ -309,7 +309,7 @@ const SlabBtn = styled.button<{ $active: boolean }>`
     !$active &&
     `
     &:hover {
-      background: #232017;
+      background: var(--amber-tint-hover);
       border-color: var(--rule-2);
       color: var(--ink);
     }
@@ -322,8 +322,8 @@ const FullscreenOverlay = styled.div<{ $isActive: boolean }>`
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 50;
-  background: #050403;
+  z-index: var(--z-fullscreen);
+  background: var(--surface-deep);
   overflow: hidden;
   cursor: ${({ $isActive }) => ($isActive ? 'crosshair' : 'default')};
 `;
@@ -400,11 +400,11 @@ function CrosshairAndDots({
             y1={`${adjustedDots[0].fy * 100}%`}
             x2={`${adjustedDots[1].fx * 100}%`}
             y2={`${adjustedDots[1].fy * 100}%`}
-            stroke="#ff4500"
+            style={{ stroke: 'var(--measure)' }}
             strokeWidth="1.5"
             strokeDasharray="5 4"
             opacity="0.75"
-            filter="drop-shadow(0 0 4px rgba(255,69,0,0.5))"
+            filter="drop-shadow(0 0 4px var(--measure-glow))"
           />
         </MeasureLine>
       )}

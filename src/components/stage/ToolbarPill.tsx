@@ -118,7 +118,7 @@ const PillWrap = styled.div`
   right: 30px;
   display: flex;
   gap: 8px;
-  z-index: 5;
+  z-index: var(--z-panel-chrome);
 
   @media (max-width: 767px) {
     top: 12px;

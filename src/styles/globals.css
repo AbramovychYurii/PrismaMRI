@@ -24,6 +24,7 @@
 }
 
 :root {
+  /* ── Core palette ─────────────────────────────────────────────────────── */
   --bg: #0c0b09;
   --panel: #15130e;
   --panel-2: #1c1a14;
@@ -43,6 +44,37 @@
   --serif: "IBM Plex Serif", Georgia, serif;
   --sans: "IBM Plex Sans", system-ui, sans-serif;
   --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+
+  /* ── Surface tokens ───────────────────────────────────────────────────── */
+  --surface-deep: #050403; /* deepest canvas / panel background  */
+  --surface-glass: rgba(12, 10, 7, 0.97); /* floating menus, tooltips, dialogs  */
+  --surface-overlay: rgba(0, 0, 0, 0.65); /* modal backdrop                     */
+  --highlight-xs: rgba(255, 255, 255, 0.04); /* hairline box-shadow rings          */
+  --highlight-sm: rgba(255, 255, 255, 0.06); /* hover state backgrounds            */
+  --highlight-border: rgba(255, 255, 255, 0.09); /* borders on dark floating surfaces  */
+
+  /* ── Measurement accent ──────────────────────────────────────────────── */
+  --measure: #ff4500; /* measurement dots and lines         */
+  --measure-glow: rgba(255, 69, 0, 0.45); /* measurement glow / drop-shadow     */
+
+  /* ── Amber-tinted interactive states ─────────────────────────────────── */
+  --amber-tint-active: #3a2a0a; /* e.g. Slab MIP button — active  */
+  --amber-tint-hover: #232017; /* e.g. Slab MIP button — hover   */
+  --amber-tint-base: #1a1710; /* e.g. Slab MIP button — default */
+  --amber-text: #1a140a; /* dark text on amber backgrounds  */
+
+  /* ── Z-index scale ───────────────────────────────────────────────────── */
+  --z-layout: 1; /* page structure roots                        */
+  --z-overlay-local: 3; /* within-panel overlays (crosshair etc.)      */
+  --z-panel-header: 4; /* panel headers and footers                   */
+  --z-panel-chrome: 5; /* panel borders, scrubbers, active indicators */
+  --z-panel-top: 6; /* topmost within-panel elements (menus, btns) */
+  --z-dock-panel: 15; /* floating dock panel                         */
+  --z-dock-ui: 20; /* dock toggle button, stage dropdown          */
+  --z-stage: 40; /* 3-D viewport focused overlay                */
+  --z-fullscreen: 50; /* fullscreen / import screen                  */
+  --z-modal: 9990; /* modal dialogs                               */
+  --z-popover: 9999; /* tooltips, context menus                     */
 }
 
 * {

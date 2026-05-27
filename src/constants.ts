@@ -5,6 +5,13 @@ export const APP_NAME = 'PrismaMRI';
 export const MAX_3D_TEXTURE_EDGE = 512;
 export const WL_DEBOUNCE_MS = 96;
 
+/**
+ * Canvas 2D context background fill for slice panels.
+ * Canvas ctx properties don't support CSS custom properties, so this mirrors
+ * `--surface-deep` as a concrete hex value with a slight lift for visual depth.
+ */
+export const CANVAS_BG = '#080604';
+
 export const ONEVOLUME_MARKER = 'JmVolumeVersion=1';
 export const ONEVOLUME_WINDOW_SCALE = 100;
 export const CT_VOL_NAME = 'CT_0.vol';

@@ -18,7 +18,7 @@ import styled from 'styled-components';
 
 const GridRoot = styled.div<{ $railOpen: boolean }>`
   position: relative;
-  z-index: 1;
+  z-index: var(--z-layout);
   display: grid;
   grid-template-columns: ${({ $railOpen }) => ($railOpen ? '1fr 360px' : '1fr 0px')};
   grid-template-rows: 56px minmax(0, 1fr);
@@ -37,7 +37,7 @@ const MobileRoot = styled.div`
   width: 100vw;
   overflow: hidden;
   position: relative;
-  z-index: 1;
+  z-index: var(--z-layout);
 `;
 
 const MobileHeaderBar = styled.header`

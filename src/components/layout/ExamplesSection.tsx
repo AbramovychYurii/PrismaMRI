@@ -151,7 +151,7 @@ const CornerTL = styled.span<{ $hover: boolean }>`
   border-left: 1px solid var(--amber);
   opacity: ${({ $hover }) => ($hover ? 1 : 0.5)};
   transition: opacity 150ms;
-  z-index: 2;
+  z-index: var(--z-overlay-local);
   pointer-events: none;
 `;
 
@@ -165,7 +165,7 @@ const CornerTR = styled.span<{ $hover: boolean }>`
   border-right: 1px solid var(--amber);
   opacity: ${({ $hover }) => ($hover ? 1 : 0.5)};
   transition: opacity 150ms;
-  z-index: 2;
+  z-index: var(--z-overlay-local);
   pointer-events: none;
 `;
 
@@ -177,17 +177,17 @@ const ModalityBadge = styled.span`
   font-size: 9px;
   letter-spacing: 0.12em;
   color: var(--ink-2);
-  background: rgba(12, 11, 9, 0.8);
+  background: var(--surface-glass);
   border: 1px solid var(--rule);
   border-radius: 2px;
   padding: 2px 5px;
-  z-index: 3;
+  z-index: var(--z-panel-header);
 `;
 
 const ThumbnailWrap = styled.div`
   width: 100%;
   aspect-ratio: 1;
-  background: #0a0907;
+  background: var(--surface-deep);
   overflow: hidden;
   flex-shrink: 0;
 `;

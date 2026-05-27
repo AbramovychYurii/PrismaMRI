@@ -10,7 +10,7 @@ import styled, { css } from 'styled-components';
 const focusedStyles = css`
   position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: var(--z-stage);
   background: radial-gradient(
     ellipse at 50% 55%,
     rgba(28, 26, 20, 0.7) 0%,

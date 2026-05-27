@@ -51,7 +51,7 @@ const ToggleButton = styled.button<{
   bottom: ${({ $open }) => ($open ? DOCK_H + 10 : 10)}px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 20;
+  z-index: var(--z-dock-ui);
   transition: ${({ $reduced }) =>
     $reduced ? 'none' : 'bottom 260ms ease, background 100ms, border-color 100ms'};
   display: flex;
@@ -85,7 +85,7 @@ const DockPanel = styled.div<{ $open: boolean; $reduced: boolean }>`
   height: ${DOCK_H}px;
   transform: ${({ $open }) => ($open ? 'translateY(0)' : `translateY(${DOCK_H}px)`)};
   transition: ${({ $reduced }) => ($reduced ? 'none' : 'transform 260ms ease')};
-  z-index: 15;
+  z-index: var(--z-dock-panel);
   background: var(--panel);
   border-top: 1px solid var(--rule);
   display: grid;

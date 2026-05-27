@@ -10,15 +10,15 @@ const TipBox = styled.div<{ $x: number; $y: number; $above: boolean }>`
   top: ${({ $y }) => $y}px;
   transform: ${({ $above }) => ($above ? 'translate(-50%, -100%)' : 'translateX(-50%)')};
   white-space: nowrap;
-  background: rgba(10, 8, 6, 0.97);
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: var(--surface-glass);
+  border: 1px solid var(--highlight-border);
   border-radius: 4px;
   padding: 4px 9px;
   font-family: var(--sans);
   font-size: 11px;
   color: var(--ink-2);
   pointer-events: none;
-  z-index: 9999;
+  z-index: var(--z-popover);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
   animation: _tip-in 80ms ease forwards;
 
