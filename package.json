@@ -10,7 +10,10 @@
     "lint": "biome check src",
     "format": "biome format --write src",
     "typecheck": "tsc -b --noEmit",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:update": "playwright test --update-snapshots"
   },
   "dependencies": {
     "fflate": "^0.8.2",
@@ -23,6 +26,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/vite": "^4.0.0-beta.7",
     "@types/node": "^25.8.0",
     "@types/react": "^18.3.12",

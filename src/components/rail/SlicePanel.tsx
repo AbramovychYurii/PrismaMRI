@@ -691,6 +691,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
 
   return (
     <PanelWrap
+      data-testid={`slice-panel-${plane}`}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
       onWheel={onWheel}

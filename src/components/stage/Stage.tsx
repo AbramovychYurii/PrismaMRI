@@ -91,8 +91,8 @@ export function Stage() {
   const hasVolume = useVolumeStore((s) => s.prepared3D !== null);
 
   return (
-    <StageSection $focus={focus}>
-      <StageCanvas ref={canvasRef} />
+    <StageSection $focus={focus} data-testid="stage-section">
+      <StageCanvas ref={canvasRef} data-testid="stage-canvas" />
       {!hasVolume && <NoVolumePlaceholder>No volume loaded</NoVolumePlaceholder>}
       <TitleGroup>
         <VolumeSubLabel>Ray-cast · native res</VolumeSubLabel>

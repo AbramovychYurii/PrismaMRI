@@ -354,6 +354,7 @@ export function SliceScrubber({
 
   return (
     <ScrubberContainer
+      data-testid={`scrubber-${axis}`}
       $visible={visible}
       $reduced={reduced}
       $inline={inline}

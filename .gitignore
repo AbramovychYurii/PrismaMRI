@@ -7,3 +7,7 @@ dist
 .vscode
 design
 .claude/
+
+# Playwright
+test-results/
+playwright-report/
