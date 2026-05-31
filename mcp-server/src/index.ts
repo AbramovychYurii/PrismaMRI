@@ -557,6 +557,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 connectRelay();
-const transport = new StdioServerTransport();
-await server.connect(transport);
-process.stderr.write('[prismamri] MCP server v2 ready.\n');
+(async () => {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  process.stderr.write('[prismamri] MCP server v2 ready.\n');
+})().catch((err: Error) => {
+  process.stderr.write(`[prismamri] Fatal: ${err.message}\n`);
+  process.exit(1);
+});
