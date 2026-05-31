@@ -1,0 +1,13 @@
+name = "prismamri-relay"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[durable_objects]
+bindings = [
+  { name = "RELAY_SESSION", class_name = "RelaySession" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RelaySession"]

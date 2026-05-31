@@ -2,6 +2,7 @@ node_modules
 dist
 .DS_Store
 *.local
+.env.local
 .vite
 .idea
 .vscode
@@ -11,3 +12,15 @@ design
 # Playwright
 test-results/
 playwright-report/
+
+# Generated / personalised artifacts
+dev-dist/
+prismamri.dxt
+dxt/
+public/dxt-server/
+
+# MCP server build output
+mcp-server/dist/
+
+# TypeScript incremental build cache
+*.tsbuildinfo
