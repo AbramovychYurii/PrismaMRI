@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build:dxt": "cd mcp-server && npx esbuild src/index.ts --bundle --platform=node --format=esm --outfile=../public/dxt-server/index.js --external:ws && cp -r node_modules/ws/index.js ../public/dxt-server/ws/index.js && cp node_modules/ws/lib/*.js ../public/dxt-server/ws/lib/",
+    "build:dxt": "cd mcp-server && npm ci && npx esbuild src/index.ts --bundle --platform=node --format=esm --outfile=../public/dxt-server/index.js --external:ws && cp -r node_modules/ws/index.js ../public/dxt-server/ws/index.js && cp node_modules/ws/lib/*.js ../public/dxt-server/ws/lib/",
     "build": "npm run build:dxt && tsc -b && vite build",
     "preview": "vite preview",
     "lint": "biome check src",
