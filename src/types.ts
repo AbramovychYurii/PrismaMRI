@@ -139,3 +139,33 @@ export interface VolumeHistogram {
   max: number;
   count: number;
 }
+
+/**
+ * Clinical severity of an AI finding — drives the marker colour everywhere
+ * (2-D panels and 3-D model) and sort order in the navigator.
+ */
+export type AnnotationSeverity = 'critical' | 'serious' | 'moderate' | 'comment';
+
+/** A finding placed on the volume by the AI agent. */
+export interface AiAnnotation {
+  /** Unique ID so React keys are stable. */
+  id: string;
+  /** Plane the agent was viewing when it placed the marker. */
+  plane: SlicePlane;
+  /** Horizontal fraction 0–1 from the left edge of the slice canvas. */
+  fx: number;
+  /** Vertical fraction 0–1 from the top edge of the slice canvas. */
+  fy: number;
+  /**
+   * Full voxel coordinate of the finding — the source of truth for projecting
+   * the marker onto the 3-D model and for jump-to navigation. Derived from
+   * `plane` + `fx`/`fy` + the cursor position at placement time.
+   */
+  voxel: VolumeCursor;
+  /** Short label rendered next to the marker. */
+  label: string;
+  /** 1–3 sentence description shown in the summary card. */
+  summary?: string;
+  /** Clinical severity — determines colour. */
+  severity: AnnotationSeverity;
+}

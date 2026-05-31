@@ -1,4 +1,4 @@
-import { TickScale } from '@/components/stage/TickScale';
+import { SessionPanel } from '@/components/mcp/SessionPanel';
 import { ToolbarPill } from '@/components/stage/ToolbarPill';
 import { useThreePreview } from '@/hooks';
 import { useVolumeStore } from '@/store';
@@ -62,26 +62,6 @@ const NoVolumePlaceholder = styled.div`
   pointer-events: none;
 `;
 
-const TitleGroup = styled.div`
-  position: absolute;
-  top: 22px;
-  left: 30px;
-  display: flex;
-  align-items: flex-end;
-  gap: 16px;
-  max-width: calc(100% - 420px);
-  min-width: 0;
-`;
-
-const VolumeSubLabel = styled.div`
-  font-family: var(--mono);
-  font-size: 10.5px;
-  color: var(--ink-3);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  padding-bottom: 4px;
-`;
-
 // ── Component ──────────────────────────────────────────────────────────────
 
 export function Stage() {
@@ -94,11 +74,8 @@ export function Stage() {
     <StageSection $focus={focus} data-testid="stage-section">
       <StageCanvas ref={canvasRef} data-testid="stage-canvas" />
       {!hasVolume && <NoVolumePlaceholder>No volume loaded</NoVolumePlaceholder>}
-      <TitleGroup>
-        <VolumeSubLabel>Ray-cast · native res</VolumeSubLabel>
-      </TitleGroup>
       <ToolbarPill previewRef={previewRef} />
-      <TickScale />
+      <SessionPanel />
     </StageSection>
   );
 }

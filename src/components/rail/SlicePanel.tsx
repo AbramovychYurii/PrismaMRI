@@ -1,3 +1,4 @@
+import { AnnotationOverlay } from '@/components/mcp/AnnotationOverlay';
 import { MeasureMenu } from '@/components/rail/MeasureMenu';
 import { SliceScrubber } from '@/components/rail/SliceScrubber';
 import { Tooltip } from '@/components/ui/Tooltip';
@@ -5,6 +6,7 @@ import { PLANE_FOOTER, PLANE_GLYPH, accentRgba } from '@/constants';
 import { useHalfSlabs } from '@/hooks/useHalfSlabs';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { axisColor, axisGlow, cursorFromClick, useSlicePanelCore } from '@/hooks/useSlicePanelCore';
+import { useVolumeStore } from '@/store/volumeStore';
 import type { SlicePlane } from '@/types';
 import { ChevronsUpDown, Download, Maximize2, Minimize2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -540,6 +542,8 @@ function ExpandedSlicePanel({
 
       <CrosshairAndDots cross={cross} axes={axes} adjustedDots={adjustedDots} />
 
+      <AnnotationOverlay plane={plane} halfSlabs={halfSlabs} />
+
       <PanelHeader>
         <PlaneGlyph $color={accentColor}>{PLANE_GLYPH[plane]}</PlaneGlyph>
         <PlaneLabel>
@@ -621,6 +625,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
   const [slabMm, setSlabMm] = useState(0);
   const isMobile = useIsMobile();
   const halfSlabs = useHalfSlabs(plane, slabMm);
+  const setCanvasRef = useVolumeStore((s) => s.setCanvasRef);
 
   // On mobile, slab is controlled from the regular panel (no expand mode).
   // On desktop, slab is only available in ExpandedSlicePanel.
@@ -653,6 +658,12 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
   } = useSlicePanelCore(plane, isMobile ? halfSlabs : 0);
   // Touch-swipe slice navigation — tracks gesture start state.
   const touchRef = useRef<{ startY: number; startIdx: number } | null>(null);
+
+  // Register canvas with the store so useMcpBridge can capture it.
+  useEffect(() => {
+    setCanvasRef(plane, canvasRef.current);
+    return () => setCanvasRef(plane, null);
+  }, [plane, setCanvasRef, canvasRef]);
 
   const isLast = plane === 'axial';
   // On mobile the scrubber is always visible — no toggle needed.
@@ -796,6 +807,8 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
           onClose={closeMenu}
         />
       )}
+
+      <AnnotationOverlay plane={plane} halfSlabs={isMobile ? halfSlabs : 0} />
 
       {expanded && <ExpandedSlicePanel plane={plane} onClose={() => setExpanded(false)} />}
     </PanelWrap>

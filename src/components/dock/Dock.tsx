@@ -10,7 +10,7 @@ import { ChevronDown } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import styled from 'styled-components';
 
-const DOCK_H = 200;
+export const DOCK_H = 200;
 
 // ── Styled components ──────────────────────────────────────────────────────
 

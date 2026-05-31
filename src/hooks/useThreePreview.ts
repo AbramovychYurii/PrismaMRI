@@ -27,6 +27,9 @@ export function useThreePreview(
   const measurement = useVolumeStore((s) => s.measurement);
   const spacing = useVolumeStore((s) => s.volume?.meta.spacing);
   const renderPreset = useVolumeStore((s) => s.renderPreset);
+  const aiAnnotations = useVolumeStore((s) => s.aiAnnotations);
+  const activeAnnotationId = useVolumeStore((s) => s.activeAnnotationId);
+  const setPreviewInstance = useVolumeStore((s) => s.setPreviewInstance);
 
   // Create / destroy
   useEffect(() => {
@@ -34,6 +37,8 @@ export function useThreePreview(
     if (!canvas) return;
     const preview = new ThreePreview(canvas);
     previewRef.current = preview;
+    // Expose the instance so the MCP bridge can capture it + drive markers.
+    setPreviewInstance(preview);
 
     const ro = new ResizeObserver(() => preview.resize());
     ro.observe(canvas);
@@ -42,8 +47,21 @@ export function useThreePreview(
       ro.disconnect();
       preview.dispose();
       previewRef.current = null;
+      setPreviewInstance(null);
     };
-  }, [canvasRef]);
+  }, [canvasRef, setPreviewInstance]);
+
+  // AI annotation markers — re-apply when the list changes, and again after a
+  // volume (re)loads so markers survive the rebuild.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: prepared3D re-triggers re-placement after setVolume
+  useEffect(() => {
+    previewRef.current?.setAnnotations(aiAnnotations);
+  }, [aiAnnotations, prepared3D]);
+
+  // Active finding emphasis.
+  useEffect(() => {
+    previewRef.current?.setActiveAnnotation(activeAnnotationId);
+  }, [activeAnnotationId]);
 
   // Load volume
   useEffect(() => {

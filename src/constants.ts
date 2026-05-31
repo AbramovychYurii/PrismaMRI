@@ -1,4 +1,4 @@
-import type { SlicePlane } from '@/types';
+import type { AnnotationSeverity, SlicePlane } from '@/types';
 
 export const APP_NAME = 'PrismaMRI';
 
@@ -101,4 +101,38 @@ export const PLANE_LABEL: Record<SlicePlane, { primary: string; secondary: strin
   coronal: { primary: 'Coronal', secondary: 'frontal' },
   sagittal: { primary: 'Sagittal', secondary: 'lateral' },
   axial: { primary: 'Axial', secondary: 'transverse' },
+};
+
+// ── AI annotation severity palette ─────────────────────────────────────────
+
+/** Severity → marker colour (hex). Shared by 2-D overlay and 3-D markers. */
+export const SEVERITY_HEX: Record<AnnotationSeverity, string> = {
+  critical: '#ff3b30', // red    — critical
+  serious: '#ff9500', //  orange — serious but not critical
+  moderate: '#ffd60a', // yellow — moderate
+  comment: '#34c759', //  green  — informational note
+};
+
+/** Severity → numeric hex for Three.js. */
+export const SEVERITY_HEX_NUM: Record<AnnotationSeverity, number> = {
+  critical: 0xff3b30,
+  serious: 0xff9500,
+  moderate: 0xffd60a,
+  comment: 0x34c759,
+};
+
+/** Severity → short human label. */
+export const SEVERITY_LABEL: Record<AnnotationSeverity, string> = {
+  critical: 'Critical',
+  serious: 'Serious',
+  moderate: 'Moderate',
+  comment: 'Note',
+};
+
+/** Most-severe-first ordering used when sorting findings in the navigator. */
+export const SEVERITY_RANK: Record<AnnotationSeverity, number> = {
+  critical: 0,
+  serious: 1,
+  moderate: 2,
+  comment: 3,
 };

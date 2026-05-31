@@ -1,3 +1,4 @@
+import { AnnotationMarkers } from '@/lib/volume/three-preview/annotation-markers';
 import { buildCamera, buildControls, frameCamera } from '@/lib/volume/three-preview/camera';
 import { CursorPlanes } from '@/lib/volume/three-preview/cursor-planes';
 import { MeasurementLine } from '@/lib/volume/three-preview/measurement-line';
@@ -9,6 +10,7 @@ import {
 import { type RenderPreset, buildTransferFunction } from '@/lib/volume/three-preview/volume-shader';
 import type {
   ActiveMeasurement,
+  AiAnnotation,
   PlanesMode,
   PreparedVolumeFor3D,
   SlicePlane,
@@ -28,6 +30,12 @@ export class ThreePreview {
   private volume: VolumeObject | null = null;
   private readonly cursorPlanes = new CursorPlanes();
   private readonly measurementLine = new MeasurementLine();
+  private readonly annotationMarkers = new AnnotationMarkers();
+  /** Voxel spacing of the loaded volume — for marker world placement. */
+  private _spacing: readonly [number, number, number] = [1, 1, 1];
+  /** Latest annotation list + active id, re-applied when a volume (re)loads. */
+  private _annotations: AiAnnotation[] = [];
+  private _activeAnnotationId: string | null = null;
   private sceneSize = 200;
   private raf = 0;
   private disposed = false;
@@ -66,6 +74,7 @@ export class ThreePreview {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.sortObjects = false;
     this.scene.add(this.measurementLine.group);
+    this.scene.add(this.annotationMarkers.group);
     this.camera = buildCamera(1, 256);
     this.resize();
     this.loop();
@@ -95,6 +104,10 @@ export class ThreePreview {
     this._volumeCenter.copy(center);
     const maxEdge = Math.max(dims[0] * sx, dims[1] * sy, dims[2] * sz);
     this.sceneSize = maxEdge;
+    this._spacing = prepared.spacing;
+    // Re-place any markers now that scene scale + spacing are known.
+    this.annotationMarkers.setAnnotations(this._annotations, this._spacing, this.sceneSize);
+    this.annotationMarkers.setActive(this._activeAnnotationId);
 
     const rect = this.canvas.getBoundingClientRect();
     const aspect = rect.height > 0 ? rect.width / rect.height : 1;
@@ -203,6 +216,21 @@ export class ThreePreview {
     }
     const toW = new THREE.Vector3(m.to.x * sx, m.to.y * sy, m.to.z * sz);
     this.measurementLine.setBoth(fromW, toW, m.distanceMm, this.sceneSize);
+    this.dirty = true;
+  }
+
+  // ── AI annotation markers ──────────────────────────────────────────────────
+
+  setAnnotations(list: AiAnnotation[]): void {
+    this._annotations = list;
+    this.annotationMarkers.setAnnotations(list, this._spacing, this.sceneSize);
+    this.annotationMarkers.setActive(this._activeAnnotationId);
+    this.dirty = true;
+  }
+
+  setActiveAnnotation(id: string | null): void {
+    this._activeAnnotationId = id;
+    this.annotationMarkers.setActive(id);
     this.dirty = true;
   }
 
@@ -418,6 +446,7 @@ export class ThreePreview {
     if (this.volume) disposeVolumeObject(this.volume);
     this.cursorPlanes.dispose();
     this.measurementLine.dispose();
+    this.annotationMarkers.dispose();
     this.renderer.dispose();
   }
 }

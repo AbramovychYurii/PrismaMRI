@@ -1,6 +1,8 @@
 import { isSlicePlane } from '@/constants';
+import type { ThreePreview } from '@/lib/volume/three-preview';
 import type {
   ActiveMeasurement,
+  AiAnnotation,
   AppView,
   ImportProgress,
   LoadedVolume,
@@ -37,6 +39,20 @@ interface VolumeState {
   snapPlane: SlicePlane;
   /** Active tab on mobile layout. */
   mobileTab: MobileTab;
+  /** AI annotation findings placed by the MCP agent. */
+  aiAnnotations: AiAnnotation[];
+  /** Currently focused finding — drives the summary card + marker emphasis. */
+  activeAnnotationId: string | null;
+  /** True while the MCP server is connected via the relay. */
+  mcpConnected: boolean;
+  /** Set while the agent is executing a command — drives the activity indicator. */
+  agentActivity: { active: boolean; action: string | null };
+  /** True for the entire duration of an agent prompt session (first cmd → inactivity/disconnect). */
+  agentSessionActive: boolean;
+  /** Canvas refs registered by each SlicePanel so useMcpBridge can capture them. */
+  canvasRefs: Record<SlicePlane, HTMLCanvasElement | null>;
+  /** Live 3-D preview instance, registered by useThreePreview (for capture + markers). */
+  previewInstance: ThreePreview | null;
 }
 
 interface VolumeActions {
@@ -57,6 +73,17 @@ interface VolumeActions {
   setRenderPreset: (preset: RenderPreset) => void;
   requestSnapToView: (plane: SlicePlane) => void;
   setMobileTab: (tab: MobileTab) => void;
+  addAiAnnotation: (a: AiAnnotation) => void;
+  removeAiAnnotation: (id: string) => void;
+  clearAiAnnotations: () => void;
+  setActiveAnnotation: (id: string | null) => void;
+  /** Jump the cursor/active plane to a finding and mark it active. */
+  focusAnnotation: (id: string) => void;
+  setMcpConnected: (v: boolean) => void;
+  setAgentActivity: (active: boolean, action?: string | null) => void;
+  setAgentSessionActive: (v: boolean) => void;
+  setCanvasRef: (plane: SlicePlane, canvas: HTMLCanvasElement | null) => void;
+  setPreviewInstance: (p: ThreePreview | null) => void;
   reset: () => void;
 }
 
@@ -93,6 +120,13 @@ const initialState: VolumeState = {
   snapSeq: 0,
   snapPlane: 'coronal',
   mobileTab: '3d',
+  aiAnnotations: [],
+  activeAnnotationId: null,
+  mcpConnected: false,
+  agentActivity: { active: false, action: null },
+  agentSessionActive: false,
+  canvasRefs: { coronal: null, sagittal: null, axial: null },
+  previewInstance: null,
 };
 
 export const useVolumeStore = create<VolumeState & VolumeActions>((set) => ({
@@ -119,6 +153,8 @@ export const useVolumeStore = create<VolumeState & VolumeActions>((set) => ({
       activePlane: initialState.activePlane,
       snapSeq: 0,
       error: null,
+      aiAnnotations: [],
+      activeAnnotationId: null,
     }),
 
   setCursor: (cursor) =>
@@ -210,6 +246,46 @@ export const useVolumeStore = create<VolumeState & VolumeActions>((set) => ({
       // Sync activePlane when switching to a slice tab.
       activePlane: isSlicePlane(mobileTab) ? mobileTab : state.activePlane,
     })),
+
+  addAiAnnotation: (a) => set((state) => ({ aiAnnotations: [...state.aiAnnotations, a] })),
+
+  removeAiAnnotation: (id) =>
+    set((state) => ({
+      aiAnnotations: state.aiAnnotations.filter((a) => a.id !== id),
+      activeAnnotationId: state.activeAnnotationId === id ? null : state.activeAnnotationId,
+    })),
+
+  clearAiAnnotations: () => set({ aiAnnotations: [], activeAnnotationId: null }),
+
+  setActiveAnnotation: (activeAnnotationId) => set({ activeAnnotationId }),
+
+  focusAnnotation: (id) =>
+    set((state) => {
+      const a = state.aiAnnotations.find((x) => x.id === id);
+      if (!a) return {};
+      const dims = state.volume?.meta.dims;
+      const clampAxis = (v: number, max: number) => Math.max(0, Math.min(max - 1, v));
+      const cursor = dims
+        ? {
+            x: clampAxis(a.voxel.x, dims[0]),
+            y: clampAxis(a.voxel.y, dims[1]),
+            z: clampAxis(a.voxel.z, dims[2]),
+          }
+        : a.voxel;
+      return { cursor, activePlane: a.plane, activeAnnotationId: id };
+    }),
+
+  setMcpConnected: (mcpConnected) => set({ mcpConnected }),
+
+  setAgentActivity: (active, action = null) =>
+    set({ agentActivity: { active, action: active ? (action ?? null) : null } }),
+
+  setAgentSessionActive: (agentSessionActive) => set({ agentSessionActive }),
+
+  setCanvasRef: (plane, canvas) =>
+    set((state) => ({ canvasRefs: { ...state.canvasRefs, [plane]: canvas } })),
+
+  setPreviewInstance: (previewInstance) => set({ previewInstance }),
 
   reset: () => set(initialState),
 }));
