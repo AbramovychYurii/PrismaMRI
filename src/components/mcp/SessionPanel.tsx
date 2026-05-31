@@ -34,9 +34,11 @@ import styled, { keyframes } from 'styled-components';
 
 const RELAY_URL = import.meta.env.VITE_RELAY_URL as string | undefined;
 
-/** URL of the pre-built server bundle shipped with the app. */
-const SERVER_BUNDLE_URL = new URL('/dxt-server/index.js', window.location.href).href;
-const WS_LIB_URL = new URL('/dxt-server/ws/', window.location.href).href;
+/** URL of the pre-built server bundle shipped with the app.
+ * Use import.meta.env.BASE_URL (e.g. "/PrismaMRI/" on GitHub Pages, "/" locally)
+ * so the path is correct regardless of the deployment sub-directory. */
+const SERVER_BUNDLE_URL = `${import.meta.env.BASE_URL}dxt-server/index.js`;
+const WS_LIB_URL = `${import.meta.env.BASE_URL}dxt-server/ws/`;
 
 /**
  * Fetch the pre-built server bundle + ws lib, inject the session/relay into
@@ -437,7 +439,6 @@ const MinimisedPill = styled.button<{
     right: 12px;
   }
 `;
-
 
 // ── Prompt example ────────────────────────────────────────────────────────────
 
