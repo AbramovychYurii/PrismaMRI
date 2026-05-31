@@ -64,8 +64,14 @@ export class RelaySession {
 
     server.addEventListener('message', (event) => {
       const msg = typeof event.data === 'string' ? event.data : new TextDecoder().decode(event.data as ArrayBuffer);
-      // Absorb heartbeat pings — no need to forward to the other side.
-      if (msg === '{"type":"ping"}') return;
+      // Respond to heartbeat pings with a pong so the client can detect
+      // dead connections (no pong = WS is silently broken → reconnect).
+      if (msg === '{"type":"ping"}') {
+        try { server.send('{"type":"pong"}'); } catch { /* ignore */ }
+        return;
+      }
+      // Silently absorb pong messages (shouldn't arrive, but be safe).
+      if (msg === '{"type":"pong"}') return;
       const other = role === 'app' ? this.mcp : this.app;
       if (other) {
         try { other.send(msg); } catch { /* ignore if other side closed */ }

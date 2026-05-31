@@ -23,6 +23,7 @@ const SEVERITIES: AnnotationSeverity[] = ['critical', 'serious', 'moderate', 'co
 // ── Protocol types ────────────────────────────────────────────────────────────
 
 type IncomingMessage =
+  | { type: 'pong' }
   | { type: 'mcp_connecting' }
   | { type: 'mcp_disconnected' }
   | { type: 'cmd'; id: string; action: string; [key: string]: unknown };
@@ -225,6 +226,8 @@ export function useMcpBridge(sessionId: string | null) {
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const heartbeatTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const sessionIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Timestamp of the last pong received from the relay. */
+  const lastPongAt = useRef<number>(Date.now());
   const store = useVolumeStore;
 
   const clearSessionIdle = useCallback(() => {
@@ -642,12 +645,22 @@ export function useMcpBridge(sessionId: string | null) {
         clearTimeout(reconnectTimer.current);
         reconnectTimer.current = null;
       }
-      // Heartbeat every 20 s — keeps the Cloudflare Durable Object awake so it
-      // never hibernates and loses its in-memory WebSocket references.
+      // Reset pong clock so we don't immediately trigger a timeout after
+      // a fresh connect (the very first pong arrives ~20 s later).
+      lastPongAt.current = Date.now();
+      // Heartbeat every 20 s — keeps the Cloudflare Durable Object awake and
+      // lets us detect a silently-dead connection: if no pong is received for
+      // 50 s (≈ 2.5 missed cycles) we close and reconnect immediately instead
+      // of waiting for a TCP timeout that may never arrive.
       heartbeatTimer.current = setInterval(() => {
-        if (wsRef.current?.readyState === WebSocket.OPEN) {
-          wsRef.current.send(JSON.stringify({ type: 'ping' }));
+        const ws = wsRef.current;
+        if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        if (Date.now() - lastPongAt.current > 50_000) {
+          // Relay stopped responding — treat as a dead connection.
+          ws.close(1000, 'pong-timeout');
+          return;
         }
+        ws.send(JSON.stringify({ type: 'ping' }));
       }, 20_000);
     });
 
@@ -656,6 +669,10 @@ export function useMcpBridge(sessionId: string | null) {
       try {
         msg = JSON.parse(event.data) as IncomingMessage;
       } catch {
+        return;
+      }
+      if (msg.type === 'pong') {
+        lastPongAt.current = Date.now();
         return;
       }
       if (msg.type === 'mcp_connecting') {
@@ -699,4 +716,24 @@ export function useMcpBridge(sessionId: string | null) {
       wsRef.current = null;
     };
   }, [connect, clearSessionIdle]);
+
+  // When the browser tab becomes visible again (user switches back), reconnect
+  // immediately if the WebSocket is gone — browsers throttle timers in hidden
+  // tabs, so the pong-timeout may fire late and the reconnect timer may not
+  // have run yet.
+  useEffect(() => {
+    const onVisibility = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) return;
+      // Cancel any pending slow reconnect and connect right now.
+      if (reconnectTimer.current) {
+        clearTimeout(reconnectTimer.current);
+        reconnectTimer.current = null;
+      }
+      wsRef.current = null; // ensure connect() doesn't bail out early
+      connect();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [connect]);
 }
