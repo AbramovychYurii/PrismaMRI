@@ -618,18 +618,6 @@ const CopyBtn = styled.button<{ $state: 'idle' | 'ok' | 'err' }>`
   }}
 `;
 
-// ── Local-mode styles ─────────────────────────────────────────────────────────
-
-const StepList = styled.ol`
-  margin: 0;
-  padding-left: 16px;
-  font-size: 10px;
-  color: var(--ink-3);
-  line-height: 1.7;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-`;
 
 // ── Shared prompt section ─────────────────────────────────────────────────────
 
@@ -681,22 +669,21 @@ function PromptSection() {
   );
 }
 
-// ── RemoteModePanel ───────────────────────────────────────────────────────────
+// ── SessionPanel ──────────────────────────────────────────────────────────────
+//
+// Not connected  →  same for Web and PWA: download button + instructions.
+// Connected      →  differs by mode:
+//   Web (relay)  →  prompt example + disconnect
+//   PWA (local)  →  direct connection info + prompt example
 
-function RemoteModePanel({
-  expanded,
-  onToggle,
-  mcpConnected,
-  agentWorking,
-  dockOpen,
-}: {
-  expanded: boolean;
-  onToggle: () => void;
-  mcpConnected: boolean;
-  agentWorking: boolean;
-  dockOpen: boolean;
-}) {
-  const sessionId = useSessionId();
+export function SessionPanel() {
+  const mcpConnected = useVolumeStore((s) => s.mcpConnected);
+  const agentWorking = useVolumeStore((s) => s.agentSessionActive);
+  const localPort    = useVolumeStore((s) => s.localPort);
+  const dockOpen     = useVolumeStore((s) => s.toolbar.dock);
+  const sessionId    = useSessionId();
+  const local        = isLocalMode();
+  const [expanded, setExpanded] = useState(false);
   const [dxtState, setDxtState] = useState<BtnState>('idle');
 
   const handleDownloadDxt = useCallback(async () => {
@@ -712,12 +699,17 @@ function RemoteModePanel({
     }
   }, [sessionId]);
 
+  // Nothing to show if we have no relay config and the session is not local.
+  if (!local && (!RELAY_URL || !sessionId)) return null;
+
+  const toggle = () => setExpanded((o) => !o);
+
   const pill = (
     <MinimisedPill
       $connected={mcpConnected}
       $working={agentWorking}
       $dockOpen={dockOpen}
-      onClick={onToggle}
+      onClick={toggle}
       aria-expanded={expanded}
       aria-label={agentWorking ? 'AI Working' : mcpConnected ? 'AI Agent Connected' : 'AI Agent'}
     >
@@ -731,46 +723,31 @@ function RemoteModePanel({
     <>
       {pill}
       <Panel $dockOpen={dockOpen} role="complementary" aria-label="AI agent session panel">
-        <PanelHeader $connected={mcpConnected} onClick={onToggle}>
-          <HeaderIcon>
-            <Bot size={14} />
-          </HeaderIcon>
+
+        {/* ── Header — identical for all states ── */}
+        <PanelHeader $connected={mcpConnected} onClick={toggle}>
+          <HeaderIcon><Bot size={14} /></HeaderIcon>
           <StatusDot $connected={mcpConnected} />
           <StatusText $connected={mcpConnected}>
             {mcpConnected ? 'AI Agent Connected' : 'Waiting for Agent'}
           </StatusText>
-          <Badge>Beta</Badge>
-          <CollapseBtn type="button" aria-label="Collapse panel">
-            <X size={14} />
-          </CollapseBtn>
+          {!local && <Badge>Beta</Badge>}
+          <CollapseBtn type="button" aria-label="Collapse panel"><X size={14} /></CollapseBtn>
         </PanelHeader>
 
+        {/* ── Body ── */}
         <PanelBody>
-          {/* .dxt download — hidden once connected */}
+
+          {/* ── NOT CONNECTED: same for Web and PWA ── */}
           {!mcpConnected && (
             <>
               <ActionBtn type="button" $primary $state={dxtState} onClick={handleDownloadDxt}>
-                {dxtState === 'ok' ? (
-                  <Check size={13} />
-                ) : dxtState === 'err' ? (
-                  <X size={13} />
-                ) : (
-                  <Download size={13} />
-                )}
-                {dxtState === 'ok'
-                  ? 'Downloaded!'
-                  : dxtState === 'err'
-                    ? 'Download failed'
-                    : 'Download extension (.dxt)'}
+                {dxtState === 'ok' ? <Check size={13} /> : dxtState === 'err' ? <X size={13} /> : <Download size={13} />}
+                {dxtState === 'ok' ? 'Downloaded!' : dxtState === 'err' ? 'Download failed' : 'Download extension (.dxt)'}
               </ActionBtn>
               <Hint>
                 Then open{' '}
-                <OpenClaudeLink
-                  href="claude://"
-                  target="_blank"
-                  rel="noopener"
-                  title="Open Claude Desktop"
-                >
+                <OpenClaudeLink href="claude://" target="_blank" rel="noopener" title="Open Claude Desktop">
                   Claude Desktop
                 </OpenClaudeLink>
                 {' '}→ Settings → <strong style={{ color: 'var(--ink-2)' }}>Extensions</strong> → Install Extension.
@@ -779,8 +756,8 @@ function RemoteModePanel({
             </>
           )}
 
-          {/* Prompt + disconnect — only when connected */}
-          {mcpConnected && (
+          {/* ── CONNECTED via relay (Web) ── */}
+          {mcpConnected && !local && (
             <>
               <PromptSection />
               <ActionBtn
@@ -789,8 +766,7 @@ function RemoteModePanel({
                 onClick={() => {
                   const ok = window.confirm(
                     'Disconnect the current agent?\n\nThis ends the live session and ' +
-                      'invalidates the installed extension. To reconnect, download a fresh .dxt ' +
-                      'and reinstall it.',
+                    'invalidates the installed extension. To reconnect, download a fresh .dxt and reinstall it.',
                   );
                   if (!ok) return;
                   localStorage.setItem('prismamri-session-id', crypto.randomUUID());
@@ -802,123 +778,26 @@ function RemoteModePanel({
               </ActionBtn>
             </>
           )}
-        </PanelBody>
-      </Panel>
-    </>
-  );
-}
 
-// ── LocalModePanel ────────────────────────────────────────────────────────────
-
-function LocalModePanel({
-  expanded,
-  onToggle,
-  mcpConnected,
-  agentWorking,
-  dockOpen,
-}: {
-  expanded: boolean;
-  onToggle: () => void;
-  mcpConnected: boolean;
-  agentWorking: boolean;
-  dockOpen: boolean;
-}) {
-  const localPort = useVolumeStore((s) => s.localPort);
-
-  const pill = (
-    <MinimisedPill
-      $connected={mcpConnected}
-      $working={agentWorking}
-      $dockOpen={dockOpen}
-      onClick={onToggle}
-      aria-expanded={expanded}
-      aria-label={agentWorking ? 'AI Working' : mcpConnected ? 'AI Agent Connected' : 'AI Agent'}
-    >
-      <Bot size={20} />
-    </MinimisedPill>
-  );
-
-  if (!expanded) return pill;
-
-  return (
-    <>
-      {pill}
-      <Panel $dockOpen={dockOpen} role="complementary" aria-label="AI agent local session panel">
-        <PanelHeader $connected={mcpConnected} onClick={onToggle}>
-          <HeaderIcon>
-            <Bot size={14} />
-          </HeaderIcon>
-          <StatusDot $connected={mcpConnected} />
-          <StatusText $connected={mcpConnected}>
-            {mcpConnected ? 'AI Agent Connected' : 'Waiting for Agent'}
-          </StatusText>
-          <CollapseBtn type="button" aria-label="Collapse panel">
-            <X size={14} />
-          </CollapseBtn>
-        </PanelHeader>
-
-        <PanelBody>
-          {/* Connection info */}
-          <Row>
-            <Label style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <Zap size={10} />
-              Direct connection
-              <InfoTip text="Claude connects directly to this app with no relay — no data leaves your machine. Lower latency, works offline." />
-            </Label>
-            <Value style={{ fontSize: 10.5, opacity: 0.45 }}>
-              {mcpConnected && localPort
-                ? `PORT: ${localPort}`
-                : `PORT: ${LOCAL_PORTS[0]}–${LOCAL_PORTS[LOCAL_PORTS.length - 1]}`}
-            </Value>
-          </Row>
-
-          {/* Not connected: instructions */}
-          {!mcpConnected && (
+          {/* ── CONNECTED via local WS (PWA) ── */}
+          {mcpConnected && local && (
             <>
-              <Divider />
               <Row>
-                <Label>How to connect</Label>
-                <StepList>
-                  <li>
-                    Install <strong style={{ color: 'var(--ink-2)' }}>prismamri.dxt</strong> in
-                    Claude Code / Desktop
-                  </li>
-                  <li>Session ID and Relay URL are already built in — no config needed</li>
-                  <li>Ask Claude about your scan — it will connect automatically</li>
-                </StepList>
+                <Label style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <Zap size={10} />
+                  Direct connection
+                  <InfoTip text="Claude connects directly to this app with no relay — no data leaves your machine. Lower latency, works offline." />
+                </Label>
+                <Value style={{ fontSize: 10.5, opacity: 0.45 }}>
+                  {localPort ? `PORT: ${localPort}` : `PORT: ${LOCAL_PORTS[0]}–${LOCAL_PORTS[LOCAL_PORTS.length - 1]}`}
+                </Value>
               </Row>
+              <PromptSection />
             </>
           )}
 
-          {/* Connected: prompt example */}
-          {mcpConnected && <PromptSection />}
         </PanelBody>
       </Panel>
     </>
   );
-}
-
-// ── SessionPanel (orchestrator) ───────────────────────────────────────────────
-
-export function SessionPanel() {
-  const mcpConnected = useVolumeStore((s) => s.mcpConnected);
-  const agentWorking = useVolumeStore((s) => s.agentSessionActive);
-  const dockOpen = useVolumeStore((s) => s.toolbar.dock);
-  const [expanded, setExpanded] = useState(false);
-
-  const sessionId = useSessionId();
-  const local = isLocalMode();
-
-  // Remote mode requires relay and session to be configured.
-  if (!local && (!RELAY_URL || !sessionId)) return null;
-
-  const sharedProps = {
-    expanded,
-    onToggle: () => setExpanded((o) => !o),
-    mcpConnected,
-    agentWorking,
-    dockOpen,
-  };
-
-  return local ? <LocalModePanel {...sharedProps} /> : <RemoteModePanel {...sharedProps} />;
 }
