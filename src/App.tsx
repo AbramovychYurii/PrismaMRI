@@ -1,7 +1,6 @@
 import { AppGrid } from '@/components/layout/AppGrid';
 import { ImportOverlay } from '@/components/layout/ImportOverlay';
 import { AgentLockOverlay } from '@/components/mcp/AgentLockOverlay';
-import { AnnotationHud } from '@/components/mcp/AnnotationHud';
 import { ConnectConfirm } from '@/components/mcp/ConnectConfirm';
 import { KeyboardShortcutsModal } from '@/components/ui/KeyboardShortcutsModal';
 import { ViewerActionsProvider, useViewerActions } from '@/hooks/ViewerActionsContext';
@@ -38,7 +37,6 @@ function AppInner({ sessionId }: { sessionId: string | null }) {
       {view === 'import' && <ImportOverlay />}
       {showShortcuts && <KeyboardShortcutsModal onClose={() => setShowShortcuts(false)} />}
       {showConfirm && <ConnectConfirm onClose={() => setShowConfirm(false)} />}
-      <AnnotationHud />
       <AgentLockOverlay />
     </>
   );

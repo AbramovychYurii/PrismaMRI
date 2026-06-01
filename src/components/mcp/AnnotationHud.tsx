@@ -33,13 +33,12 @@ function orderAll(list: AiAnnotation[]): AiAnnotation[] {
 }
 
 // ── Layout constants ────────────────────────────────────────────────────────
-// Top-left corner, aligned with the ToolbarPill on the right of the stage.
-// Stage starts below the 56 px header → ToolbarPill sits at top:22 inside the
-// stage → 56 + 22 = 78 px from viewport on desktop. Mobile header is 48 px and
-// the ToolbarPill offset is 12 px → 60 px.
+// Rendered INSIDE <StageSection> (position: relative), so offsets are local to
+// the stage container — mirrors the ToolbarPill (top:22 / right:30) on the
+// opposite corner so both stage pills share the exact same visual weight.
 const SIDE_OFFSET = 30;
-const TOP_OFFSET = 78;
-const MOBILE_TOP = 60;
+const TOP_OFFSET = 22;
+const MOBILE_TOP = 12;
 const MOBILE_SIDE = 12;
 
 // ── Animations ──────────────────────────────────────────────────────────────
@@ -62,7 +61,7 @@ const rainbowSpin = keyframes`
 // ── Expanded card ───────────────────────────────────────────────────────────
 
 const Card = styled.div`
-  position: fixed;
+  position: absolute;
   top: ${TOP_OFFSET}px;
   left: ${SIDE_OFFSET}px;
   z-index: var(--z-modal);
@@ -203,9 +202,9 @@ const Index = styled.span`
 // ── Collapsed pill ──────────────────────────────────────────────────────────
 
 const PillWrap = styled.div`
-  position: fixed;
+  position: absolute;
   /* Offset by half a pixel so the pill inside the 0.5 px padding ring lands
-     at the same visual edge (18 / 12 px) as the SessionPanel pill opposite. */
+     at the same visual edge as the ToolbarPill on the opposite corner. */
   top: ${TOP_OFFSET - 0.5}px;
   left: ${SIDE_OFFSET - 0.5}px;
   z-index: var(--z-modal);
@@ -294,6 +293,8 @@ const PillLabel = styled.span`
 // ── Component ───────────────────────────────────────────────────────────────
 
 export function AnnotationHud() {
+  // No view-gate needed — this component renders inside <StageSection>, which
+  // itself is only mounted in the viewer view.
   const annotations = useVolumeStore((s) => s.aiAnnotations);
   const activeId = useVolumeStore((s) => s.activeAnnotationId);
   const focusAnnotation = useVolumeStore((s) => s.focusAnnotation);

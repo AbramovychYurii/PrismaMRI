@@ -1,3 +1,4 @@
+import { AnnotationHud } from '@/components/mcp/AnnotationHud';
 import { SessionPanel } from '@/components/mcp/SessionPanel';
 import { ToolbarPill } from '@/components/stage/ToolbarPill';
 import { useThreePreview } from '@/hooks';
@@ -75,6 +76,7 @@ export function Stage() {
       <StageCanvas ref={canvasRef} data-testid="stage-canvas" />
       {!hasVolume && <NoVolumePlaceholder>No volume loaded</NoVolumePlaceholder>}
       <ToolbarPill previewRef={previewRef} />
+      <AnnotationHud />
       <SessionPanel />
     </StageSection>
   );

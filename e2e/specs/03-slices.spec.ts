@@ -158,29 +158,39 @@ test.describe('Slice panels', () => {
   });
 
   // ── Slab MIP ────────────────────────────────────────────────────────────
+  // Slab MIP now lives in the dock's Render Mode cell, not in the expanded
+  // slice panel — controlled centrally so it applies to every panel.
 
-  test('slab MIP presets are visible in the expanded panel', async ({ page }) => {
-    // SlabMipBar is inside ExpandedSlicePanel (desktop).
-    const panel = page.getByTestId('slice-panel-coronal');
-    await panel.getByRole('button', { name: /expand panel/i }).click();
+  async function openDock(page: import('@playwright/test').Page) {
+    // Mirror the working pattern from 04-dock.spec.ts.
+    const dockToggle = page
+      .locator('button')
+      .filter({ has: page.locator('svg[class*="lucide-chevron"]') })
+      .first();
+    if (await dockToggle.count() > 0) await dockToggle.click();
+    else await page.mouse.click(720, 880);
+    await page.waitForTimeout(500);
+    // Wait until a Dock cell heading appears so the rest of the test is stable.
+    await expect(page.getByText(/render mode/i).first()).toBeVisible({ timeout: 3_000 });
+  }
 
-    // Preset labels defined in SLAB_PRESETS: Off, 3 mm, 5 mm, 10 mm.
-    await expect(page.getByRole('button', { name: /^Off$/i }).first()).toBeVisible({ timeout: 5_000 });
-    await expect(page.getByRole('button', { name: /^3 mm$/i }).first()).toBeVisible();
-    await expect(page.getByRole('button', { name: /^5 mm$/i }).first()).toBeVisible();
-    await expect(page.getByRole('button', { name: /^10 mm$/i }).first()).toBeVisible();
+  test('slab MIP presets are visible in the dock', async ({ page }) => {
+    await openDock(page);
+    // Buttons render their label as plain text — find them by text.
+    await expect(page.locator('button', { hasText: /^Off$/ }).first()).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('button', { hasText: /^3 mm$/ }).first()).toBeVisible();
+    await expect(page.locator('button', { hasText: /^5 mm$/ }).first()).toBeVisible();
+    await expect(page.locator('button', { hasText: /^10 mm$/ }).first()).toBeVisible();
   });
 
   test('clicking a slab MIP preset does not crash the app', async ({ page }) => {
-    const panel = page.getByTestId('slice-panel-coronal');
-    await panel.getByRole('button', { name: /expand panel/i }).click();
-
-    const preset5 = page.getByRole('button', { name: /^5 mm$/i }).first();
+    await openDock(page);
+    const preset5 = page.locator('button', { hasText: /^5 mm$/ }).first();
     await expect(preset5).toBeVisible({ timeout: 5_000 });
     await preset5.click();
-
-    // Still visible — no crash.
+    // Still visible — no crash; the button now reports pressed=true.
     await expect(preset5).toBeVisible();
+    await expect(preset5).toHaveAttribute('aria-pressed', 'true');
   });
 
   // ── Measurement context menu ────────────────────────────────────────────
