@@ -212,7 +212,13 @@ export function ConnectConfirm({ onClose }: { onClose: () => void }) {
         </DialogBody>
 
         <DialogFooter>
-          <Btn type="button" $primary ref={confirmRef} onClick={onClose} style={{ flex: 'none', width: '100%' }}>
+          <Btn
+            type="button"
+            $primary
+            ref={confirmRef}
+            onClick={onClose}
+            style={{ flex: 'none', width: '100%' }}
+          >
             Got it
           </Btn>
         </DialogFooter>

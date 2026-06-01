@@ -710,8 +710,8 @@ export function SessionPanel() {
               </ActionBtn>
               <Hint>
                 Drag the downloaded file into Claude Desktop → Extensions, or click{' '}
-                <strong style={{ color: 'var(--ink-2)' }}>Install Extension</strong>. Your Session ID is
-                already embedded — no extra config needed.
+                <strong style={{ color: 'var(--ink-2)' }}>Install Extension</strong>. Your Session
+                ID is already embedded — no extra config needed.
               </Hint>
             </>
           )}

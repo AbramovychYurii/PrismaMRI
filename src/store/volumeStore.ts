@@ -34,6 +34,8 @@ interface VolumeState {
   scrubVisible: Record<SlicePlane, boolean>;
   measurement: ActiveMeasurement | null;
   renderPreset: RenderPreset;
+  /** Slab MIP thickness in mm — 0 = single slice. Applies to all panels. */
+  slabMm: number;
   /** Increments each time a snap-to-plane is requested. Hook watches for changes. */
   snapSeq: number;
   snapPlane: SlicePlane;
@@ -71,6 +73,7 @@ interface VolumeActions {
   setMeasurementTo: (p: MeasurementPoint) => void;
   clearMeasurement: () => void;
   setRenderPreset: (preset: RenderPreset) => void;
+  setSlabMm: (mm: number) => void;
   requestSnapToView: (plane: SlicePlane) => void;
   setMobileTab: (tab: MobileTab) => void;
   addAiAnnotation: (a: AiAnnotation) => void;
@@ -117,6 +120,7 @@ const initialState: VolumeState = {
   scrubVisible: { coronal: true, sagittal: true, axial: true },
   measurement: null,
   renderPreset: 'mip',
+  slabMm: 0,
   snapSeq: 0,
   snapPlane: 'coronal',
   mobileTab: '3d',
@@ -231,6 +235,8 @@ export const useVolumeStore = create<VolumeState & VolumeActions>((set) => ({
       const defaultWL = state.volume?.windowLevel ?? state.wl;
       return { renderPreset, wl: defaultWL, wlDraft: defaultWL };
     }),
+
+  setSlabMm: (slabMm) => set({ slabMm }),
 
   requestSnapToView: (plane) =>
     set((state) => ({

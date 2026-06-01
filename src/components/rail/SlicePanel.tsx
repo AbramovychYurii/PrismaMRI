@@ -272,51 +272,6 @@ const TrayBtn = styled.button<{ $active?: boolean; $large?: boolean }>`
   }
 `;
 
-const SlabBar = styled.div`
-  position: absolute;
-  bottom: 36px;
-  left: 14px;
-  z-index: var(--z-panel-top);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  pointer-events: auto;
-`;
-
-const SlabLabel = styled.span`
-  font-family: var(--mono);
-  font-size: 9.5px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-`;
-
-const SlabBtn = styled.button<{ $active: boolean }>`
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  padding: 5px 10px;
-  border-radius: 4px;
-  border: 1px solid
-    ${({ $active }) => ($active ? 'var(--amber-dim)' : 'var(--rule)')};
-  background: ${({ $active }) => ($active ? 'var(--amber-tint-active)' : 'var(--amber-tint-base)')};
-  color: ${({ $active }) => ($active ? 'var(--amber)' : 'var(--ink-3)')};
-  cursor: pointer;
-  transition:
-    background 80ms,
-    border-color 80ms,
-    color 80ms;
-
-  ${({ $active }) =>
-    !$active &&
-    `
-    &:hover {
-      background: var(--amber-tint-hover);
-      border-color: var(--rule-2);
-      color: var(--ink);
-    }
-  `}
-`;
 
 const FullscreenOverlay = styled.div<{ $isActive: boolean }>`
   position: fixed;
@@ -426,44 +381,6 @@ function CrosshairAndDots({
   );
 }
 
-// ── Slab MIP bar ───────────────────────────────────────────────────────────
-
-/** Slab thickness presets: [label, mm] — 0 = off */
-const SLAB_PRESETS: Array<[string, number]> = [
-  ['Off', 0],
-  ['3 mm', 3],
-  ['5 mm', 5],
-  ['10 mm', 10],
-];
-
-function SlabMipBar({
-  slabMm,
-  setSlabMm,
-}: {
-  slabMm: number;
-  setSlabMm: (mm: number) => void;
-}) {
-  return (
-    <SlabBar>
-      <SlabLabel>Slab MIP</SlabLabel>
-      {SLAB_PRESETS.map(([label, mm]) => (
-        <SlabBtn
-          key={label}
-          type="button"
-          $active={slabMm === mm}
-          onClick={(e) => {
-            e.stopPropagation();
-            setSlabMm(mm);
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          {label}
-        </SlabBtn>
-      ))}
-    </SlabBar>
-  );
-}
-
 // ── ExpandedSlicePanel ──────────────────────────────────────────────────────
 
 function ExpandedSlicePanel({
@@ -473,7 +390,9 @@ function ExpandedSlicePanel({
   plane: SlicePlane;
   onClose: () => void;
 }) {
-  const [slabMm, setSlabMm] = useState(0);
+  // Slab MIP now lives in the global store so it stays in sync across the
+  // rail panels and the fullscreen view, and is controlled from RenderCell.
+  const slabMm = useVolumeStore((s) => s.slabMm);
   const halfSlabs = useHalfSlabs(plane, slabMm);
 
   const {
@@ -507,6 +426,12 @@ function ExpandedSlicePanel({
 
   const footer = PLANE_FOOTER[plane];
 
+  // Expanding a panel auto-focuses it — first click should move the cursor
+  // immediately, not just focus an already-fullscreen view.
+  useEffect(() => {
+    setActivePlane(plane);
+  }, [plane, setActivePlane]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -517,16 +442,15 @@ function ExpandedSlicePanel({
 
   function handleClick(e: React.MouseEvent) {
     e.stopPropagation();
-    // Focus the panel without rotating the 3-D model — rotation is opt-in via
-    // the context-menu "View from this side" item.
-    if (!isActive) setActivePlane(plane);
+    // First click on an inactive panel just focuses it — cursor only moves on
+    // subsequent clicks. Rotating the 3-D model is opt-in via the context-menu
+    // "View from this side" item.
+    if (!isActive) {
+      setActivePlane(plane);
+      return;
+    }
     if (!canvasRef.current || !dims || !cursor) return;
     setCursor(cursorFromClick(e, canvasRef.current, plane, dims, cursor, drawFracs));
-  }
-
-  function handleWheel(e: React.WheelEvent) {
-    e.stopPropagation();
-    onWheel(e);
   }
 
   return createPortal(
@@ -534,7 +458,10 @@ function ExpandedSlicePanel({
       $isActive={isActive}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
-      onWheel={handleWheel}
+      onWheel={(e) => {
+        e.stopPropagation();
+        onWheel(e);
+      }}
       onPointerDown={(e) => e.stopPropagation()}
       onPointerUp={(e) => e.stopPropagation()}
     >
@@ -586,8 +513,6 @@ function ExpandedSlicePanel({
         />
       )}
 
-      <SlabMipBar slabMm={slabMm} setSlabMm={setSlabMm} />
-
       <PanelFooter $scrubVisible={scrubVisible}>
         <span>
           {footer.hint} · {footer.code}
@@ -623,13 +548,13 @@ function ExpandedSlicePanel({
 
 export function SlicePanel({ plane }: { plane: SlicePlane }) {
   const [expanded, setExpanded] = useState(false);
-  const [slabMm, setSlabMm] = useState(0);
   const isMobile = useIsMobile();
+  // Slab MIP comes from the global store — controlled in the Render dock cell
+  // and applied uniformly to all three rail panels + the fullscreen view.
+  const slabMm = useVolumeStore((s) => s.slabMm);
   const halfSlabs = useHalfSlabs(plane, slabMm);
   const setCanvasRef = useVolumeStore((s) => s.setCanvasRef);
 
-  // On mobile, slab is controlled from the regular panel (no expand mode).
-  // On desktop, slab is only available in ExpandedSlicePanel.
   const {
     canvasRef,
     drawFracs,
@@ -657,7 +582,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
     onMeasureTo,
     onClear,
     closeMenu,
-  } = useSlicePanelCore(plane, isMobile ? halfSlabs : 0);
+  } = useSlicePanelCore(plane, halfSlabs);
   // Touch-swipe slice navigation — tracks gesture start state.
   const touchRef = useRef<{ startY: number; startIdx: number } | null>(null);
 
@@ -672,9 +597,13 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
   const scrubberVisible = isMobile || scrubVisible;
 
   function handleClick(e: React.MouseEvent) {
-    // Focus the panel without rotating the 3-D model — rotation is opt-in via
-    // the context-menu "View from this side" item.
-    if (!isActive) setActivePlane(plane);
+    // First click on an inactive panel just focuses it — cursor only moves on
+    // subsequent clicks. Rotating the 3-D model is opt-in via the context-menu
+    // "View from this side" item.
+    if (!isActive) {
+      setActivePlane(plane);
+      return;
+    }
     if (!canvasRef.current || !dims || !cursor) return;
     setCursor(cursorFromClick(e, canvasRef.current, plane, dims, cursor, drawFracs));
   }
@@ -752,7 +681,6 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
               </MobileCounter>
             )}
           </MobileRightCol>
-          <SlabMipBar slabMm={slabMm} setSlabMm={setSlabMm} />
         </>
       ) : (
         /* ── Desktop: ButtonTray (top-right) + absolute Scrubber ── */
@@ -810,7 +738,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
         />
       )}
 
-      <AnnotationOverlay plane={plane} halfSlabs={isMobile ? halfSlabs : 0} />
+      <AnnotationOverlay plane={plane} halfSlabs={halfSlabs} />
 
       {expanded && <ExpandedSlicePanel plane={plane} onClose={() => setExpanded(false)} />}
     </PanelWrap>

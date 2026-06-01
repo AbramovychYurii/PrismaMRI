@@ -7,7 +7,7 @@ import styled from 'styled-components';
 const DisplayCellWrap = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 9px;
   flex: 1;
 `;
 
