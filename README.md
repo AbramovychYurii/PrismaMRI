@@ -83,6 +83,16 @@ npm run typecheck
 4. Adjust **Window** and **Level** in the Display panel.
 5. Press `Esc` to return to the import screen and load another study.
 
+## AI-assisted analysis (optional)
+
+PrismaMRI ships a Claude Desktop Extension (`prismamri.dxt`) that lets Claude navigate the viewer, capture slices, place annotations, and produce structured descriptions of a study.
+
+For materially better analysis quality, every `prismamri.dxt` ships with an embedded evidence-based skill prompt — **[`mcp-server/skill/SKILL.md`](mcp-server/skill/SKILL.md)**. It encodes systematic CT/MRI search patterns, an RSNA-style structured report template, and a tool-orchestration recipe derived from peer-reviewed studies on multimodal-LLM performance in radiology (2024–2025).
+
+The skill is bundled inside the `.dxt` archive and delivered to Claude automatically via the MCP `initialize` handshake (`instructions` field) — there is nothing to install or configure. As soon as you connect the extension in Claude Desktop, the methodology is active. Compared to an unguided prompt, this noticeably improves descriptive accuracy and reduces hallucinated findings.
+
+> The skill is for **personal exploration and learning**, not a medical device. It does not diagnose and does not replace a physician's consultation or an official radiology report.
+
 ## Privacy
 
 - Data is **never sent** to a server.

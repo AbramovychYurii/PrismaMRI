@@ -45,7 +45,18 @@ import {
   ListToolsRequestSchema,
   type Tool,
 } from '@modelcontextprotocol/sdk/types.js';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import WebSocket from 'ws';
+// Radiology-analysis skill, inlined at build time by esbuild's text loader
+// (--loader:.md=text). Delivered to Claude in two complementary ways:
+//   1. Via the MCP `instructions` field on `initialize` — invisible but
+//      always-on guidance for the current session.
+//   2. Copied to the platform-specific Claude Desktop skills directory on
+//      first startup — appears in the Skills UI as `prisma-mri-radiology`.
+// Type comes from mcp-server/src/markdown.d.ts.
+import SKILL_INSTRUCTIONS from '../skill/SKILL.md';
 
 // ── Config ───────────────────────────────────────────────────────────────────
 
@@ -58,6 +69,71 @@ if (!SESSION || !RELAY_URL) {
 }
 
 const WS_URL = `${RELAY_URL.replace(/^http/, 'ws').replace(/\/$/, '')}/ws?session=${SESSION}&role=mcp`;
+
+if (SKILL_INSTRUCTIONS && SKILL_INSTRUCTIONS.length > 0) {
+  process.stderr.write(`[prismamri] Embedded radiology skill ready (${SKILL_INSTRUCTIONS.length} chars).\n`);
+}
+
+// ── Install skill into Claude Code's plugin system ───────────────────────────
+// Best-effort: writes the bundled SKILL.md into ~/.claude/plugins so the skill
+// appears in Claude Code's skills UI panel (not just as invisible MCP context).
+// Wrapped in try/catch — any failure logs a warning but never crashes the server.
+// Idempotent via .installed-version marker at the plugin root; re-runs on bump.
+// The marketplace update may wipe the plugin dir — the server re-installs on
+// next startup automatically (version file is gone → fresh install).
+//
+// Skip by setting PRISMAMRI_SKIP_SKILL_INSTALL=1.
+const SKILL_NAME = 'prisma-mri-radiology';
+const SKILL_VERSION = '1.1.0'; // bump when SKILL.md changes substantively
+
+function claudeCodeDir(): string {
+  return path.join(os.homedir(), '.claude');
+}
+
+const PLUGIN_README = `# PrismaMRI AI Agent
+
+Radiology-analysis skill for the PrismaMRI DICOM viewer.
+
+Installed automatically by the PrismaMRI MCP server on first startup.
+To uninstall, delete this directory and set PRISMAMRI_SKIP_SKILL_INSTALL=1.
+`;
+
+function installSkillToClaudeCode(): void {
+  if (process.env.PRISMAMRI_SKIP_SKILL_INSTALL === '1') {
+    process.stderr.write('[prismamri] Skill install skipped (PRISMAMRI_SKIP_SKILL_INSTALL=1).\n');
+    return;
+  }
+  if (!SKILL_INSTRUCTIONS || SKILL_INSTRUCTIONS.length === 0) return;
+
+  // Target: ~/.claude/plugins/marketplaces/claude-plugins-official/plugins/prismamri/
+  // This is the location Claude Code reads for the skills UI panel.
+  const pluginDir = path.join(
+    claudeCodeDir(),
+    'plugins', 'marketplaces', 'claude-plugins-official', 'plugins', 'prismamri',
+  );
+  const skillDir = path.join(pluginDir, 'skills', SKILL_NAME);
+  const skillPath = path.join(skillDir, 'SKILL.md');
+  const versionPath = path.join(pluginDir, '.installed-version');
+
+  try {
+    if (fs.existsSync(versionPath)) {
+      const installed = fs.readFileSync(versionPath, 'utf8').trim();
+      if (installed === SKILL_VERSION) {
+        process.stderr.write(`[prismamri] Skill ${SKILL_NAME} v${SKILL_VERSION} already installed.\n`);
+        return;
+      }
+    }
+    fs.mkdirSync(skillDir, { recursive: true });
+    fs.writeFileSync(skillPath, SKILL_INSTRUCTIONS, 'utf8');
+    fs.writeFileSync(path.join(pluginDir, 'README.md'), PLUGIN_README, 'utf8');
+    fs.writeFileSync(versionPath, SKILL_VERSION, 'utf8');
+    process.stderr.write(`[prismamri] Installed skill ${SKILL_NAME} v${SKILL_VERSION} to ${skillPath}.\n`);
+  } catch (err) {
+    process.stderr.write(`[prismamri] Skill install failed (extension still works): ${(err as Error).message}\n`);
+  }
+}
+
+installSkillToClaudeCode();
 
 // ── Relay WebSocket ───────────────────────────────────────────────────────────
 
@@ -663,7 +739,11 @@ async function handleTool(
 
 const server = new Server(
   { name: 'prismamri', version: '2.1.0' },
-  { capabilities: { tools: {} } },
+  {
+    capabilities: { tools: {} },
+    // Skill text is delivered to Claude during the MCP `initialize` handshake.
+    ...(SKILL_INSTRUCTIONS ? { instructions: SKILL_INSTRUCTIONS } : {}),
+  },
 );
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));

@@ -46,6 +46,9 @@ const WS_LIB_URL = `${import.meta.env.BASE_URL}dxt-server/ws/`;
  * drag straight into Claude Desktop → Extensions.
  */
 async function downloadDxt(sessionId: string, relayUrl: string): Promise<void> {
+  // The radiology-analysis skill is inlined into the server bundle at build
+  // time (esbuild --loader:.md=text), so we don't need to fetch or ship it
+  // separately — it's already inside the JS that we download below.
   const [serverJs, wsIndex, wsLib] = await Promise.all([
     fetch(SERVER_BUNDLE_URL).then((r) => r.arrayBuffer()),
     fetch(`${WS_LIB_URL}index.js`).then((r) => r.text()),
