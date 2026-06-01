@@ -655,6 +655,12 @@ export function useMcpBridge(sessionId: string | null) {
       heartbeatTimer.current = setInterval(() => {
         const ws = wsRef.current;
         if (!ws || ws.readyState !== WebSocket.OPEN) return;
+        // While the tab is hidden the browser throttles setInterval to ~1 min,
+        // so the timer itself fires late — don't punish that as a dead connection.
+        if (document.visibilityState === 'hidden') {
+          lastPongAt.current = Date.now();
+          return;
+        }
         if (Date.now() - lastPongAt.current > 50_000) {
           // Relay stopped responding — treat as a dead connection.
           ws.close(1000, 'pong-timeout');
@@ -724,6 +730,9 @@ export function useMcpBridge(sessionId: string | null) {
   useEffect(() => {
     const onVisibility = () => {
       if (document.visibilityState !== 'visible') return;
+      // Reset pong clock — the heartbeat timer was throttled while hidden,
+      // so elapsed time is meaningless; don't trigger a false pong-timeout.
+      lastPongAt.current = Date.now();
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) return;
       // Cancel any pending slow reconnect and connect right now.
       if (reconnectTimer.current) {

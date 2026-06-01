@@ -619,7 +619,7 @@ export function SessionPanel() {
   const [expanded, setExpanded] = useState(false);
   const [dxtState, setDxtState] = useState<BtnState>('idle');
   const [copyState, setCopyState] = useState<'idle' | 'ok' | 'err'>('idle');
-  const [promptOpen, setPromptOpen] = useState(false);
+  const [promptOpen, setPromptOpen] = useState(true);
 
   // ── Copy prompt example ─────────────────────────────────────────────────
   const handleCopyPrompt = useCallback(async () => {
@@ -691,26 +691,30 @@ export function SessionPanel() {
             <SessionId>{sessionId}</SessionId>
           </Row>
 
-          {/* ── ① Download .dxt — one drag-and-drop install ── */}
-          <ActionBtn type="button" $primary $state={dxtState} onClick={handleDownloadDxt}>
-            {dxtState === 'ok' ? (
-              <Check size={13} />
-            ) : dxtState === 'err' ? (
-              <X size={13} />
-            ) : (
-              <Download size={13} />
-            )}
-            {dxtState === 'ok'
-              ? 'Downloaded! Drag into Claude Desktop'
-              : dxtState === 'err'
-                ? 'Download failed'
-                : 'Download for Claude Desktop (.dxt)'}
-          </ActionBtn>
-          <Hint>
-            Drag the downloaded file into Claude Desktop → Extensions, or click{' '}
-            <strong style={{ color: 'var(--ink-2)' }}>Install Extension</strong>. Your Session ID is
-            already embedded — no extra config needed.
-          </Hint>
+          {/* ── ① Download .dxt — hidden once agent is connected ── */}
+          {!mcpConnected && (
+            <>
+              <ActionBtn type="button" $primary $state={dxtState} onClick={handleDownloadDxt}>
+                {dxtState === 'ok' ? (
+                  <Check size={13} />
+                ) : dxtState === 'err' ? (
+                  <X size={13} />
+                ) : (
+                  <Download size={13} />
+                )}
+                {dxtState === 'ok'
+                  ? 'Downloaded! Drag into Claude Desktop'
+                  : dxtState === 'err'
+                    ? 'Download failed'
+                    : 'Download for Claude Desktop (.dxt)'}
+              </ActionBtn>
+              <Hint>
+                Drag the downloaded file into Claude Desktop → Extensions, or click{' '}
+                <strong style={{ color: 'var(--ink-2)' }}>Install Extension</strong>. Your Session ID is
+                already embedded — no extra config needed.
+              </Hint>
+            </>
+          )}
 
           <Row style={{ gap: 6, marginTop: 2 }}>
             <Label style={{ display: 'flex', alignItems: 'center', gap: 5 }}>

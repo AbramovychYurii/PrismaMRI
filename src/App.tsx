@@ -13,18 +13,21 @@ import { useEffect, useRef, useState } from 'react';
 function AppInner({ sessionId }: { sessionId: string | null }) {
   const view = useVolumeStore((s) => s.view);
   const mcpConnected = useVolumeStore((s) => s.mcpConnected);
+  const volumeLoaded = useVolumeStore((s) => s.volume !== null);
   const { showShortcuts, setShowShortcuts } = useViewerActions();
 
-  // Track when agent first connects so we can show the confirm dialog once.
-  const prevConnected = useRef(false);
+  // Show the confirm dialog only once per page load, and only when both the
+  // agent is connected AND a volume is open (no point showing it on the
+  // landing page before the user has loaded any scan).
+  const confirmedOnce = useRef(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
-    if (mcpConnected && !prevConnected.current) {
+    if (mcpConnected && volumeLoaded && !confirmedOnce.current) {
+      confirmedOnce.current = true;
       setShowConfirm(true);
     }
-    prevConnected.current = mcpConnected;
-  }, [mcpConnected]);
+  }, [mcpConnected, volumeLoaded]);
 
   // Start the relay WebSocket bridge (no-op when RELAY_URL is absent).
   useMcpBridge(sessionId);
