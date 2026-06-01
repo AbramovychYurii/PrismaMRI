@@ -1,5 +1,5 @@
 import { accentRgba } from '@/constants';
-import { MapPin, Ruler, Trash2 } from 'lucide-react';
+import { Eye, MapPin, Ruler, Trash2 } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
@@ -65,6 +65,7 @@ interface Props {
   hasMeasurementFrom: boolean;
   onMeasureFrom: () => void;
   onMeasureTo: () => void;
+  onSnapToView: () => void;
   onClear: () => void;
   onClose: () => void;
 }
@@ -75,14 +76,17 @@ export function MeasureMenu({
   hasMeasurementFrom,
   onMeasureFrom,
   onMeasureTo,
+  onSnapToView,
   onClear,
   onClose,
 }: Props) {
   const ref = useRef<HTMLDivElement>(null);
 
-  // Clamp to viewport so menu never overflows edge
+  // Clamp to viewport so menu never overflows edge — items: measure-from (+
+  // optional measure-to) → divider → view-from-here → optional clear group.
   const menuW = 200;
-  const menuH = hasMeasurementFrom ? 110 : 44;
+  const baseH = 44 + 8 + 36; // measure-from + divider + view-from-here
+  const menuH = hasMeasurementFrom ? baseH + 36 + 8 + 36 : baseH;
   const safeX = Math.min(x, window.innerWidth - menuW - 8);
   const safeY = Math.min(y, window.innerHeight - menuH - 8);
 
@@ -120,6 +124,11 @@ export function MeasureMenu({
           Measure to here
         </Item>
       )}
+      <Divider />
+      <Item type="button" onClick={wrap(onSnapToView)}>
+        <Eye size={12} />
+        View from this side
+      </Item>
       {hasMeasurementFrom && (
         <>
           <Divider />

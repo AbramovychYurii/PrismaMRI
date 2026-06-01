@@ -155,12 +155,14 @@ export interface SlicePanelCore {
   scrubVisible: boolean;
   // Store actions
   setCursor: (c: VolumeCursor) => void;
+  setActivePlane: (p: SlicePlane) => void;
   setScrubVisible: (axis: SlicePlane, value: boolean) => void;
   requestSnapToView: (plane: SlicePlane) => void;
   // Handlers
   onWheel: (e: React.WheelEvent) => void;
   handleScrub: (nextSlice: number) => void;
   handleContextMenu: (e: React.MouseEvent) => void;
+  onSnapToView: () => void;
   // Measurement
   measurement: ReturnType<typeof useMeasurementInteraction>['measurement'];
   menu: ReturnType<typeof useMeasurementInteraction>['menu'];
@@ -186,6 +188,7 @@ export function useSlicePanelCore(plane: SlicePlane, halfSlabs = 0): SlicePanelC
 
   // ── Store selectors ───────────────────────────────────────────────────
   const activePlane = useVolumeStore((s) => s.activePlane);
+  const setActivePlane = useVolumeStore((s) => s.setActivePlane);
   const setCursor = useVolumeStore((s) => s.setCursor);
   const requestSnapToView = useVolumeStore((s) => s.requestSnapToView);
   const dims = useVolumeStore((s) => s.volume?.meta.dims);
@@ -297,13 +300,19 @@ export function useSlicePanelCore(plane: SlicePlane, halfSlabs = 0): SlicePanelC
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      requestSnapToView(plane);
+      // Right-click no longer auto-rotates the 3-D model — that's now opt-in
+      // via the new "View from this side" menu item (see MeasureMenu).
       if (canvasRef.current) {
         measureInteraction.openMenu(e, canvasRef.current, drawFracs);
       }
     },
-    [requestSnapToView, plane, measureInteraction.openMenu, drawFracs],
+    [measureInteraction.openMenu, drawFracs],
   );
+
+  /** Rotate the 3-D model to face this plane. Wired into the context menu. */
+  const onSnapToView = useCallback(() => {
+    requestSnapToView(plane);
+  }, [requestSnapToView, plane]);
 
   return {
     canvasRef,
@@ -320,11 +329,13 @@ export function useSlicePanelCore(plane: SlicePlane, halfSlabs = 0): SlicePanelC
     dims,
     scrubVisible,
     setCursor,
+    setActivePlane,
     setScrubVisible,
     requestSnapToView,
     onWheel,
     handleScrub,
     handleContextMenu,
+    onSnapToView,
     measurement: measureInteraction.measurement,
     menu: measureInteraction.menu,
     closeMenu: measureInteraction.closeMenu,

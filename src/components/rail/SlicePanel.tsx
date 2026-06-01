@@ -492,10 +492,11 @@ function ExpandedSlicePanel({
     scrubVisible,
     setScrubVisible,
     setCursor,
-    requestSnapToView,
+    setActivePlane,
     onWheel,
     handleScrub,
     handleContextMenu,
+    onSnapToView,
     measurement,
     menu,
     onMeasureFrom,
@@ -516,10 +517,9 @@ function ExpandedSlicePanel({
 
   function handleClick(e: React.MouseEvent) {
     e.stopPropagation();
-    if (!isActive) {
-      requestSnapToView(plane);
-      return;
-    }
+    // Focus the panel without rotating the 3-D model — rotation is opt-in via
+    // the context-menu "View from this side" item.
+    if (!isActive) setActivePlane(plane);
     if (!canvasRef.current || !dims || !cursor) return;
     setCursor(cursorFromClick(e, canvasRef.current, plane, dims, cursor, drawFracs));
   }
@@ -609,6 +609,7 @@ function ExpandedSlicePanel({
           hasMeasurementFrom={measurement !== null}
           onMeasureFrom={onMeasureFrom}
           onMeasureTo={onMeasureTo}
+          onSnapToView={onSnapToView}
           onClear={onClear}
           onClose={closeMenu}
         />
@@ -645,10 +646,11 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
     scrubVisible,
     setScrubVisible,
     setCursor,
-    requestSnapToView,
+    setActivePlane,
     onWheel,
     handleScrub,
     handleContextMenu,
+    onSnapToView,
     measurement,
     menu,
     onMeasureFrom,
@@ -670,16 +672,15 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
   const scrubberVisible = isMobile || scrubVisible;
 
   function handleClick(e: React.MouseEvent) {
-    if (!isActive) {
-      requestSnapToView(plane);
-      return;
-    }
+    // Focus the panel without rotating the 3-D model — rotation is opt-in via
+    // the context-menu "View from this side" item.
+    if (!isActive) setActivePlane(plane);
     if (!canvasRef.current || !dims || !cursor) return;
     setCursor(cursorFromClick(e, canvasRef.current, plane, dims, cursor, drawFracs));
   }
 
   function handleTouchStart(e: React.TouchEvent) {
-    if (!isActive) requestSnapToView(plane);
+    if (!isActive) setActivePlane(plane);
     const t = e.touches[0];
     touchRef.current = { startY: t.clientY, startIdx: idx };
   }
@@ -803,6 +804,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
           hasMeasurementFrom={measurement !== null}
           onMeasureFrom={onMeasureFrom}
           onMeasureTo={onMeasureTo}
+          onSnapToView={onSnapToView}
           onClear={onClear}
           onClose={closeMenu}
         />
