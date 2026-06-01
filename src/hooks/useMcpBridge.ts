@@ -11,6 +11,7 @@ import type {
   AiAnnotation,
   AnnotationSeverity,
   LoadedVolume,
+  MeasurementPoint,
   SlicePlane,
   VolumeCursor,
 } from '@/types';
@@ -194,6 +195,7 @@ const ACTION_LABELS: Record<string, string> = {
   set_wl: 'Adjusting window / level',
   apply_wl_preset: 'Applying W/L preset',
   set_preset: 'Changing render preset',
+  set_slab_mm: 'Adjusting slab MIP thickness',
   capture_slice: 'Capturing slice',
   capture_3d: 'Capturing 3D view',
   capture_all: 'Capturing all planes',
@@ -202,6 +204,9 @@ const ACTION_LABELS: Record<string, string> = {
   remove_annotation: 'Removing annotation',
   list_annotations: 'Listing annotations',
   clear_annotations: 'Clearing annotations',
+  set_measurement: 'Placing measurement',
+  get_measurement: 'Reading measurement',
+  clear_measurement: 'Clearing measurement',
 };
 
 // W/L presets as fractions of [scalarMin, scalarMax].
@@ -453,6 +458,19 @@ export function useMcpBridge(sessionId: string | null) {
             break;
           }
 
+          // ── set_slab_mm — slab-MIP thickness for all panels ───────────
+          case 'set_slab_mm': {
+            const raw = Number(msg.slab_mm);
+            if (!Number.isFinite(raw) || raw < 0) {
+              fail('slab_mm must be a non-negative number');
+              break;
+            }
+            const slabMm = Math.min(50, raw);
+            store.getState().setSlabMm(slabMm);
+            ok({ slabMm });
+            break;
+          }
+
           // ── capture_slice ─────────────────────────────────────────────
           case 'capture_slice': {
             const plane = msg.plane as SlicePlane;
@@ -617,6 +635,64 @@ export function useMcpBridge(sessionId: string | null) {
           // ── clear_annotations ─────────────────────────────────────────
           case 'clear_annotations': {
             store.getState().clearAiAnnotations();
+            ok();
+            break;
+          }
+
+          // ── set_measurement — place both endpoints in one call ────────
+          // Only one segment is active at a time; calling again replaces it.
+          case 'set_measurement': {
+            const { volume } = store.getState();
+            if (!volume) {
+              fail('No volume loaded');
+              break;
+            }
+            const dims = volume.meta.dims;
+            const parsePoint = (key: 'from' | 'to'): MeasurementPoint | null => {
+              const p = msg[key] as Partial<MeasurementPoint> | undefined;
+              if (!p || typeof p !== 'object') return null;
+              const { x, y, z } = p;
+              if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
+              return {
+                x: clampVoxel(Math.round(x as number), dims[0]),
+                y: clampVoxel(Math.round(y as number), dims[1]),
+                z: clampVoxel(Math.round(z as number), dims[2]),
+              };
+            };
+            const from = parsePoint('from');
+            const to = parsePoint('to');
+            if (!from || !to) {
+              fail('`from` and `to` must each be {x, y, z} voxel coordinates');
+              break;
+            }
+            // Replace any existing measurement atomically — placing `from`
+            // wipes the prior `to`, then we set `to` to finalize distance.
+            store.getState().setMeasurementFrom(from);
+            store.getState().setMeasurementTo(to);
+            const m = store.getState().measurement;
+            ok({
+              from,
+              to,
+              distanceMm: m?.distanceMm ?? null,
+            });
+            break;
+          }
+
+          // ── get_measurement ───────────────────────────────────────────
+          case 'get_measurement': {
+            const m = store.getState().measurement;
+            ok({
+              hasMeasurement: m !== null,
+              from: m?.from ?? null,
+              to: m?.to ?? null,
+              distanceMm: m?.distanceMm ?? null,
+            });
+            break;
+          }
+
+          // ── clear_measurement ─────────────────────────────────────────
+          case 'clear_measurement': {
+            store.getState().clearMeasurement();
             ok();
             break;
           }

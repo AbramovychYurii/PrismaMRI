@@ -221,6 +221,22 @@ const TOOLS: Tool[] = [
       required: ['preset'],
     },
   },
+  {
+    name: 'set_slab_mm',
+    description:
+      'Set the Slab MIP thickness (in millimetres) applied to ALL three 2-D ' +
+      'slice panels. A slab MIP composites several adjacent slices into one, ' +
+      'so vessels, fractures or lesions spanning multiple slices become much ' +
+      'easier to see. Use 0 to disable (single slice). Typical values: 3, 5, ' +
+      '10 mm. Effective range: 0 – 50 mm.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        slab_mm: { type: 'number', description: 'Thickness in mm. 0 = off.' },
+      },
+      required: ['slab_mm'],
+    },
+  },
 
   // ── Capture ────────────────────────────────────────────────────────────────
   {
@@ -324,6 +340,56 @@ const TOOLS: Tool[] = [
   {
     name: 'clear_annotations',
     description: 'Remove every AI finding marker from the viewer.',
+    inputSchema: { type: 'object', properties: {}, required: [] },
+  },
+
+  // ── Measurement ────────────────────────────────────────────────────────────
+  {
+    name: 'set_measurement',
+    description:
+      'Place a single straight-line measurement segment between two voxel ' +
+      'coordinates and let the viewer compute its physical distance in mm ' +
+      '(uses the volume voxel spacing). Only ONE measurement exists at a ' +
+      'time — calling this again replaces the previous segment. Use voxel ' +
+      'coordinates from `get_viewer_state` or from a captured slice. To ' +
+      'remove the measurement use `clear_measurement`.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        from: {
+          type: 'object',
+          description: 'Start voxel.',
+          properties: {
+            x: { type: 'number' },
+            y: { type: 'number' },
+            z: { type: 'number' },
+          },
+          required: ['x', 'y', 'z'],
+        },
+        to: {
+          type: 'object',
+          description: 'End voxel.',
+          properties: {
+            x: { type: 'number' },
+            y: { type: 'number' },
+            z: { type: 'number' },
+          },
+          required: ['x', 'y', 'z'],
+        },
+      },
+      required: ['from', 'to'],
+    },
+  },
+  {
+    name: 'get_measurement',
+    description:
+      'Return the currently placed measurement (from/to voxels and the ' +
+      'computed distance in mm), or null if none is set.',
+    inputSchema: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'clear_measurement',
+    description: 'Remove the current measurement segment from the viewer.',
     inputSchema: { type: 'object', properties: {}, required: [] },
   },
 ];
@@ -438,6 +504,17 @@ async function handleTool(
       return { content: [txt(`3-D preset changed to "${preset}".`)] };
     }
 
+    // ── set_slab_mm ──────────────────────────────────────────────────────────
+    case 'set_slab_mm': {
+      const { slab_mm } = args as { slab_mm: number };
+      const { slabMm } = await command<{ slabMm: number }>({ action: 'set_slab_mm', slab_mm });
+      return {
+        content: [
+          txt(slabMm === 0 ? 'Slab MIP disabled.' : `Slab MIP set to ${slabMm} mm.`),
+        ],
+      };
+    }
+
     // ── capture_slice ────────────────────────────────────────────────────────
     case 'capture_slice': {
       const { plane, slab_mm } = args as { plane: string; slab_mm?: number };
@@ -531,6 +608,50 @@ async function handleTool(
     case 'clear_annotations': {
       await command({ action: 'clear_annotations' });
       return { content: [txt('All annotations cleared.')] };
+    }
+
+    // ── set_measurement ──────────────────────────────────────────────────────
+    case 'set_measurement': {
+      const { from, to } = args as {
+        from: { x: number; y: number; z: number };
+        to: { x: number; y: number; z: number };
+      };
+      const result = await command<{
+        from: { x: number; y: number; z: number };
+        to: { x: number; y: number; z: number };
+        distanceMm: number | null;
+      }>({ action: 'set_measurement', from, to });
+      const dist =
+        result.distanceMm !== null ? `${result.distanceMm.toFixed(2)} mm` : 'distance unavailable';
+      return {
+        content: [
+          txt(
+            `Measurement placed: (${from.x}, ${from.y}, ${from.z}) → (${to.x}, ${to.y}, ${to.z}) — ${dist}.`,
+          ),
+        ],
+      };
+    }
+
+    // ── get_measurement ──────────────────────────────────────────────────────
+    case 'get_measurement': {
+      const result = await command<{
+        hasMeasurement: boolean;
+        from: { x: number; y: number; z: number } | null;
+        to: { x: number; y: number; z: number } | null;
+        distanceMm: number | null;
+      }>({ action: 'get_measurement' });
+      if (!result.hasMeasurement) {
+        return { content: [txt('No measurement is currently set.')] };
+      }
+      return {
+        content: [txt(`Current measurement:\n\`\`\`json\n${JSON.stringify(result, null, 2)}\n\`\`\``)],
+      };
+    }
+
+    // ── clear_measurement ────────────────────────────────────────────────────
+    case 'clear_measurement': {
+      await command({ action: 'clear_measurement' });
+      return { content: [txt('Measurement cleared.')] };
     }
 
     default:

@@ -102,6 +102,7 @@ async function downloadDxt(sessionId: string, relayUrl: string): Promise<void> {
       'set_window_level',
       'apply_wl_preset',
       'set_render_preset',
+      'set_slab_mm',
       'capture_slice',
       'capture_all_planes',
       'capture_overview_grid',
@@ -110,6 +111,9 @@ async function downloadDxt(sessionId: string, relayUrl: string): Promise<void> {
       'remove_annotation',
       'list_annotations',
       'clear_annotations',
+      'set_measurement',
+      'get_measurement',
+      'clear_measurement',
     ].map((name) => ({ name })),
     compatibility: { claude_desktop: '>=0.10.0', platforms: ['darwin', 'win32', 'linux'] },
   };
