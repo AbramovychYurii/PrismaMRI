@@ -721,34 +721,38 @@ export function SessionPanel() {
             <SessionId style={{ fontSize: 9.5, opacity: 0.55 }}>{RELAY_URL}</SessionId>
           </Row>
 
-          {/* ── ② Prompt example — copy & paste into Claude ── */}
-          <Divider />
-          <PromptBox>
-            <PromptLabel
-              type="button"
-              aria-expanded={promptOpen}
-              onClick={() => setPromptOpen((o) => !o)}
-            >
-              <PromptLabelText>Prompt example</PromptLabelText>
-              <PromptChevron $open={promptOpen}>
-                <ChevronDown size={12} />
-              </PromptChevron>
-            </PromptLabel>
-            {promptOpen && <PromptPreview aria-hidden="true">{EXAMPLE_PROMPT}</PromptPreview>}
-          </PromptBox>
-          <CopyBtn
-            type="button"
-            $state={copyState}
-            onClick={handleCopyPrompt}
-            aria-label="Copy prompt example to clipboard"
-          >
-            {copyState === 'ok' ? <ClipboardCheck size={13} /> : <Clipboard size={13} />}
-            {copyState === 'ok'
-              ? 'Copied! Paste into Claude'
-              : copyState === 'err'
-                ? 'Copy failed — try manually'
-                : 'Copy prompt example'}
-          </CopyBtn>
+          {/* ── ② Prompt example — only shown once the agent is connected ── */}
+          {mcpConnected && (
+            <>
+              <Divider />
+              <PromptBox>
+                <PromptLabel
+                  type="button"
+                  aria-expanded={promptOpen}
+                  onClick={() => setPromptOpen((o) => !o)}
+                >
+                  <PromptLabelText>Prompt example</PromptLabelText>
+                  <PromptChevron $open={promptOpen}>
+                    <ChevronDown size={12} />
+                  </PromptChevron>
+                </PromptLabel>
+                {promptOpen && <PromptPreview aria-hidden="true">{EXAMPLE_PROMPT}</PromptPreview>}
+              </PromptBox>
+              <CopyBtn
+                type="button"
+                $state={copyState}
+                onClick={handleCopyPrompt}
+                aria-label="Copy prompt example to clipboard"
+              >
+                {copyState === 'ok' ? <ClipboardCheck size={13} /> : <Clipboard size={13} />}
+                {copyState === 'ok'
+                  ? 'Copied! Paste into Claude'
+                  : copyState === 'err'
+                    ? 'Copy failed — try manually'
+                    : 'Copy prompt example'}
+              </CopyBtn>
+            </>
+          )}
 
           {mcpConnected && (
             <ActionBtn
