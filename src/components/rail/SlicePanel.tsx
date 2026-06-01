@@ -272,7 +272,6 @@ const TrayBtn = styled.button<{ $active?: boolean; $large?: boolean }>`
   }
 `;
 
-
 const FullscreenOverlay = styled.div<{ $isActive: boolean }>`
   position: fixed;
   top: 56px;

@@ -1,4 +1,5 @@
 import { isSlicePlane } from '@/constants';
+import * as annotationsStorage from '@/lib/annotationsStorage';
 import type { ThreePreview } from '@/lib/volume/three-preview';
 import type {
   ActiveMeasurement,
@@ -124,7 +125,9 @@ const initialState: VolumeState = {
   snapSeq: 0,
   snapPlane: 'coronal',
   mobileTab: '3d',
-  aiAnnotations: [],
+  // Hydrate from localStorage so previously placed findings survive reloads
+  // and volume switches. Cleared explicitly via `clearAiAnnotations`.
+  aiAnnotations: annotationsStorage.load(),
   activeAnnotationId: null,
   mcpConnected: false,
   agentActivity: { active: false, action: null },
@@ -157,7 +160,8 @@ export const useVolumeStore = create<VolumeState & VolumeActions>((set) => ({
       activePlane: initialState.activePlane,
       snapSeq: 0,
       error: null,
-      aiAnnotations: [],
+      // Intentionally do NOT reset `aiAnnotations` here — findings persist
+      // across volume switches and are cleared only via `clearAiAnnotations`.
       activeAnnotationId: null,
     }),
 
@@ -253,15 +257,27 @@ export const useVolumeStore = create<VolumeState & VolumeActions>((set) => ({
       activePlane: isSlicePlane(mobileTab) ? mobileTab : state.activePlane,
     })),
 
-  addAiAnnotation: (a) => set((state) => ({ aiAnnotations: [...state.aiAnnotations, a] })),
+  addAiAnnotation: (a) =>
+    set((state) => {
+      const next = [...state.aiAnnotations, a];
+      annotationsStorage.save(next);
+      return { aiAnnotations: next };
+    }),
 
   removeAiAnnotation: (id) =>
-    set((state) => ({
-      aiAnnotations: state.aiAnnotations.filter((a) => a.id !== id),
-      activeAnnotationId: state.activeAnnotationId === id ? null : state.activeAnnotationId,
-    })),
+    set((state) => {
+      const next = state.aiAnnotations.filter((a) => a.id !== id);
+      annotationsStorage.save(next);
+      return {
+        aiAnnotations: next,
+        activeAnnotationId: state.activeAnnotationId === id ? null : state.activeAnnotationId,
+      };
+    }),
 
-  clearAiAnnotations: () => set({ aiAnnotations: [], activeAnnotationId: null }),
+  clearAiAnnotations: () => {
+    annotationsStorage.clear();
+    set({ aiAnnotations: [], activeAnnotationId: null });
+  },
 
   setActiveAnnotation: (activeAnnotationId) => set({ activeAnnotationId }),
 
