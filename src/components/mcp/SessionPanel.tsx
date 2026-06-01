@@ -1,15 +1,14 @@
 /**
  * SessionPanel
  *
- * Floating panel (bottom-right) with two ways to push the MCP config into
- * Claude Desktop:
+ * Shows one of two panels depending on how the PWA is being used:
  *
- *  1. "Update Config File" — uses the File System Access API to let the user
- *     pick claude_desktop_config.json, reads it, merges the prismamri entry,
- *     and writes it back in one click. No terminal needed.
+ *  • RemoteModePanel — hosted web app, connects via Cloudflare relay.
+ *    Shows Session ID, Relay URL, and a one-click .dxt download.
  *
- *  2. "Copy JSON" — classic clipboard fallback for browsers that don't support
- *     the File System Access API (Firefox, Safari).
+ *  • LocalModePanel  — installed PWA or localhost dev server.
+ *    Connects directly to the MCP server on 127.0.0.1; no relay,
+ *    no Session ID needed.
  */
 
 import { DOCK_H } from '@/components/dock/Dock';
@@ -27,45 +26,41 @@ import {
   Link2,
   Unplug,
   X,
+  Zap,
 } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import styled, { keyframes } from 'styled-components';
 
-const RELAY_URL = import.meta.env.VITE_RELAY_URL as string | undefined;
+// ── Environment ───────────────────────────────────────────────────────────────
 
-/** URL of the pre-built server bundle shipped with the app.
- * Use import.meta.env.BASE_URL (e.g. "/PrismaMRI/" on GitHub Pages, "/" locally)
- * so the path is correct regardless of the deployment sub-directory. */
+const RELAY_URL = import.meta.env.VITE_RELAY_URL as string | undefined;
 const SERVER_BUNDLE_URL = `${import.meta.env.BASE_URL}dxt-server/index.js`;
 const WS_LIB_URL = `${import.meta.env.BASE_URL}dxt-server/ws/`;
 
-/**
- * Fetch the pre-built server bundle + ws lib, inject the session/relay into
- * manifest.json, and download as a personalised prismamri.dxt the user can
- * drag straight into Claude Desktop → Extensions.
- */
+/** Ports the MCP server tries in order. Must match mcp-server/src/index.ts. */
+const LOCAL_PORTS = [7389, 7390, 7391, 7392, 7393];
+
+/** True when running as an installed PWA or from localhost. */
+function isLocalMode(): boolean {
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (navigator as { standalone?: boolean }).standalone === true ||
+    ['localhost', '127.0.0.1'].includes(location.hostname)
+  );
+}
+
+// ── .dxt download ─────────────────────────────────────────────────────────────
+
 async function downloadDxt(sessionId: string, relayUrl: string): Promise<void> {
-  // The radiology-analysis skill is inlined into the server bundle at build
-  // time (esbuild --loader:.md=text), so we don't need to fetch or ship it
-  // separately — it's already inside the JS that we download below.
   const [serverJs, wsIndex, wsLib] = await Promise.all([
     fetch(SERVER_BUNDLE_URL).then((r) => r.arrayBuffer()),
     fetch(`${WS_LIB_URL}index.js`).then((r) => r.text()),
     Promise.all(
       [
-        'constants.js',
-        'event-target.js',
-        'buffer-util.js',
-        'extension.js',
-        'limiter.js',
-        'permessage-deflate.js',
-        'receiver.js',
-        'sender.js',
-        'stream.js',
-        'subprotocol.js',
-        'validation.js',
-        'websocket.js',
+        'constants.js', 'event-target.js', 'buffer-util.js', 'extension.js',
+        'limiter.js', 'permessage-deflate.js', 'receiver.js', 'sender.js',
+        'stream.js', 'subprotocol.js', 'validation.js', 'websocket.js',
         'websocket-server.js',
       ].map((f) =>
         fetch(`${WS_LIB_URL}lib/${f}`)
@@ -79,9 +74,8 @@ async function downloadDxt(sessionId: string, relayUrl: string): Promise<void> {
     dxt_version: '0.1',
     name: 'prismamri',
     display_name: 'PrismaMRI AI Agent',
-    version: '2.0.0',
-    description:
-      'Navigate MRI slices, analyze findings, place annotations and capture images — all controlled by Claude.',
+    version: '2.1.0',
+    description: 'Navigate MRI slices, analyze findings, place annotations and capture images — all controlled by Claude.',
     author: { name: 'PrismaMRI' },
     license: 'MIT',
     server: {
@@ -97,26 +91,11 @@ async function downloadDxt(sessionId: string, relayUrl: string): Promise<void> {
       },
     },
     tools: [
-      'get_viewer_state',
-      'get_volume_overview',
-      'navigate_to_slice',
-      'step_slice',
-      'navigate_to_center',
-      'set_window_level',
-      'apply_wl_preset',
-      'set_render_preset',
-      'set_slab_mm',
-      'capture_slice',
-      'capture_all_planes',
-      'capture_overview_grid',
-      'capture_3d',
-      'add_annotation',
-      'remove_annotation',
-      'list_annotations',
-      'clear_annotations',
-      'set_measurement',
-      'get_measurement',
-      'clear_measurement',
+      'get_viewer_state', 'get_volume_overview', 'navigate_to_slice', 'step_slice',
+      'navigate_to_center', 'set_window_level', 'apply_wl_preset', 'set_render_preset',
+      'set_slab_mm', 'capture_slice', 'capture_all_planes', 'capture_overview_grid',
+      'capture_3d', 'add_annotation', 'remove_annotation', 'list_annotations',
+      'clear_annotations', 'set_measurement', 'get_measurement', 'clear_measurement',
     ].map((name) => ({ name })),
     compatibility: { claude_desktop: '>=0.10.0', platforms: ['darwin', 'win32', 'linux'] },
   };
@@ -124,7 +103,6 @@ async function downloadDxt(sessionId: string, relayUrl: string): Promise<void> {
   const zip = new JSZip();
   zip.file('manifest.json', JSON.stringify(manifest, null, 2));
   zip.file('server/index.js', serverJs);
-  // ws (only external dep — not bundled by esbuild)
   zip.file('server/node_modules/ws/index.js', wsIndex);
   for (const { name, text } of wsLib) {
     zip.file(`server/node_modules/ws/lib/${name}`, text);
@@ -139,9 +117,25 @@ async function downloadDxt(sessionId: string, relayUrl: string): Promise<void> {
   URL.revokeObjectURL(url);
 }
 
-// ── Styled components ────────────────────────────────────────────────────────
+// ── Shared styled components ──────────────────────────────────────────────────
 
-const Panel = styled.div<{ $dockOpen: boolean }>`
+const pulse = keyframes`
+  0%,100% { opacity:1; }
+  50%      { opacity:0.35; }
+`;
+
+const borderGlow = keyframes`
+  0%,100% {
+    box-shadow: 0 0 0 0 rgba(80,200,120,0), 0 4px 16px rgba(0,0,0,0.5);
+    border-color: rgba(80,200,120,0.55);
+  }
+  50% {
+    box-shadow: 0 0 10px 2px rgba(80,200,120,0.45), 0 4px 16px rgba(0,0,0,0.5);
+    border-color: rgba(80,200,120,0.95);
+  }
+`;
+
+export const Panel = styled.div<{ $dockOpen: boolean }>`
   position: fixed;
   bottom: ${({ $dockOpen }) => ($dockOpen ? DOCK_H + 18 : 18)}px;
   right: 18px;
@@ -165,7 +159,7 @@ const Panel = styled.div<{ $dockOpen: boolean }>`
   }
 `;
 
-const PanelHeader = styled.div<{ $connected: boolean }>`
+export const PanelHeader = styled.div<{ $connected: boolean }>`
   display: flex;
   align-items: center;
   gap: 10px;
@@ -182,23 +176,7 @@ const PanelHeader = styled.div<{ $connected: boolean }>`
   }
 `;
 
-const pulse = keyframes`
-  0%,100% { opacity:1; }
-  50%      { opacity:0.35; }
-`;
-
-const borderGlow = keyframes`
-  0%,100% {
-    box-shadow: 0 0 0 0 rgba(80,200,120,0), 0 4px 16px rgba(0,0,0,0.5);
-    border-color: rgba(80,200,120,0.55);
-  }
-  50% {
-    box-shadow: 0 0 10px 2px rgba(80,200,120,0.45), 0 4px 16px rgba(0,0,0,0.5);
-    border-color: rgba(80,200,120,0.95);
-  }
-`;
-
-const StatusDot = styled.span<{ $connected: boolean }>`
+export const StatusDot = styled.span<{ $connected: boolean }>`
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -207,7 +185,7 @@ const StatusDot = styled.span<{ $connected: boolean }>`
   animation: ${({ $connected }) => ($connected ? pulse : 'none')} 2s ease-in-out infinite;
 `;
 
-const StatusText = styled.span<{ $connected: boolean }>`
+export const StatusText = styled.span<{ $connected: boolean }>`
   font-size: 11px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -232,7 +210,7 @@ const CollapseBtn = styled.button`
   &:hover { color: var(--ink); }
 `;
 
-const PanelBody = styled.div`
+export const PanelBody = styled.div`
   padding: 14px;
   display: flex;
   flex-direction: column;
@@ -252,7 +230,7 @@ const Label = styled.span`
   color: var(--ink-3);
 `;
 
-const SessionId = styled.span`
+const Value = styled.span`
   font-size: 11.5px;
   letter-spacing: 0.04em;
   color: var(--ink-2);
@@ -318,7 +296,29 @@ const Hint = styled.p`
   margin: 0;
 `;
 
-// ── InfoTip — multi-line hover tooltip via portal ────────────────────────────
+const Divider = styled.div`
+  height: 1px;
+  background: var(--rule);
+  margin: 2px 0;
+`;
+
+// ── Badge (remote mode only) ──────────────────────────────────────────────────
+
+const Badge = styled.span`
+  font-size: 8.5px;
+  font-family: var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 1.5px 5px;
+  border-radius: 3px;
+  border: 1px solid rgba(255,181,71,0.35);
+  background: rgba(255,181,71,0.08);
+  color: var(--amber);
+  flex-shrink: 0;
+  line-height: 1;
+`;
+
+// ── InfoTip ───────────────────────────────────────────────────────────────────
 
 const InfoBubble = styled.div<{ $x: number; $y: number }>`
   position: fixed;
@@ -366,50 +366,20 @@ function InfoTip({ text }: { text: string }) {
 
   return (
     <>
-      <InfoBtn
-        ref={ref}
-        type="button"
-        aria-label="More info"
-        onMouseEnter={show}
-        onMouseLeave={() => setPos(null)}
-      >
+      <InfoBtn ref={ref} type="button" aria-label="More info" onMouseEnter={show} onMouseLeave={() => setPos(null)}>
         <Info size={10} />
       </InfoBtn>
-      {pos &&
-        createPortal(
-          <InfoBubble $x={pos.x} $y={pos.y}>
-            {text}
-          </InfoBubble>,
-          document.body,
-        )}
+      {pos && createPortal(
+        <InfoBubble $x={pos.x} $y={pos.y}>{text}</InfoBubble>,
+        document.body,
+      )}
     </>
   );
 }
 
-const BetaBadge = styled.span`
-  font-size: 8.5px;
-  font-family: var(--mono);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  padding: 1.5px 5px;
-  border-radius: 3px;
-  border: 1px solid rgba(255, 181, 71, 0.35);
-  background: rgba(255, 181, 71, 0.08);
-  color: var(--amber);
-  line-height: 1;
-  flex-shrink: 0;
-`;
+// ── MinimisedPill ─────────────────────────────────────────────────────────────
 
-const MinimisedPill = styled.button<{
-  $connected: boolean;
-  $working: boolean;
-  $dockOpen: boolean;
-}>`
-  /* Anchored inside the 3-D Stage section (its parent has position:relative).
-     The expanded Panel switches to position:fixed so it slides out to the
-     viewport edge instead of the stage edge. Sizing mirrors the ToolbarPill
-     ToolBtn (top-right of the stage) so all stage chrome shares the same
-     visual weight. Lifts above the Dock when it's open. */
+const MinimisedPill = styled.button<{ $connected: boolean; $working: boolean; $dockOpen: boolean }>`
   position: absolute;
   bottom: ${({ $dockOpen }) => ($dockOpen ? DOCK_H + 22 : 22)}px;
   right: 30px;
@@ -421,7 +391,7 @@ const MinimisedPill = styled.button<{
   border-radius: 999px;
   border: 1px solid ${({ $connected, $working }) =>
     $working ? 'rgba(80,200,120,0.55)' : $connected ? 'rgba(80,200,120,0.35)' : 'var(--rule)'};
-  background: ${({ $working }) => ($working ? 'rgba(14,12,9,0.97)' : 'rgba(20, 18, 14, 0.85)')};
+  background: ${({ $working }) => ($working ? 'rgba(14,12,9,0.97)' : 'rgba(20,18,14,0.85)')};
   backdrop-filter: blur(8px);
   font-family: var(--mono);
   font-size: 10.5px;
@@ -429,7 +399,7 @@ const MinimisedPill = styled.button<{
   text-transform: uppercase;
   color: ${({ $connected }) => ($connected ? '#50c878' : 'var(--ink-2)')};
   cursor: pointer;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
   animation: ${({ $working }) => ($working ? borderGlow : 'none')} 2s ease-in-out infinite;
   white-space: nowrap;
   -webkit-tap-highlight-color: transparent;
@@ -437,11 +407,10 @@ const MinimisedPill = styled.button<{
   &:hover {
     border-color: ${({ $connected }) => ($connected ? 'rgba(80,200,120,0.6)' : 'var(--rule-2)')};
     color: ${({ $connected }) => ($connected ? '#70d898' : 'var(--ink)')};
-    background: ${({ $working }) => ($working ? 'rgba(20,18,13,0.97)' : 'rgba(28, 24, 18, 0.92)')};
+    background: ${({ $working }) => ($working ? 'rgba(20,18,13,0.97)' : 'rgba(28,24,18,0.92)')};
   }
 
   @media (max-width: 767px) {
-    /* Mobile has no Dock — ignore $dockOpen and pin near the tab bar. */
     bottom: 12px;
     right: 12px;
   }
@@ -449,10 +418,6 @@ const MinimisedPill = styled.button<{
 
 // ── Prompt example ────────────────────────────────────────────────────────────
 
-/**
- * Ready-to-paste prompt that demonstrates the full PrismaMRI AI-agent workflow.
- * Kept as a plain string so it's easy to update without touching JSX.
- */
 const EXAMPLE_PROMPT = `Using the PrismaMRI tools, perform a systematic review of the medical volume currently open in the viewer and produce a structured report.
 
 > ⚠️ Research and educational use only — not a substitute for clinical judgment.
@@ -511,14 +476,6 @@ Present the final report in this format:
 
 **Recommendations** — suggested next steps: follow-up imaging, specialist referral, urgency.`;
 
-// ── Styled components (prompt section) ───────────────────────────────────────
-
-const Divider = styled.div`
-  height: 1px;
-  background: var(--rule);
-  margin: 2px 0;
-`;
-
 const PromptBox = styled.div`
   position: relative;
   border: 1px solid var(--rule);
@@ -567,16 +524,11 @@ const PromptPreview = styled.pre`
   word-break: break-word;
   max-height: 200px;
   overflow-y: auto;
-
-  /* Thin dark scrollbar */
   scrollbar-width: thin;
   scrollbar-color: var(--rule-2) transparent;
   &::-webkit-scrollbar { width: 4px; }
   &::-webkit-scrollbar-track { background: transparent; }
-  &::-webkit-scrollbar-thumb {
-    background: var(--rule-2);
-    border-radius: 2px;
-  }
+  &::-webkit-scrollbar-thumb { background: var(--rule-2); border-radius: 2px; }
   &::-webkit-scrollbar-thumb:hover { background: var(--ink-3); }
 `;
 
@@ -616,20 +568,26 @@ const CopyBtn = styled.button<{ $state: 'idle' | 'ok' | 'err' }>`
   }}
 `;
 
-// ── Component ────────────────────────────────────────────────────────────────
+// ── Local-mode styles ─────────────────────────────────────────────────────────
 
-export function SessionPanel() {
-  const sessionId = useSessionId();
-  const mcpConnected = useVolumeStore((s) => s.mcpConnected);
-  const agentWorking = useVolumeStore((s) => s.agentSessionActive);
-  const dockOpen = useVolumeStore((s) => s.toolbar.dock);
-  const [expanded, setExpanded] = useState(false);
-  const [dxtState, setDxtState] = useState<BtnState>('idle');
-  const [copyState, setCopyState] = useState<'idle' | 'ok' | 'err'>('idle');
+const StepList = styled.ol`
+  margin: 0;
+  padding-left: 16px;
+  font-size: 10px;
+  color: var(--ink-3);
+  line-height: 1.7;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+`;
+
+// ── Shared prompt section ─────────────────────────────────────────────────────
+
+function PromptSection() {
   const [promptOpen, setPromptOpen] = useState(true);
+  const [copyState, setCopyState] = useState<'idle' | 'ok' | 'err'>('idle');
 
-  // ── Copy prompt example ─────────────────────────────────────────────────
-  const handleCopyPrompt = useCallback(async () => {
+  const handleCopy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(EXAMPLE_PROMPT);
       setCopyState('ok');
@@ -640,7 +598,46 @@ export function SessionPanel() {
     }
   }, []);
 
-  // ── .dxt download ───────────────────────────────────────────────────────
+  return (
+    <>
+      <Divider />
+      <PromptBox>
+        <PromptLabel type="button" aria-expanded={promptOpen} onClick={() => setPromptOpen((o) => !o)}>
+          <PromptLabelText>Prompt example</PromptLabelText>
+          <PromptChevron $open={promptOpen}><ChevronDown size={12} /></PromptChevron>
+        </PromptLabel>
+        {promptOpen && <PromptPreview aria-hidden="true">{EXAMPLE_PROMPT}</PromptPreview>}
+      </PromptBox>
+      <CopyBtn type="button" $state={copyState} onClick={handleCopy} aria-label="Copy prompt example to clipboard">
+        {copyState === 'ok' ? <ClipboardCheck size={13} /> : <Clipboard size={13} />}
+        {copyState === 'ok'
+          ? 'Copied! Paste into Claude'
+          : copyState === 'err'
+            ? 'Copy failed — try manually'
+            : 'Copy prompt example'}
+      </CopyBtn>
+    </>
+  );
+}
+
+// ── RemoteModePanel ───────────────────────────────────────────────────────────
+
+function RemoteModePanel({
+  expanded,
+  onToggle,
+  mcpConnected,
+  agentWorking,
+  dockOpen,
+}: {
+  expanded: boolean;
+  onToggle: () => void;
+  mcpConnected: boolean;
+  agentWorking: boolean;
+  dockOpen: boolean;
+}) {
+  const sessionId = useSessionId();
+  const [dxtState, setDxtState] = useState<BtnState>('idle');
+
   const handleDownloadDxt = useCallback(async () => {
     if (!RELAY_URL || !sessionId) return;
     setDxtState('idle');
@@ -654,14 +651,12 @@ export function SessionPanel() {
     }
   }, [sessionId]);
 
-  if (!RELAY_URL || !sessionId) return null;
-
   const pill = (
     <MinimisedPill
       $connected={mcpConnected}
       $working={agentWorking}
       $dockOpen={dockOpen}
-      onClick={() => setExpanded((o) => !o)}
+      onClick={onToggle}
       aria-expanded={expanded}
       aria-label={agentWorking ? 'AI Working' : mcpConnected ? 'AI Agent Connected' : 'AI Agent'}
     >
@@ -675,40 +670,31 @@ export function SessionPanel() {
     <>
       {pill}
       <Panel $dockOpen={dockOpen} role="complementary" aria-label="AI agent session panel">
-        <PanelHeader $connected={mcpConnected} onClick={() => setExpanded(false)}>
-          <HeaderIcon>
-            <Bot size={14} />
-          </HeaderIcon>
+        <PanelHeader $connected={mcpConnected} onClick={onToggle}>
+          <HeaderIcon><Bot size={14} /></HeaderIcon>
           <StatusDot $connected={mcpConnected} />
           <StatusText $connected={mcpConnected}>
             {mcpConnected ? 'AI Agent Connected' : 'Waiting for Agent'}
           </StatusText>
-          <BetaBadge>Beta</BetaBadge>
-          <CollapseBtn type="button" aria-label="Collapse panel">
-            <X size={14} />
-          </CollapseBtn>
+          <Badge>Beta</Badge>
+          <CollapseBtn type="button" aria-label="Collapse panel"><X size={14} /></CollapseBtn>
         </PanelHeader>
 
         <PanelBody>
+          {/* Session ID */}
           <Row>
             <Label style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
               Session ID
               <InfoTip text="Tied to the downloaded .dxt extension — Claude uses this ID to find your viewer. If you regenerate the session, download a new .dxt and reinstall it in Claude Desktop." />
             </Label>
-            <SessionId>{sessionId}</SessionId>
+            <Value>{sessionId}</Value>
           </Row>
 
-          {/* ── ① Download .dxt — hidden once agent is connected ── */}
+          {/* .dxt download — hidden once connected */}
           {!mcpConnected && (
             <>
               <ActionBtn type="button" $primary $state={dxtState} onClick={handleDownloadDxt}>
-                {dxtState === 'ok' ? (
-                  <Check size={13} />
-                ) : dxtState === 'err' ? (
-                  <X size={13} />
-                ) : (
-                  <Download size={13} />
-                )}
+                {dxtState === 'ok' ? <Check size={13} /> : dxtState === 'err' ? <X size={13} /> : <Download size={13} />}
                 {dxtState === 'ok'
                   ? 'Downloaded! Drag into Claude Desktop'
                   : dxtState === 'err'
@@ -723,73 +709,151 @@ export function SessionPanel() {
             </>
           )}
 
+          {/* Relay URL */}
           <Row style={{ gap: 6, marginTop: 2 }}>
             <Label style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
               <Link2 size={10} />
               Relay
               <InfoTip text="Lightweight WebSocket bridge that links Claude Desktop to this browser tab — no data is stored or logged. Commands travel directly between Claude and the viewer; the relay only forwards them." />
             </Label>
-            <SessionId style={{ fontSize: 9.5, opacity: 0.55 }}>{RELAY_URL}</SessionId>
+            <Value style={{ fontSize: 9.5, opacity: 0.55 }}>{RELAY_URL}</Value>
           </Row>
 
-          {/* ── ② Prompt example — only shown once the agent is connected ── */}
+          {/* Prompt + disconnect — only when connected */}
           {mcpConnected && (
             <>
-              <Divider />
-              <PromptBox>
-                <PromptLabel
-                  type="button"
-                  aria-expanded={promptOpen}
-                  onClick={() => setPromptOpen((o) => !o)}
-                >
-                  <PromptLabelText>Prompt example</PromptLabelText>
-                  <PromptChevron $open={promptOpen}>
-                    <ChevronDown size={12} />
-                  </PromptChevron>
-                </PromptLabel>
-                {promptOpen && <PromptPreview aria-hidden="true">{EXAMPLE_PROMPT}</PromptPreview>}
-              </PromptBox>
-              <CopyBtn
+              <PromptSection />
+              <ActionBtn
                 type="button"
-                $state={copyState}
-                onClick={handleCopyPrompt}
-                aria-label="Copy prompt example to clipboard"
+                $danger
+                onClick={() => {
+                  const ok = window.confirm(
+                    'Disconnect the current agent?\n\nThis ends the live session with Claude Desktop and ' +
+                    "invalidates the .dxt extension you already installed. To reconnect, you'll need to " +
+                    'download a fresh .dxt and reinstall it in Claude Desktop → Extensions.',
+                  );
+                  if (!ok) return;
+                  localStorage.setItem('prismamri-session-id', crypto.randomUUID());
+                  window.location.reload();
+                }}
               >
-                {copyState === 'ok' ? <ClipboardCheck size={13} /> : <Clipboard size={13} />}
-                {copyState === 'ok'
-                  ? 'Copied! Paste into Claude'
-                  : copyState === 'err'
-                    ? 'Copy failed — try manually'
-                    : 'Copy prompt example'}
-              </CopyBtn>
+                <Unplug size={12} />
+                Disconnect agent
+              </ActionBtn>
             </>
-          )}
-
-          {mcpConnected && (
-            <ActionBtn
-              type="button"
-              $danger
-              onClick={() => {
-                const ok = window.confirm(
-                  'Disconnect the current agent?\n\n' +
-                    'This ends the live session with Claude Desktop and ' +
-                    'invalidates the .dxt extension you already installed. ' +
-                    "To reconnect, you'll need to download a fresh .dxt and " +
-                    'reinstall it in Claude Desktop → Extensions.',
-                );
-                if (!ok) return;
-                const id = crypto.randomUUID();
-                localStorage.setItem('prismamri-session-id', id);
-                window.location.reload();
-              }}
-              title="End the live session and disconnect the current Claude Desktop agent"
-            >
-              <Unplug size={12} />
-              Disconnect agent
-            </ActionBtn>
           )}
         </PanelBody>
       </Panel>
     </>
   );
+}
+
+// ── LocalModePanel ────────────────────────────────────────────────────────────
+
+function LocalModePanel({
+  expanded,
+  onToggle,
+  mcpConnected,
+  agentWorking,
+  dockOpen,
+}: {
+  expanded: boolean;
+  onToggle: () => void;
+  mcpConnected: boolean;
+  agentWorking: boolean;
+  dockOpen: boolean;
+}) {
+  const localPort = useVolumeStore((s) => s.localPort);
+
+  const pill = (
+    <MinimisedPill
+      $connected={mcpConnected}
+      $working={agentWorking}
+      $dockOpen={dockOpen}
+      onClick={onToggle}
+      aria-expanded={expanded}
+      aria-label={agentWorking ? 'AI Working' : mcpConnected ? 'AI Agent Connected' : 'AI Agent'}
+    >
+      <Bot size={20} />
+    </MinimisedPill>
+  );
+
+  if (!expanded) return pill;
+
+  return (
+    <>
+      {pill}
+      <Panel $dockOpen={dockOpen} role="complementary" aria-label="AI agent local session panel">
+        <PanelHeader $connected={mcpConnected} onClick={onToggle}>
+          <HeaderIcon><Bot size={14} /></HeaderIcon>
+          <StatusDot $connected={mcpConnected} />
+          <StatusText $connected={mcpConnected}>
+            {mcpConnected ? 'AI Agent Connected' : 'Waiting for Agent'}
+          </StatusText>
+          <CollapseBtn type="button" aria-label="Collapse panel"><X size={14} /></CollapseBtn>
+        </PanelHeader>
+
+        <PanelBody>
+          {/* Connection info */}
+          <Row>
+            <Label style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <Zap size={10} />
+              Direct connection
+              <InfoTip text="Claude connects directly to this app with no relay — no data leaves your machine. Lower latency, works offline." />
+            </Label>
+            <Value style={{ fontSize: 10.5, opacity: 0.45 }}>
+              {mcpConnected && localPort
+                ? `PORT: ${localPort}`
+                : `PORT: ${LOCAL_PORTS[0]}–${LOCAL_PORTS[LOCAL_PORTS.length - 1]}`}
+            </Value>
+          </Row>
+
+          {/* Not connected: instructions */}
+          {!mcpConnected && (
+            <>
+              <Divider />
+              <Row>
+                <Label>How to connect</Label>
+                <StepList>
+                  <li>Install <strong style={{ color: 'var(--ink-2)' }}>prismamri.dxt</strong> in Claude Code / Desktop</li>
+                  <li>Leave Session ID and Relay URL empty</li>
+                  <li>Ask Claude about your scan — it will connect automatically</li>
+                </StepList>
+              </Row>
+            </>
+          )}
+
+          {/* Connected: prompt example */}
+          {mcpConnected && <PromptSection />}
+        </PanelBody>
+      </Panel>
+    </>
+  );
+}
+
+// ── SessionPanel (orchestrator) ───────────────────────────────────────────────
+
+export function SessionPanel() {
+  const mcpConnected = useVolumeStore((s) => s.mcpConnected);
+  const agentWorking = useVolumeStore((s) => s.agentSessionActive);
+  const dockOpen = useVolumeStore((s) => s.toolbar.dock);
+  const [expanded, setExpanded] = useState(false);
+
+  const sessionId = useSessionId();
+  const local = isLocalMode();
+
+  // Remote mode requires relay and session to be configured.
+  if (!local && (!RELAY_URL || !sessionId)) return null;
+
+  const sharedProps = {
+    expanded,
+    onToggle: () => setExpanded((o) => !o),
+    mcpConnected,
+    agentWorking,
+    dockOpen,
+  };
+
+  return local
+    ? <LocalModePanel {...sharedProps} />
+    : <RemoteModePanel {...sharedProps} />;
 }

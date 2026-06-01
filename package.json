@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build:dxt": "cd mcp-server && npm ci && npx esbuild src/index.ts --bundle --platform=node --format=cjs --outfile=../public/dxt-server/index.js --external:ws --loader:.md=text && mkdir -p ../public/dxt-server/ws/lib && cp node_modules/ws/index.js ../public/dxt-server/ws/index.js && cp node_modules/ws/lib/*.js ../public/dxt-server/ws/lib/",
+    "package:dxt": "npm run build:dxt && cp public/dxt-server/index.js dxt/server/index.js && cp mcp-server/skill/SKILL.md dxt/skill/SKILL.md && python3 -c \"import zipfile,os; z=zipfile.ZipFile('prismamri.dxt','w',zipfile.ZIP_DEFLATED); [z.write(os.path.join(r,f),os.path.relpath(os.path.join(r,f),'dxt')) for r,ds,fs in os.walk('dxt') for f in fs if not f.startswith('.')]; z.close(); print('prismamri.dxt ready')\"",
     "build": "npm run build:dxt && tsc -b && vite build",
     "preview": "vite preview",
     "lint": "biome check src",

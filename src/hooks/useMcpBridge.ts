@@ -19,12 +19,53 @@ import { useCallback, useEffect, useRef } from 'react';
 
 const RELAY_URL = import.meta.env.VITE_RELAY_URL as string | undefined;
 
+// ── Local-mode detection & discovery ─────────────────────────────────────────
+// When running as an installed PWA (standalone display mode) or from localhost,
+// connect directly to the MCP server's local WS instead of going through relay.
+// The same extension works for both modes — no reinstall needed.
+
+const LOCAL_PORTS = [7389, 7390, 7391, 7392, 7393];
+
+function isLocalMode(): boolean {
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    // iOS Safari sets navigator.standalone
+    (navigator as { standalone?: boolean }).standalone === true ||
+    ['localhost', '127.0.0.1'].includes(location.hostname)
+  );
+}
+
+/** Try to open ws://127.0.0.1:port within timeoutMs. Resolves with the open socket. */
+function tryLocalPort(port: number, timeoutMs = 500): Promise<WebSocket> {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(`ws://127.0.0.1:${port}`);
+    const timer = setTimeout(() => {
+      ws.close();
+      reject(new Error('timeout'));
+    }, timeoutMs);
+    ws.addEventListener('open', () => { clearTimeout(timer); resolve(ws); });
+    ws.addEventListener('error', () => { clearTimeout(timer); reject(new Error('error')); });
+  });
+}
+
+/**
+ * Scan LOCAL_PORTS sequentially and return the first responsive MCP server,
+ * or null if none is found.  Total time ≤ LOCAL_PORTS.length × timeoutMs.
+ */
+async function findLocalServer(): Promise<WebSocket | null> {
+  for (const port of LOCAL_PORTS) {
+    try { return await tryLocalPort(port); } catch { /* try next */ }
+  }
+  return null;
+}
+
 const SEVERITIES: AnnotationSeverity[] = ['critical', 'serious', 'moderate', 'comment'];
 
 // ── Protocol types ────────────────────────────────────────────────────────────
 
 type IncomingMessage =
   | { type: 'pong' }
+  | { type: 'ping' }                // local mode: server pings us, we pong back
   | { type: 'mcp_connecting' }
   | { type: 'mcp_disconnected' }
   | { type: 'cmd'; id: string; action: string; [key: string]: unknown };
@@ -231,8 +272,12 @@ export function useMcpBridge(sessionId: string | null) {
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const heartbeatTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const sessionIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** Timestamp of the last pong received from the relay. */
+  /** Timestamp of the last pong received from the relay (relay mode only). */
   const lastPongAt = useRef<number>(Date.now());
+  /** Prevents concurrent connect() calls while async port-scan is in flight. */
+  const connectingRef = useRef(false);
+  /** True when the current socket is a direct local connection (not relay). */
+  const localModeRef = useRef(false);
   const store = useVolumeStore;
 
   const clearSessionIdle = useCallback(() => {
@@ -710,82 +755,117 @@ export function useMcpBridge(sessionId: string | null) {
   // ── WebSocket lifecycle ──────────────────────────────────────────────────
 
   const connect = useCallback(() => {
-    if (!RELAY_URL || !sessionId || wsRef.current) return;
+    // Bail out if already connected or a connection attempt is in flight.
+    if (wsRef.current || connectingRef.current) return;
 
-    const wsBase = RELAY_URL.replace(/^http/, 'ws').replace(/\/$/, '');
-    const ws = new WebSocket(`${wsBase}/ws?session=${sessionId}&role=app`);
-    wsRef.current = ws;
+    // ── Decide mode and acquire a WebSocket ────────────────────────────────
+    // Run asynchronously so port-scanning doesn't block the call site.
+    void (async () => {
+      connectingRef.current = true;
+      let ws: WebSocket | null = null;
+      let isLocal = false;
 
-    ws.addEventListener('open', () => {
-      if (reconnectTimer.current) {
-        clearTimeout(reconnectTimer.current);
-        reconnectTimer.current = null;
+      if (isLocalMode()) {
+        // Try to reach the MCP server's local WS directly first.
+        ws = await findLocalServer();
+        if (ws) {
+          isLocal = true;
+          // Extract port from ws://127.0.0.1:PORT and persist it for the UI.
+          const port = Number(new URL(ws.url).port);
+          if (port) store.getState().setLocalPort(port);
+        }
       }
-      // Reset pong clock so we don't immediately trigger a timeout after
-      // a fresh connect (the very first pong arrives ~20 s later).
-      lastPongAt.current = Date.now();
-      // Heartbeat every 20 s — keeps the Cloudflare Durable Object awake and
-      // lets us detect a silently-dead connection: if no pong is received for
-      // 50 s (≈ 2.5 missed cycles) we close and reconnect immediately instead
-      // of waiting for a TCP timeout that may never arrive.
-      heartbeatTimer.current = setInterval(() => {
-        const ws = wsRef.current;
-        if (!ws || ws.readyState !== WebSocket.OPEN) return;
-        // While the tab is hidden the browser throttles setInterval to ~1 min,
-        // so the timer itself fires late — don't punish that as a dead connection.
-        if (document.visibilityState === 'hidden') {
+
+      // Fallback (or primary for web-app mode): Cloudflare relay.
+      if (!ws && RELAY_URL && sessionId) {
+        const wsBase = RELAY_URL.replace(/^http/, 'ws').replace(/\/$/, '');
+        ws = new WebSocket(`${wsBase}/ws?session=${sessionId}&role=app`);
+      }
+
+      connectingRef.current = false;
+
+      if (!ws) return; // nothing to connect to — wait for next trigger
+
+      wsRef.current = ws;
+      localModeRef.current = isLocal;
+
+      // In local mode the MCP server is already running; mark connected now
+      // (no mcp_connecting event will arrive over the relay).
+      if (isLocal) store.getState().setMcpConnected(true);
+
+      // ── Open handler ────────────────────────────────────────────────────
+      ws.addEventListener('open', () => {
+        if (reconnectTimer.current) {
+          clearTimeout(reconnectTimer.current);
+          reconnectTimer.current = null;
+        }
+        lastPongAt.current = Date.now();
+
+        if (!isLocal) {
+          // Relay mode: we ping Cloudflare every 20 s to keep the Durable
+          // Object alive and detect silently-dead connections (no pong for 50 s).
+          heartbeatTimer.current = setInterval(() => {
+            const sock = wsRef.current;
+            if (!sock || sock.readyState !== WebSocket.OPEN) return;
+            if (document.visibilityState === 'hidden') {
+              lastPongAt.current = Date.now(); // don't penalise throttled tabs
+              return;
+            }
+            if (Date.now() - lastPongAt.current > 50_000) {
+              sock.close(1000, 'pong-timeout');
+              return;
+            }
+            sock.send('{"type":"ping"}');
+          }, 20_000);
+        }
+        // Local mode: the MCP server pings us — we just respond (see message handler).
+      });
+
+      // ── Message handler ─────────────────────────────────────────────────
+      ws.addEventListener('message', (event: MessageEvent<string>) => {
+        let msg: IncomingMessage;
+        try { msg = JSON.parse(event.data) as IncomingMessage; } catch { return; }
+
+        if (msg.type === 'ping') {
+          // Local mode: server keepalive — send pong back.
+          wsRef.current?.send('{"type":"pong"}');
+          return;
+        }
+        if (msg.type === 'pong') {
           lastPongAt.current = Date.now();
           return;
         }
-        if (Date.now() - lastPongAt.current > 50_000) {
-          // Relay stopped responding — treat as a dead connection.
-          ws.close(1000, 'pong-timeout');
+        if (msg.type === 'mcp_connecting') {
+          store.getState().setMcpConnected(true);
           return;
         }
-        ws.send(JSON.stringify({ type: 'ping' }));
-      }, 20_000);
-    });
+        if (msg.type === 'mcp_disconnected') {
+          store.getState().setMcpConnected(false);
+          clearSessionIdle();
+          store.getState().setAgentSessionActive(false);
+          return;
+        }
+        if (msg.type === 'cmd') void handleCommand(msg);
+      });
 
-    ws.addEventListener('message', (event: MessageEvent<string>) => {
-      let msg: IncomingMessage;
-      try {
-        msg = JSON.parse(event.data) as IncomingMessage;
-      } catch {
-        return;
-      }
-      if (msg.type === 'pong') {
-        lastPongAt.current = Date.now();
-        return;
-      }
-      if (msg.type === 'mcp_connecting') {
-        store.getState().setMcpConnected(true);
-        return;
-      }
-      if (msg.type === 'mcp_disconnected') {
+      // ── Close handler ───────────────────────────────────────────────────
+      ws.addEventListener('close', () => {
+        wsRef.current = null;
+        localModeRef.current = false;
         store.getState().setMcpConnected(false);
-        clearSessionIdle();
-        store.getState().setAgentSessionActive(false);
-        return;
-      }
-      if (msg.type === 'cmd') void handleCommand(msg);
-    });
+        store.getState().setLocalPort(null);
+        if (heartbeatTimer.current) {
+          clearInterval(heartbeatTimer.current);
+          heartbeatTimer.current = null;
+        }
+        reconnectTimer.current = setTimeout(() => {
+          reconnectTimer.current = null;
+          connect();
+        }, 5_000);
+      });
 
-    ws.addEventListener('close', () => {
-      wsRef.current = null;
-      store.getState().setMcpConnected(false);
-      if (heartbeatTimer.current) {
-        clearInterval(heartbeatTimer.current);
-        heartbeatTimer.current = null;
-      }
-      reconnectTimer.current = setTimeout(() => {
-        reconnectTimer.current = null;
-        connect();
-      }, 5_000);
-    });
-
-    ws.addEventListener('error', () => {
-      /* close fires next */
-    });
+      ws.addEventListener('error', () => { /* close fires next */ });
+    })();
   }, [sessionId, handleCommand, store, clearSessionIdle]);
 
   useEffect(() => {

@@ -48,7 +48,7 @@ import {
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import WebSocket from 'ws';
+import WebSocket, { WebSocketServer } from 'ws';
 // Radiology-analysis skill, inlined at build time by esbuild's text loader
 // (--loader:.md=text). Delivered to Claude in two complementary ways:
 //   1. Via the MCP `instructions` field on `initialize` — invisible but
@@ -60,15 +60,22 @@ import SKILL_INSTRUCTIONS from '../skill/SKILL.md';
 
 // ── Config ───────────────────────────────────────────────────────────────────
 
-const SESSION = process.env.PRISMAMRI_SESSION;
+const SESSION   = process.env.PRISMAMRI_SESSION;
 const RELAY_URL = process.env.PRISMAMRI_RELAY_URL;
 
-if (!SESSION || !RELAY_URL) {
-  process.stderr.write('[prismamri] ERROR: set PRISMAMRI_SESSION and PRISMAMRI_RELAY_URL.\n');
-  process.exit(1);
+// Relay is optional — if both vars are set, the server bridges to the hosted web app.
+// When running without relay the server accepts direct local connections from the PWA.
+const WS_URL =
+  SESSION && RELAY_URL
+    ? `${RELAY_URL.replace(/^http/, 'ws').replace(/\/$/, '')}/ws?session=${SESSION}&role=mcp`
+    : null;
+
+if (!WS_URL) {
+  process.stderr.write('[prismamri] Relay not configured — running in local-only mode.\n');
 }
 
-const WS_URL = `${RELAY_URL.replace(/^http/, 'ws').replace(/\/$/, '')}/ws?session=${SESSION}&role=mcp`;
+// Ports tried in order when starting the local WS server.
+const LOCAL_PORTS = [7389, 7390, 7391, 7392, 7393];
 
 if (SKILL_INSTRUCTIONS && SKILL_INSTRUCTIONS.length > 0) {
   process.stderr.write(`[prismamri] Embedded radiology skill ready (${SKILL_INSTRUCTIONS.length} chars).\n`);
@@ -135,20 +142,46 @@ function installSkillToClaudeCode(): void {
 
 installSkillToClaudeCode();
 
-// ── Relay WebSocket ───────────────────────────────────────────────────────────
+// ── Channel management ────────────────────────────────────────────────────────
+// Two independent channels can be active simultaneously:
+//   • relay  – MCP server connects OUT to Cloudflare  (for the hosted web app)
+//   • local  – MCP server listens on 127.0.0.1:PORT   (for the installed PWA)
+//
+// send() prefers the local socket (zero relay latency); falls back to relay.
+// appConnected() = true when EITHER channel has a live app connection.
 
 type Pending = { resolve: (d: unknown) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> };
-let ws: WebSocket | null = null;
 const pending = new Map<string, Pending>();
-let appConnected = false;
+
+let relayWs: WebSocket | null = null;      // outbound conn to Cloudflare relay
+let localSocket: WebSocket | null = null;  // inbound conn from PWA (local mode)
+let relayAppOnline = false;                // relay told us the web app is open
+
+function appConnected(): boolean {
+  return (localSocket?.readyState === WebSocket.OPEN) || relayAppOnline;
+}
 
 function send(msg: object): void {
-  if (!ws || ws.readyState !== WebSocket.OPEN) throw new Error('Relay not connected');
-  ws.send(JSON.stringify(msg));
+  const json = JSON.stringify(msg);
+  // Prefer local (no relay round-trip).
+  if (localSocket?.readyState === WebSocket.OPEN) { localSocket.send(json); return; }
+  if (relayWs?.readyState   === WebSocket.OPEN)  { relayWs.send(json);     return; }
+  throw new Error('No channel available');
+}
+
+/** Resolve or reject the pending request that matches msg.id. */
+function handleResult(msg: Record<string, unknown>): void {
+  const req = pending.get(msg.id as string);
+  if (!req) return;
+  pending.delete(msg.id as string);
+  clearTimeout(req.timer);
+  msg.ok
+    ? req.resolve(msg.data ?? null)
+    : req.reject(new Error((msg.error as string) ?? 'App error'));
 }
 
 function command<T = unknown>(action: object, timeoutMs = 20_000): Promise<T> {
-  if (!appConnected) throw new Error('PrismaMRI is not connected — open the app in your browser first.');
+  if (!appConnected()) throw new Error('PrismaMRI is not connected — open the app in your browser first.');
   const id = crypto.randomUUID();
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -160,40 +193,108 @@ function command<T = unknown>(action: object, timeoutMs = 20_000): Promise<T> {
   });
 }
 
-let heartbeat: ReturnType<typeof setInterval> | null = null;
+// ── Local WebSocket server ────────────────────────────────────────────────────
+// Tries LOCAL_PORTS in order and binds to the first available one.
+// The installed PWA connects to ws://127.0.0.1:<port> directly.
+
+function startLocalServer(): void {
+  let portIndex = 0;
+
+  const tryNext = (): void => {
+    if (portIndex >= LOCAL_PORTS.length) {
+      process.stderr.write('[prismamri] All local ports busy — local-direct mode unavailable.\n');
+      return;
+    }
+    const port = LOCAL_PORTS[portIndex++];
+    const srv = new WebSocketServer({ port, host: '127.0.0.1' });
+
+    srv.once('error', (e: NodeJS.ErrnoException) => {
+      if (e.code === 'EADDRINUSE') {
+        process.stderr.write(`[prismamri] Port ${port} busy, trying ${LOCAL_PORTS[portIndex] ?? 'none'}…\n`);
+        tryNext();
+      } else {
+        process.stderr.write(`[prismamri] Local server error: ${e.message}\n`);
+      }
+    });
+
+    srv.once('listening', () => {
+      process.stderr.write(`[prismamri] Local WS ready — ws://127.0.0.1:${port}\n`);
+
+      srv.on('connection', (socket: WebSocket) => {
+        // Only one PWA at a time; replace any stale socket.
+        localSocket?.close(1001, 'superseded by new connection');
+        localSocket = socket;
+        process.stderr.write('[prismamri] PWA connected (local).\n');
+
+        // Server-side keepalive: ping the PWA every 20 s.
+        const hb = setInterval(() => {
+          if (socket.readyState === WebSocket.OPEN) socket.send('{"type":"ping"}');
+        }, 20_000);
+
+        socket.on('message', (raw: WebSocket.RawData) => {
+          let msg: Record<string, unknown>;
+          try { msg = JSON.parse(raw.toString()) as Record<string, unknown>; } catch { return; }
+          if (msg.type === 'pong') return; // keepalive ack
+          if (msg.type === 'result') handleResult(msg);
+        });
+
+        socket.on('close', () => {
+          clearInterval(hb);
+          if (localSocket === socket) {
+            localSocket = null;
+            process.stderr.write('[prismamri] PWA disconnected (local).\n');
+          }
+        });
+
+        socket.on('error', (e: Error) =>
+          process.stderr.write(`[prismamri] Local socket error: ${e.message}\n`),
+        );
+      });
+    });
+  };
+
+  tryNext();
+}
+
+// ── Relay WebSocket ───────────────────────────────────────────────────────────
+
+let relayHeartbeat: ReturnType<typeof setInterval> | null = null;
 
 function connectRelay(): void {
-  ws = new WebSocket(WS_URL);
-  ws.on('open', () => {
+  if (!WS_URL) return;
+  relayWs = new WebSocket(WS_URL);
+
+  relayWs.on('open', () => {
     process.stderr.write('[prismamri] Relay connected.\n');
-    // Ping every 20 s — prevents Cloudflare Durable Object hibernation which
-    // would null out its stored WebSocket references and silently drop messages.
-    heartbeat = setInterval(() => {
-      if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'ping' }));
+    // Ping every 20 s — prevents Cloudflare Durable Object hibernation.
+    relayHeartbeat = setInterval(() => {
+      if (relayWs?.readyState === WebSocket.OPEN) relayWs.send('{"type":"ping"}');
     }, 20_000);
   });
-  ws.on('message', (raw: WebSocket.RawData) => {
+
+  relayWs.on('message', (raw: WebSocket.RawData) => {
     let msg: Record<string, unknown>;
     try { msg = JSON.parse(raw.toString()) as Record<string, unknown>; } catch { return; }
     const type = msg.type as string;
-    if (type === 'app_connected')    { appConnected = true;  process.stderr.write('[prismamri] App online.\n');  return; }
-    if (type === 'app_disconnected') { appConnected = false; process.stderr.write('[prismamri] App offline.\n'); return; }
-    if (type === 'result') {
-      const req = pending.get(msg.id as string);
-      if (!req) return;
-      pending.delete(msg.id as string);
-      clearTimeout(req.timer);
-      msg.ok ? req.resolve(msg.data ?? null) : req.reject(new Error((msg.error as string) ?? 'App error'));
-    }
+    if (type === 'app_connected')    { relayAppOnline = true;  process.stderr.write('[prismamri] Web app online (relay).\n');  return; }
+    if (type === 'app_disconnected') { relayAppOnline = false; process.stderr.write('[prismamri] Web app offline (relay).\n'); return; }
+    if (type === 'result') handleResult(msg);
   });
-  ws.on('close', () => {
-    appConnected = false;
-    if (heartbeat) { clearInterval(heartbeat); heartbeat = null; }
+
+  relayWs.on('close', () => {
+    relayAppOnline = false;
+    relayWs = null;
+    if (relayHeartbeat) { clearInterval(relayHeartbeat); relayHeartbeat = null; }
     process.stderr.write('[prismamri] Relay disconnected — reconnecting in 5 s…\n');
-    for (const [id, req] of pending) { clearTimeout(req.timer); req.reject(new Error('WS closed')); pending.delete(id); }
+    for (const [id, req] of pending) {
+      clearTimeout(req.timer);
+      req.reject(new Error('Relay closed'));
+      pending.delete(id);
+    }
     setTimeout(connectRelay, 5_000);
   });
-  ws.on('error', (e: Error) => process.stderr.write(`[prismamri] WS error: ${e.message}\n`));
+
+  relayWs.on('error', (e: Error) => process.stderr.write(`[prismamri] Relay error: ${e.message}\n`));
 }
 
 // ── Tool definitions ──────────────────────────────────────────────────────────
@@ -757,7 +858,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 });
 
-connectRelay();
+// Start local server unconditionally; connect to relay only when configured.
+startLocalServer();
+if (WS_URL) connectRelay();
 (async () => {
   const transport = new StdioServerTransport();
   await server.connect(transport);

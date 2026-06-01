@@ -48,6 +48,8 @@ interface VolumeState {
   activeAnnotationId: string | null;
   /** True while the MCP server is connected via the relay. */
   mcpConnected: boolean;
+  /** Port used for the active local direct connection, or null when using relay. */
+  localPort: number | null;
   /** Set while the agent is executing a command — drives the activity indicator. */
   agentActivity: { active: boolean; action: string | null };
   /** True for the entire duration of an agent prompt session (first cmd → inactivity/disconnect). */
@@ -84,6 +86,7 @@ interface VolumeActions {
   /** Jump the cursor/active plane to a finding and mark it active. */
   focusAnnotation: (id: string) => void;
   setMcpConnected: (v: boolean) => void;
+  setLocalPort: (port: number | null) => void;
   setAgentActivity: (active: boolean, action?: string | null) => void;
   setAgentSessionActive: (v: boolean) => void;
   setCanvasRef: (plane: SlicePlane, canvas: HTMLCanvasElement | null) => void;
@@ -130,6 +133,7 @@ const initialState: VolumeState = {
   aiAnnotations: annotationsStorage.load(),
   activeAnnotationId: null,
   mcpConnected: false,
+  localPort: null,
   agentActivity: { active: false, action: null },
   agentSessionActive: false,
   canvasRefs: { coronal: null, sagittal: null, axial: null },
@@ -298,6 +302,7 @@ export const useVolumeStore = create<VolumeState & VolumeActions>((set) => ({
     }),
 
   setMcpConnected: (mcpConnected) => set({ mcpConnected }),
+  setLocalPort: (localPort) => set({ localPort }),
 
   setAgentActivity: (active, action = null) =>
     set({ agentActivity: { active, action: active ? (action ?? null) : null } }),
