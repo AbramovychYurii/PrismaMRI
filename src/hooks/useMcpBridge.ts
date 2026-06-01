@@ -43,8 +43,14 @@ function tryLocalPort(port: number, timeoutMs = 500): Promise<WebSocket> {
       ws.close();
       reject(new Error('timeout'));
     }, timeoutMs);
-    ws.addEventListener('open', () => { clearTimeout(timer); resolve(ws); });
-    ws.addEventListener('error', () => { clearTimeout(timer); reject(new Error('error')); });
+    ws.addEventListener('open', () => {
+      clearTimeout(timer);
+      resolve(ws);
+    });
+    ws.addEventListener('error', () => {
+      clearTimeout(timer);
+      reject(new Error('error'));
+    });
   });
 }
 
@@ -54,7 +60,11 @@ function tryLocalPort(port: number, timeoutMs = 500): Promise<WebSocket> {
  */
 async function findLocalServer(): Promise<WebSocket | null> {
   for (const port of LOCAL_PORTS) {
-    try { return await tryLocalPort(port); } catch { /* try next */ }
+    try {
+      return await tryLocalPort(port);
+    } catch {
+      /* try next */
+    }
   }
   return null;
 }
@@ -65,7 +75,7 @@ const SEVERITIES: AnnotationSeverity[] = ['critical', 'serious', 'moderate', 'co
 
 type IncomingMessage =
   | { type: 'pong' }
-  | { type: 'ping' }                // local mode: server pings us, we pong back
+  | { type: 'ping' } // local mode: server pings us, we pong back
   | { type: 'mcp_connecting' }
   | { type: 'mcp_disconnected' }
   | { type: 'cmd'; id: string; action: string; [key: string]: unknown };
@@ -824,7 +834,11 @@ export function useMcpBridge(sessionId: string | null) {
       // ── Message handler ─────────────────────────────────────────────────
       ws.addEventListener('message', (event: MessageEvent<string>) => {
         let msg: IncomingMessage;
-        try { msg = JSON.parse(event.data) as IncomingMessage; } catch { return; }
+        try {
+          msg = JSON.parse(event.data) as IncomingMessage;
+        } catch {
+          return;
+        }
 
         if (msg.type === 'ping') {
           // Local mode: server keepalive — send pong back.
@@ -864,7 +878,9 @@ export function useMcpBridge(sessionId: string | null) {
         }, 5_000);
       });
 
-      ws.addEventListener('error', () => { /* close fires next */ });
+      ws.addEventListener('error', () => {
+        /* close fires next */
+      });
     })();
   }, [sessionId, handleCommand, store, clearSessionIdle]);
 

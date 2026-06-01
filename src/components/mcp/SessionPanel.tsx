@@ -23,7 +23,6 @@ import {
   ClipboardCheck,
   Download,
   Info,
-  Link2,
   Unplug,
   X,
   Zap,
@@ -41,12 +40,16 @@ const WS_LIB_URL = `${import.meta.env.BASE_URL}dxt-server/ws/`;
 /** Ports the MCP server tries in order. Must match mcp-server/src/index.ts. */
 const LOCAL_PORTS = [7389, 7390, 7391, 7392, 7393];
 
-/** True when running as an installed PWA or from localhost. */
+/**
+ * True only when the app is running as an *installed* PWA (standalone window).
+ * Regular browser tabs — including localhost dev — show the Remote panel.
+ * The connection layer (useMcpBridge) still tries local WS on localhost
+ * independently of which panel is displayed.
+ */
 function isLocalMode(): boolean {
   return (
     window.matchMedia('(display-mode: standalone)').matches ||
-    (navigator as { standalone?: boolean }).standalone === true ||
-    ['localhost', '127.0.0.1'].includes(location.hostname)
+    (navigator as { standalone?: boolean }).standalone === true
   );
 }
 
@@ -58,9 +61,18 @@ async function downloadDxt(sessionId: string, relayUrl: string): Promise<void> {
     fetch(`${WS_LIB_URL}index.js`).then((r) => r.text()),
     Promise.all(
       [
-        'constants.js', 'event-target.js', 'buffer-util.js', 'extension.js',
-        'limiter.js', 'permessage-deflate.js', 'receiver.js', 'sender.js',
-        'stream.js', 'subprotocol.js', 'validation.js', 'websocket.js',
+        'constants.js',
+        'event-target.js',
+        'buffer-util.js',
+        'extension.js',
+        'limiter.js',
+        'permessage-deflate.js',
+        'receiver.js',
+        'sender.js',
+        'stream.js',
+        'subprotocol.js',
+        'validation.js',
+        'websocket.js',
         'websocket-server.js',
       ].map((f) =>
         fetch(`${WS_LIB_URL}lib/${f}`)
@@ -75,7 +87,8 @@ async function downloadDxt(sessionId: string, relayUrl: string): Promise<void> {
     name: 'prismamri',
     display_name: 'PrismaMRI AI Agent',
     version: '2.1.0',
-    description: 'Navigate MRI slices, analyze findings, place annotations and capture images — all controlled by Claude.',
+    description:
+      'Navigate MRI slices, analyze findings, place annotations and capture images — all controlled by Claude.',
     author: { name: 'PrismaMRI' },
     license: 'MIT',
     server: {
@@ -91,11 +104,26 @@ async function downloadDxt(sessionId: string, relayUrl: string): Promise<void> {
       },
     },
     tools: [
-      'get_viewer_state', 'get_volume_overview', 'navigate_to_slice', 'step_slice',
-      'navigate_to_center', 'set_window_level', 'apply_wl_preset', 'set_render_preset',
-      'set_slab_mm', 'capture_slice', 'capture_all_planes', 'capture_overview_grid',
-      'capture_3d', 'add_annotation', 'remove_annotation', 'list_annotations',
-      'clear_annotations', 'set_measurement', 'get_measurement', 'clear_measurement',
+      'get_viewer_state',
+      'get_volume_overview',
+      'navigate_to_slice',
+      'step_slice',
+      'navigate_to_center',
+      'set_window_level',
+      'apply_wl_preset',
+      'set_render_preset',
+      'set_slab_mm',
+      'capture_slice',
+      'capture_all_planes',
+      'capture_overview_grid',
+      'capture_3d',
+      'add_annotation',
+      'remove_annotation',
+      'list_annotations',
+      'clear_annotations',
+      'set_measurement',
+      'get_measurement',
+      'clear_measurement',
     ].map((name) => ({ name })),
     compatibility: { claude_desktop: '>=0.10.0', platforms: ['darwin', 'win32', 'linux'] },
   };
@@ -296,6 +324,19 @@ const Hint = styled.p`
   margin: 0;
 `;
 
+const OpenClaudeLink = styled.a`
+  color: var(--ink-2);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: rgba(255,255,255,0.2);
+  cursor: pointer;
+  transition: color 120ms, text-decoration-color 120ms;
+  &:hover {
+    color: var(--ink);
+    text-decoration-color: rgba(255,255,255,0.5);
+  }
+`;
+
 const Divider = styled.div`
   height: 1px;
   background: var(--rule);
@@ -366,13 +407,22 @@ function InfoTip({ text }: { text: string }) {
 
   return (
     <>
-      <InfoBtn ref={ref} type="button" aria-label="More info" onMouseEnter={show} onMouseLeave={() => setPos(null)}>
+      <InfoBtn
+        ref={ref}
+        type="button"
+        aria-label="More info"
+        onMouseEnter={show}
+        onMouseLeave={() => setPos(null)}
+      >
         <Info size={10} />
       </InfoBtn>
-      {pos && createPortal(
-        <InfoBubble $x={pos.x} $y={pos.y}>{text}</InfoBubble>,
-        document.body,
-      )}
+      {pos &&
+        createPortal(
+          <InfoBubble $x={pos.x} $y={pos.y}>
+            {text}
+          </InfoBubble>,
+          document.body,
+        )}
     </>
   );
 }
@@ -602,13 +652,24 @@ function PromptSection() {
     <>
       <Divider />
       <PromptBox>
-        <PromptLabel type="button" aria-expanded={promptOpen} onClick={() => setPromptOpen((o) => !o)}>
+        <PromptLabel
+          type="button"
+          aria-expanded={promptOpen}
+          onClick={() => setPromptOpen((o) => !o)}
+        >
           <PromptLabelText>Prompt example</PromptLabelText>
-          <PromptChevron $open={promptOpen}><ChevronDown size={12} /></PromptChevron>
+          <PromptChevron $open={promptOpen}>
+            <ChevronDown size={12} />
+          </PromptChevron>
         </PromptLabel>
         {promptOpen && <PromptPreview aria-hidden="true">{EXAMPLE_PROMPT}</PromptPreview>}
       </PromptBox>
-      <CopyBtn type="button" $state={copyState} onClick={handleCopy} aria-label="Copy prompt example to clipboard">
+      <CopyBtn
+        type="button"
+        $state={copyState}
+        onClick={handleCopy}
+        aria-label="Copy prompt example to clipboard"
+      >
         {copyState === 'ok' ? <ClipboardCheck size={13} /> : <Clipboard size={13} />}
         {copyState === 'ok'
           ? 'Copied! Paste into Claude'
@@ -671,53 +732,52 @@ function RemoteModePanel({
       {pill}
       <Panel $dockOpen={dockOpen} role="complementary" aria-label="AI agent session panel">
         <PanelHeader $connected={mcpConnected} onClick={onToggle}>
-          <HeaderIcon><Bot size={14} /></HeaderIcon>
+          <HeaderIcon>
+            <Bot size={14} />
+          </HeaderIcon>
           <StatusDot $connected={mcpConnected} />
           <StatusText $connected={mcpConnected}>
             {mcpConnected ? 'AI Agent Connected' : 'Waiting for Agent'}
           </StatusText>
           <Badge>Beta</Badge>
-          <CollapseBtn type="button" aria-label="Collapse panel"><X size={14} /></CollapseBtn>
+          <CollapseBtn type="button" aria-label="Collapse panel">
+            <X size={14} />
+          </CollapseBtn>
         </PanelHeader>
 
         <PanelBody>
-          {/* Session ID */}
-          <Row>
-            <Label style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              Session ID
-              <InfoTip text="Tied to the downloaded .dxt extension — Claude uses this ID to find your viewer. If you regenerate the session, download a new .dxt and reinstall it in Claude Desktop." />
-            </Label>
-            <Value>{sessionId}</Value>
-          </Row>
-
           {/* .dxt download — hidden once connected */}
           {!mcpConnected && (
             <>
               <ActionBtn type="button" $primary $state={dxtState} onClick={handleDownloadDxt}>
-                {dxtState === 'ok' ? <Check size={13} /> : dxtState === 'err' ? <X size={13} /> : <Download size={13} />}
+                {dxtState === 'ok' ? (
+                  <Check size={13} />
+                ) : dxtState === 'err' ? (
+                  <X size={13} />
+                ) : (
+                  <Download size={13} />
+                )}
                 {dxtState === 'ok'
-                  ? 'Downloaded! Drag into Claude Desktop'
+                  ? 'Downloaded!'
                   : dxtState === 'err'
                     ? 'Download failed'
-                    : 'Download for Claude Desktop (.dxt)'}
+                    : 'Download extension (.dxt)'}
               </ActionBtn>
               <Hint>
-                Drag the downloaded file into Claude Desktop → Extensions, or click{' '}
-                <strong style={{ color: 'var(--ink-2)' }}>Install Extension</strong>. Your Session
-                ID is already embedded — no extra config needed.
+                Then open{' '}
+                <OpenClaudeLink
+                  href="claude://"
+                  target="_blank"
+                  rel="noopener"
+                  title="Open Claude Desktop"
+                >
+                  Claude Desktop
+                </OpenClaudeLink>
+                {' '}→ Settings → <strong style={{ color: 'var(--ink-2)' }}>Extensions</strong> → Install Extension.
+                {' '}Claude connects to this viewer automatically.
               </Hint>
             </>
           )}
-
-          {/* Relay URL */}
-          <Row style={{ gap: 6, marginTop: 2 }}>
-            <Label style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <Link2 size={10} />
-              Relay
-              <InfoTip text="Lightweight WebSocket bridge that links Claude Desktop to this browser tab — no data is stored or logged. Commands travel directly between Claude and the viewer; the relay only forwards them." />
-            </Label>
-            <Value style={{ fontSize: 9.5, opacity: 0.55 }}>{RELAY_URL}</Value>
-          </Row>
 
           {/* Prompt + disconnect — only when connected */}
           {mcpConnected && (
@@ -728,9 +788,9 @@ function RemoteModePanel({
                 $danger
                 onClick={() => {
                   const ok = window.confirm(
-                    'Disconnect the current agent?\n\nThis ends the live session with Claude Desktop and ' +
-                    "invalidates the .dxt extension you already installed. To reconnect, you'll need to " +
-                    'download a fresh .dxt and reinstall it in Claude Desktop → Extensions.',
+                    'Disconnect the current agent?\n\nThis ends the live session and ' +
+                      'invalidates the installed extension. To reconnect, download a fresh .dxt ' +
+                      'and reinstall it.',
                   );
                   if (!ok) return;
                   localStorage.setItem('prismamri-session-id', crypto.randomUUID());
@@ -785,12 +845,16 @@ function LocalModePanel({
       {pill}
       <Panel $dockOpen={dockOpen} role="complementary" aria-label="AI agent local session panel">
         <PanelHeader $connected={mcpConnected} onClick={onToggle}>
-          <HeaderIcon><Bot size={14} /></HeaderIcon>
+          <HeaderIcon>
+            <Bot size={14} />
+          </HeaderIcon>
           <StatusDot $connected={mcpConnected} />
           <StatusText $connected={mcpConnected}>
             {mcpConnected ? 'AI Agent Connected' : 'Waiting for Agent'}
           </StatusText>
-          <CollapseBtn type="button" aria-label="Collapse panel"><X size={14} /></CollapseBtn>
+          <CollapseBtn type="button" aria-label="Collapse panel">
+            <X size={14} />
+          </CollapseBtn>
         </PanelHeader>
 
         <PanelBody>
@@ -815,8 +879,11 @@ function LocalModePanel({
               <Row>
                 <Label>How to connect</Label>
                 <StepList>
-                  <li>Install <strong style={{ color: 'var(--ink-2)' }}>prismamri.dxt</strong> in Claude Code / Desktop</li>
-                  <li>Leave Session ID and Relay URL empty</li>
+                  <li>
+                    Install <strong style={{ color: 'var(--ink-2)' }}>prismamri.dxt</strong> in
+                    Claude Code / Desktop
+                  </li>
+                  <li>Session ID and Relay URL are already built in — no config needed</li>
                   <li>Ask Claude about your scan — it will connect automatically</li>
                 </StepList>
               </Row>
@@ -853,7 +920,5 @@ export function SessionPanel() {
     dockOpen,
   };
 
-  return local
-    ? <LocalModePanel {...sharedProps} />
-    : <RemoteModePanel {...sharedProps} />;
+  return local ? <LocalModePanel {...sharedProps} /> : <RemoteModePanel {...sharedProps} />;
 }
