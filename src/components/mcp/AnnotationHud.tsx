@@ -35,8 +35,8 @@ function orderAll(list: AiAnnotation[]): AiAnnotation[] {
 
 // ── Layout constants ────────────────────────────────────────────────────────
 const SIDE_OFFSET = 30;
-const TOP_OFFSET  = 22;
-const MOBILE_TOP  = 12;
+const TOP_OFFSET = 22;
+const MOBILE_TOP = 12;
 const MOBILE_SIDE = 12;
 
 // ── Animations ──────────────────────────────────────────────────────────────
@@ -215,7 +215,6 @@ const Summary = styled.p`
   color: var(--ink-2);
 `;
 
-
 // ── Tag row (coords + size) ──────────────────────────────────────────────────
 
 const TagRow = styled.div`
@@ -350,10 +349,10 @@ function SparkleIcon() {
       <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
         <defs>
           <linearGradient id="hud-sparkle-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%"   stopColor="#ff8a3c" />
-            <stop offset="25%"  stopColor="#ffd24a" />
-            <stop offset="50%"  stopColor="#7ee0c0" />
-            <stop offset="75%"  stopColor="#7aa7ff" />
+            <stop offset="0%" stopColor="#ff8a3c" />
+            <stop offset="25%" stopColor="#ffd24a" />
+            <stop offset="50%" stopColor="#7ee0c0" />
+            <stop offset="75%" stopColor="#7aa7ff" />
             <stop offset="100%" stopColor="#c79bff" />
           </linearGradient>
         </defs>
@@ -372,9 +371,9 @@ function SparkleIcon() {
 // ── Component ────────────────────────────────────────────────────────────────
 
 export function AnnotationHud() {
-  const annotations    = useVolumeStore((s) => s.aiAnnotations);
-  const activeId       = useVolumeStore((s) => s.activeAnnotationId);
-  const focusAnnotation    = useVolumeStore((s) => s.focusAnnotation);
+  const annotations = useVolumeStore((s) => s.aiAnnotations);
+  const activeId = useVolumeStore((s) => s.activeAnnotationId);
+  const focusAnnotation = useVolumeStore((s) => s.focusAnnotation);
   const setActiveAnnotation = useVolumeStore((s) => s.setActiveAnnotation);
 
   const [open, setOpen] = useState(false);
@@ -401,7 +400,7 @@ export function AnnotationHud() {
   if (annotations.length === 0) return null;
 
   const ordered = orderAll(annotations);
-  const active  = activeId ? annotations.find((a) => a.id === activeId) : null;
+  const active = activeId ? annotations.find((a) => a.id === activeId) : null;
 
   // ── Collapsed pill ────────────────────────────────────────────────────
   if (!open) {
@@ -426,16 +425,15 @@ export function AnnotationHud() {
   // ── Expanded card ─────────────────────────────────────────────────────
   const shown = active ?? ordered[0];
   const color = SEVERITY_HEX[shown.severity];
-  const idx   = ordered.findIndex((a) => a.id === shown.id);
+  const idx = ordered.findIndex((a) => a.id === shown.id);
 
   const step = (delta: number) => {
     const next = (idx + delta + ordered.length) % ordered.length;
     focusAnnotation(ordered[next].id);
   };
 
-  const confidencePct = shown.confidence != null
-    ? Math.min(100, Math.max(0, shown.confidence))
-    : null;
+  const confidencePct =
+    shown.confidence != null ? Math.min(100, Math.max(0, shown.confidence)) : null;
 
   return (
     <Card aria-label="Finding summary" aria-live="polite">
@@ -482,11 +480,23 @@ export function AnnotationHud() {
 
         {/* Coordinate tags + optional size */}
         <TagRow>
-          <Tag><TagKey>X</TagKey>{shown.voxel.x}</Tag>
-          <Tag><TagKey>Y</TagKey>{shown.voxel.y}</Tag>
-          <Tag><TagKey>Z</TagKey>{shown.voxel.z}</Tag>
+          <Tag>
+            <TagKey>X</TagKey>
+            {shown.voxel.x}
+          </Tag>
+          <Tag>
+            <TagKey>Y</TagKey>
+            {shown.voxel.y}
+          </Tag>
+          <Tag>
+            <TagKey>Z</TagKey>
+            {shown.voxel.z}
+          </Tag>
           {shown.sizeMm != null && (
-            <Tag><TagKey>ø</TagKey>{shown.sizeMm} mm</Tag>
+            <Tag>
+              <TagKey>ø</TagKey>
+              {shown.sizeMm} mm
+            </Tag>
           )}
         </TagRow>
 
@@ -498,7 +508,9 @@ export function AnnotationHud() {
               <NavBtn type="button" aria-label="Previous finding" onClick={() => step(-1)}>
                 <ChevronLeft size={15} />
               </NavBtn>
-              <NavIndex>{idx + 1} / {ordered.length}</NavIndex>
+              <NavIndex>
+                {idx + 1} / {ordered.length}
+              </NavIndex>
               <NavBtn type="button" aria-label="Next finding" onClick={() => step(1)}>
                 <ChevronRight size={15} />
               </NavBtn>

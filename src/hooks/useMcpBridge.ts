@@ -730,7 +730,10 @@ export function useMcpBridge(sessionId: string | null) {
               label: msg.label as string,
               summary: msg.summary as string | undefined,
               severity,
-              confidence: rawConfidence != null ? Math.min(100, Math.max(0, Math.round(rawConfidence))) : undefined,
+              confidence:
+                rawConfidence != null
+                  ? Math.min(100, Math.max(0, Math.round(rawConfidence)))
+                  : undefined,
               sizeMm: msg.size_mm != null ? Number(msg.size_mm) : undefined,
             };
             store.getState().addAiAnnotation(annotation);
@@ -915,7 +918,9 @@ export function useMcpBridge(sessionId: string | null) {
           // Relay not open yet — reschedule instead of bailing permanently
           if (currentWs.readyState !== WebSocket.OPEN) {
             console.debug('[mcp-bridge] upgrade: relay not open yet, retrying in 2s');
-            localUpgradeRef.current = setTimeout(() => { void tryUpgrade(); }, 2_000);
+            localUpgradeRef.current = setTimeout(() => {
+              void tryUpgrade();
+            }, 2_000);
             return;
           }
 
@@ -1004,7 +1009,9 @@ export function useMcpBridge(sessionId: string | null) {
 
       // ── Close handler ───────────────────────────────────────────────────
       ws.addEventListener('close', (evt) => {
-        console.debug('[mcp-bridge] ws closed', evt.code, evt.reason || '(none)', { wasClean: evt.wasClean });
+        console.debug('[mcp-bridge] ws closed', evt.code, evt.reason || '(none)', {
+          wasClean: evt.wasClean,
+        });
 
         // Always stop the heartbeat for this specific socket.
         if (heartbeatTimer.current) {
@@ -1036,7 +1043,12 @@ export function useMcpBridge(sessionId: string | null) {
             ? 2_000 + Math.floor(Math.random() * 3_000) // 2–5 s random
             : 1_000
           : 5_000;
-        console.debug('[mcp-bridge] scheduling reconnect in', delay, 'ms', competing ? '(backoff — competing client)' : '');
+        console.debug(
+          '[mcp-bridge] scheduling reconnect in',
+          delay,
+          'ms',
+          competing ? '(backoff — competing client)' : '',
+        );
         reconnectTimer.current = setTimeout(() => {
           reconnectTimer.current = null;
           connect();
@@ -1048,10 +1060,10 @@ export function useMcpBridge(sessionId: string | null) {
         /* close fires next */
       });
     })();
-  // sessionId and handleCommand are accessed via refs — removing them from deps
-  // prevents connect() from changing identity (and triggering an effect re-run
-  // that would tear down the live socket) every time sessionId resolves on mount.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // sessionId and handleCommand are accessed via refs — removing them from deps
+    // prevents connect() from changing identity (and triggering an effect re-run
+    // that would tear down the live socket) every time sessionId resolves on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store, clearSessionIdle]);
 
   useEffect(() => {

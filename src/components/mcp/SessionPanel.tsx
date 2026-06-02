@@ -474,59 +474,80 @@ const EXAMPLE_PROMPT = `Using the PrismaMRI tools, perform a systematic review o
 
 ## Step 1 · Verify the volume
 Call \`get_viewer_state\`. If \`volumeLoaded\` is false, stop and ask the user to open a file first.
-Note the modality (CT or MRI), dims, and spacing — they guide every decision below.
+Record: modality (CT or MRI), dims [W×H×D], voxel spacing in mm — every size estimate depends on spacing.
 
-## Step 2 · Get an overview
-Call \`get_volume_overview\` to receive metadata and centre-slice PNGs of all three planes.
-Based on the modality, apply a contrast preset before step 3:
-- CT → \`apply_wl_preset\` "bone" (skeletal) or "soft_tissue" (organs/vessels)
-- MRI → \`apply_wl_preset\` "t1", "t2", or "flair" matching the sequence protocol
+## Step 2 · Overview + windowing
+Call \`get_volume_overview\` → metadata and centre-slice PNGs of all three planes.
+Set the optimal window/level for the modality:
+- CT skeletal → \`apply_wl_preset "bone"\`
+- CT soft tissue / abdomen → \`apply_wl_preset "soft_tissue"\`
+- MRI → \`apply_wl_preset\` matching the sequence ("t1" / "t2" / "flair")
 
-## Step 3 · Survey all three planes
+## Step 3 · Slab MIP survey (preferred capture method)
+**Always prefer Slab MIP captures** — they composite adjacent slices and reveal lesions, fractures and vessels that single slices miss.
+
 For each plane (coronal → sagittal → axial):
-1. Call \`capture_overview_grid\` with \`count=6\` — six evenly-spaced thumbnails give you the full anatomy at a glance before zooming in.
-2. Identify 2–3 slices that deserve closer inspection.
-3. Call \`navigate_to_slice\`, then \`capture_slice\` (with \`slab_mm=5\` for a MIP slab on CT) to get a high-detail PNG of each region of interest.
-4. For every genuine abnormality you see in the captured image, place a marker immediately (see "Marking a finding" below) — don't wait until the end.
+1. Call \`set_slab_mm\` with **3 mm** (CT detail) or **5 mm** (CT overview / MRI) before capturing.
+2. Call \`capture_overview_grid\` with \`count=6\` — six evenly-spaced slab thumbnails to survey the full anatomy.
+3. Identify the 2–3 slices with the most significant findings.
+4. Call \`navigate_to_slice\`, then \`capture_slice\` with \`slab_mm=5\` for each region of interest.
+5. For any suspected finding, call \`capture_all_planes\` at that slice — seeing coronal + sagittal + axial simultaneously greatly improves localisation accuracy and reduces false positives.
+6. Place a marker for every confirmed abnormality (see "Marking a finding" below) — do not wait until the end.
 
 ### Marking a finding
-Look at the PNG you just captured and estimate where the abnormality sits:
-- \`fx\` = horizontal position ÷ image width  (0 = left edge, 1 = right edge)
-- \`fy\` = vertical position ÷ image height  (0 = top edge, 1 = bottom edge)
+After \`capture_all_planes\`, choose the plane where the finding is most clearly centred.
+Measure \`fx\` / \`fy\` from that image:
+- \`fx\` = centre of the finding ÷ image width   (0 = left edge, 1 = right edge)
+- \`fy\` = centre of the finding ÷ image height  (0 = top edge, 1 = bottom edge)
+
+Aim for the geometric centre of the lesion, not its edge — the system snaps to the nearest anatomy automatically.
 
 Then call \`add_annotation\` with:
-- \`plane\` — the plane you were viewing when you captured the image
-- \`fx\`, \`fy\` — position fractions as above
-- \`severity\` — one of:
+- \`plane\` — the plane where you measured fx/fy
+- \`fx\`, \`fy\` — centre fractions as above
+- \`severity\`:
   - 🔴 \`critical\` — urgent, requires immediate attention
   - 🟠 \`serious\` — significant, needs timely follow-up
   - 🟡 \`moderate\` — mild, monitor at next visit
   - 🟢 \`comment\` — incidental / informational note, no danger
-- \`label\` — concise anatomical name of the finding (≤ 5 words)
-- \`summary\` — 1–3 sentences: what you see, size if measurable, clinical relevance
-- \`confidence\` — integer 0–100 reflecting how certain you are (never use 100; typical range 40–95)
-- \`size_mm\` — largest visible diameter in mm (only if a clear boundary is measurable; omit for diffuse findings)
+- \`label\` — concise anatomical name (≤ 5 words)
+- \`summary\` — 2–4 sentences covering:
+  1. What you see (morphology, density/signal, margins)
+  2. Size (only if a clear boundary is visible — derive from voxel spacing × pixel count)
+  3. Differential diagnosis: list 2–3 most likely entities in order of probability
+  4. Clinical relevance / urgency
+- \`confidence\` — integer 0–100; never 100; reflect genuine uncertainty (typical range 45–92)
+- \`size_mm\` — largest in-plane diameter in mm (omit for diffuse or ill-defined findings)
 
-Only annotate genuine abnormalities or clinically notable incidental findings. Do not mark normal anatomy.
+Only annotate genuine abnormalities. Do not mark normal anatomy.
 
-## Step 4 · 3-D capture
-Call \`set_render_preset\`:
-- "bone" — CT skeletal studies (recommended for most CT)
-- "tissue" — soft-tissue or MRI volumes
-- "mip" — angiography / airways
+### Differential diagnosis guidance
+For each finding, explicitly state the top 2–3 differentials ranked by likelihood, e.g.:
+> "Most likely odontogenic keratocyst; differential includes dentigerous cyst or unicystic ameloblastoma."
 
-Then call \`capture_3d\`. The returned PNG shows all colour-coded markers on the model.
+Base the ranking on: lesion morphology, margins, density/signal, location, patient age context (if known), and associated structures.
+
+## Step 4 · 3-D spatial verification
+After placing all markers, call \`set_render_preset\`:
+- "bone" — CT skeletal / dental studies
+- "tissue" — soft-tissue or MRI
+- "mip" — angiography / airway
+
+Call \`capture_3d\` — verify that every marker appears at the correct anatomical location on the 3-D model. If a marker looks misplaced, remove it and re-annotate using \`capture_all_planes\` for better localisation.
 
 ## Step 5 · Report
-Present the final report in this format:
+Present the final structured report:
 
-**Technique** — modality, dims, spacing, preset used.
+**Technique** — modality, dims, voxel spacing, W/L preset, slab thickness used.
 
-**Findings** — list each finding by anatomical region, most severe first; include voxel location, size, and severity level.
+**Findings** — one paragraph per anatomical region, most severe first.
+Each finding must include: location (anatomical name + voxel coords), size if measurable, morphology, and top differential.
 
-**Impression** — 2–4 sentence summary of the most important conclusions.
+**Impression** — 3–5 sentences summarising the most clinically significant conclusions with confidence levels.
 
-**Recommendations** — suggested next steps: follow-up imaging, specialist referral, urgency.`;
+**Differentials** — for each serious/critical finding, list the ranked differential diagnoses with brief reasoning.
+
+**Recommendations** — suggested next steps: additional imaging sequences, specialist referral, urgency tier.`;
 
 const PromptBox = styled.div`
   position: relative;

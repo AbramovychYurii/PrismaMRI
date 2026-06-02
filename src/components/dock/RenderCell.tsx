@@ -2,6 +2,7 @@ import { Tooltip } from '@/components/ui/Tooltip';
 import { useHover } from '@/hooks/useHover';
 import { useVolumeStore } from '@/store';
 import type { RenderPreset } from '@/types';
+import { Info } from 'lucide-react';
 import styled from 'styled-components';
 
 // ── Slab MIP options shared across all panels (side + fullscreen). ─────────
@@ -36,7 +37,7 @@ const PresetBtn = styled.button<{ $active: boolean; $hover: boolean }>`
   border-radius: 4px;
   border: 1px solid
     ${({ $active, $hover }) =>
-      $active ? 'var(--amber)' : $hover ? 'var(--ink-4)' : 'var(--rule-2)'};
+    $active ? 'var(--amber)' : $hover ? 'var(--ink-4)' : 'var(--rule-2)'};
   background: ${({ $active, $hover }) =>
     $active ? 'rgba(196,153,70,0.12)' : $hover ? 'rgba(255,255,255,0.04)' : 'transparent'};
   cursor: pointer;
@@ -109,8 +110,8 @@ const SlabBtn = styled.button<{ $active: boolean }>`
 
   &:hover {
     ${({ $active }) =>
-      !$active &&
-      `
+    !$active &&
+    `
       background: rgba(255,255,255,0.04);
       border-color: var(--ink-4);
     `}
@@ -182,6 +183,12 @@ export function RenderCell() {
       <SlabSection>
         <SlabHead>
           <SlabHeadTitle>Slab MIP</SlabHeadTitle>
+          <Tooltip
+            label="Maximum Intensity Projection — composites several adjacent slices into one image. Reveals vessels, fractures and lesions that span multiple slices. 3–5 mm is ideal for most CT studies."
+            above
+          >
+            <Info size={13} style={{ color: 'var(--ink-3)', cursor: 'default', flexShrink: 0 }} />
+          </Tooltip>
           <SlabHeadLine />
         </SlabHead>
         <SlabRow>

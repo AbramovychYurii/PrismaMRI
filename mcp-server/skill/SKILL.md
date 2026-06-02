@@ -44,12 +44,14 @@ Do **not** proceed to Phase 2 until modality + (for MRI) sequence + indication a
 
 Use this ordered recipe. Skip a step only when the previous step makes it irrelevant.
 
-1. `capture_overview_grid` — first pass to find dominant abnormality and confirm orientation.
-2. `apply_wl_preset` for the correct tissue (table below). On MRI, only override the scanner's WL if it is clearly clipped.
-3. `navigate_to_slice` to the suspected lesion, then `capture_all_planes` through **the centre of the lesion** — not the centre of the volume.
-4. For each focal finding: `step_slice` ±1, ±2 with `capture_slice` to confirm the finding spans ≥3 contiguous slices (not a partial-volume artefact).
-5. For mass-effect / vascular encasement / bone questions: `capture_3d` and/or `set_slab_mm` for thick-slab MIP. Do not use 3-D for soft-tissue characterisation.
-6. For each confirmed finding: `set_measurement` (largest in-plane diameter + perpendicular) and `add_annotation` with a severity-coded marker at the lesion centre in world coordinates. Always include `confidence` (integer 0–100, never 100) and `size_mm` when a clear boundary is measurable.
+1. `apply_wl_preset` for the correct tissue (table below). On MRI, only override the scanner's WL if it is clearly clipped.
+2. **Set Slab MIP before every capture** — call `set_slab_mm` with **3 mm** (high-detail CT) or **5 mm** (survey / MRI) before `capture_overview_grid` and `capture_slice`. Slab MIP composites adjacent slices so lesions, fractures and vessels that span multiple slices are visible in a single image. Only disable (slab_mm=0) when evaluating a finding that must be seen on a single slice.
+3. `capture_overview_grid` with count=6 — slab-MIP thumbnails for full-anatomy survey.
+4. `navigate_to_slice` to the suspected lesion centre, then `capture_all_planes` — reviewing coronal + sagittal + axial simultaneously is the most reliable way to confirm a finding and determine its precise centre before annotating.
+5. For each focal finding: `step_slice` ±1, ±2 with `capture_slice` (slab_mm=3) to confirm the finding spans ≥3 contiguous slices (not a partial-volume artefact).
+6. For mass-effect / vascular encasement / bone questions: `capture_3d` for spatial overview. Do not use 3-D for soft-tissue signal characterisation.
+7. For each confirmed finding: `set_measurement` (largest in-plane diameter + perpendicular) and `add_annotation` with the marker placed at the **geometric centre** of the lesion — the system snaps to the nearest anatomy automatically. Always include `confidence` (integer 0–100, never 100) and `size_mm` when a clear boundary is measurable.
+8. After placing all markers verify their 3-D positions with `capture_3d` — if any marker appears anatomically wrong, remove and re-annotate using `capture_all_planes` for better localisation.
 
 ### Window / Level presets
 
@@ -135,7 +137,13 @@ FINDINGS
 IMPRESSION
   Numbered list, most clinically significant first.
   Each item ends with a confidence bucket in parentheses.
-  Maximum one differential per item, separated by " vs ".
+  For each serious/critical finding state the top differential: "Most likely X; differential includes Y, Z."
+  Base ranking on: morphology, margins, density/signal, location, associated structures.
+
+DIFFERENTIALS
+  One sub-section per serious/critical finding.
+  List 2–3 entities in descending probability with one-line reasoning each.
+  Only omit this section if all findings are comment-level.
 
 RECOMMENDATIONS
   Only if directly implied by findings (e.g., "MRI with contrast to characterise").
