@@ -53,9 +53,8 @@ const popIn = keyframes`
   to   { transform: scale(1);    opacity: 1; }
 `;
 
-const rainbowSpin = keyframes`
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
+const auroraSlide = keyframes`
+  to { background-position: 320% 0; }
 `;
 
 // ── Expanded card ───────────────────────────────────────────────────────────
@@ -200,95 +199,88 @@ const Index = styled.span`
 `;
 
 // ── Collapsed pill ──────────────────────────────────────────────────────────
-
 const PillWrap = styled.div`
   position: absolute;
-  /* Offset by half a pixel so the pill inside the 0.5 px padding ring lands
-     at the same visual edge as the ToolbarPill on the opposite corner. */
-  top: ${TOP_OFFSET - 0.5}px;
-  left: ${SIDE_OFFSET - 0.5}px;
+  top: ${TOP_OFFSET - 0.8}px;
+  left: ${SIDE_OFFSET - 0.8}px;
   z-index: var(--z-modal);
   border-radius: 999px;
-  padding: 0.5px;
-  isolation: isolate;
-  overflow: hidden;
-  animation: ${popIn} 160ms ease;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  padding: 1.6px;
+  background: linear-gradient(110deg, #ff8a3c, #ffd24a, #7ee0c0, #7aa7ff, #c79bff, #ff8a3c);
+  background-size: 320% 100%;
+  animation: ${auroraSlide} 7s linear infinite;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55);
+  transition: transform 160ms ease, filter 160ms ease;
 
-  /* Full rainbow border that slowly rotates around the pill — signals an AI
-     feature. The inner dark mask (::after) hides the centre so only a thin
-     ring is visible; the whole ring is always coloured, the colours just
-     drift around the perimeter. */
-  &::before {
-    content: '';
-    position: absolute;
-    /* Disc larger than the wrap so colours don't compress at the corners. */
-    inset: -150%;
-    background: conic-gradient(
-      from 0deg,
-      #ff5e8a,
-      #ffb547,
-      #50c878,
-      #4ec5ff,
-      #b780ff,
-      #ff5e8a
-    );
-    animation: ${rainbowSpin} 6s linear infinite;
-    z-index: -1;
+  &:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.06);
   }
 
-  &::after {
-    content: '';
-    position: absolute;
-    inset: 1px;
-    border-radius: 999px;
-    background: rgba(14, 12, 9, 0.95);
-    z-index: -1;
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
   }
 
   @media (max-width: 767px) {
-    top: ${MOBILE_TOP - 0.5}px;
-    left: ${MOBILE_SIDE - 0.5}px;
+    top: ${MOBILE_TOP - 0.8}px;
+    left: ${MOBILE_SIDE - 0.8}px;
   }
 `;
 
 const Pill = styled.button`
-  position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
-  /* Mirrors the ToolbarPill ToolBtn sizing on the opposite stage corner. */
-  padding: 12px 14px;
+  gap: 11px;
+  padding: 10px 17px 10px 14px;
   border-radius: 999px;
   border: none;
-  background: transparent;
+  background: linear-gradient(180deg, #171410, #100d0a);
   font-family: var(--mono);
-  font-size: 10.5px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ink-2);
   cursor: pointer;
-  transition: color 120ms;
-
-  &:hover {
-    color: var(--ink);
-  }
-`;
-
-const PillIcon = styled.span`
-  display: flex;
-  align-items: center;
+  animation: ${popIn} 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+  white-space: nowrap;
 `;
 
 const PillCount = styled.span`
+  font-size: 14px;
+  font-weight: 700;
+  color: #f2ece2;
   font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
 `;
 
 const PillLabel = styled.span`
-  opacity: 0.65;
+  font-size: 13px;
+  color: #8e887e;
+  letter-spacing: 0.14em;
 `;
+
+function SparkleIcon() {
+  return (
+    <>
+      {/* Gradient def — cross-SVG url() refs work in modern browsers */}
+      <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
+        <defs>
+          <linearGradient id="hud-sparkle-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%"   stopColor="#ff8a3c" />
+            <stop offset="25%"  stopColor="#ffd24a" />
+            <stop offset="50%"  stopColor="#7ee0c0" />
+            <stop offset="75%"  stopColor="#7aa7ff" />
+            <stop offset="100%" stopColor="#c79bff" />
+          </linearGradient>
+        </defs>
+      </svg>
+      <Sparkles
+        size={22}
+        stroke="url(#hud-sparkle-grad)"
+        strokeWidth={1.75}
+        style={{ filter: 'drop-shadow(0 0 5px rgba(180,160,255,.45))', flexShrink: 0 }}
+        aria-hidden="true"
+      />
+    </>
+  );
+}
 
 // ── Component ───────────────────────────────────────────────────────────────
 
@@ -330,32 +322,17 @@ export function AnnotationHud() {
   if (!open) {
     return (
       <PillWrap>
-        {/* Inline SVG defs — referenced by the Sparkles stroke below. */}
-        <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
-          <defs>
-            <linearGradient id="ai-rainbow" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#ff5e8a" />
-              <stop offset="25%" stopColor="#ffb547" />
-              <stop offset="50%" stopColor="#50c878" />
-              <stop offset="75%" stopColor="#4ec5ff" />
-              <stop offset="100%" stopColor="#b780ff" />
-            </linearGradient>
-          </defs>
-        </svg>
         <Pill
           type="button"
           onClick={() => {
-            // If no active finding yet, focus the most severe one.
             if (!activeId) focusAnnotation(ordered[0].id);
             setOpen(true);
           }}
           aria-label={`Show ${annotations.length} AI findings`}
         >
-          <PillIcon>
-            <Sparkles size={18} stroke="url(#ai-rainbow)" />
-          </PillIcon>
+          <SparkleIcon />
           <PillCount>{annotations.length}</PillCount>
-          <PillLabel>{annotations.length === 1 ? 'finding' : 'findings'}</PillLabel>
+          <PillLabel>FINDINGS</PillLabel>
         </Pill>
       </PillWrap>
     );
