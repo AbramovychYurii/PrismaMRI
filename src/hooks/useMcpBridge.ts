@@ -15,7 +15,7 @@ import type {
   SlicePlane,
   VolumeCursor,
 } from '@/types';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const RELAY_URL = import.meta.env.VITE_RELAY_URL as string | undefined;
 
@@ -55,18 +55,32 @@ function tryLocalPort(port: number, timeoutMs = 500): Promise<WebSocket> {
 }
 
 /**
- * Scan LOCAL_PORTS sequentially and return the first responsive MCP server,
- * or null if none is found.  Total time ≤ LOCAL_PORTS.length × timeoutMs.
+ * Probe all LOCAL_PORTS simultaneously and return the first responsive MCP
+ * server.  Parallel scanning ensures the total wait is at most `timeoutMs`
+ * (300 ms) regardless of how many ports are tried — vs the sequential approach
+ * which could take LOCAL_PORTS.length × timeoutMs (1.5 s).
  */
 async function findLocalServer(): Promise<WebSocket | null> {
-  for (const port of LOCAL_PORTS) {
-    try {
-      return await tryLocalPort(port);
-    } catch {
-      /* try next */
+  return new Promise((resolve) => {
+    let settled = false;
+    let pending = LOCAL_PORTS.length;
+
+    for (const port of LOCAL_PORTS) {
+      tryLocalPort(port, 300)
+        .then((ws) => {
+          if (!settled) {
+            settled = true;
+            resolve(ws);
+          } else {
+            ws.close(); // extra successful probe — discard
+          }
+        })
+        .catch(() => {
+          pending--;
+          if (!settled && pending === 0) resolve(null);
+        });
     }
-  }
-  return null;
+  });
 }
 
 const SEVERITIES: AnnotationSeverity[] = ['critical', 'serious', 'moderate', 'comment'];
@@ -288,7 +302,48 @@ export function useMcpBridge(sessionId: string | null) {
   const connectingRef = useRef(false);
   /** True when the current socket is a direct local connection (not relay). */
   const localModeRef = useRef(false);
+  /**
+   * When connected via relay in local mode, this timer periodically scans for
+   * a local MCP server and upgrades the connection as soon as one appears.
+   */
+  const localUpgradeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const store = useVolumeStore;
+
+  // ── Leader election via Web Locks ────────────────────────────────────────────
+  // Only one tab manages the WebSocket bridge at a time.  The first tab to
+  // acquire the 'prismamri-mcp-bridge' lock becomes the leader; others wait.
+  // When the leader tab closes, the next-in-queue tab takes over automatically.
+  const [isLeader, setIsLeader] = useState(false);
+
+  useEffect(() => {
+    const abort = new AbortController();
+    // Resolving this promise releases the lock and relinquishes leadership.
+    let releaseLock: (() => void) | null = null;
+    const held = new Promise<void>((resolve) => {
+      releaseLock = resolve;
+    });
+
+    if (!('locks' in navigator)) {
+      // Fallback for environments without Web Locks (rare) — behave as before.
+      setIsLeader(true);
+    } else {
+      navigator.locks
+        .request('prismamri-mcp-bridge', { signal: abort.signal }, async () => {
+          setIsLeader(true);
+          await held;
+          setIsLeader(false);
+        })
+        .catch(() => {
+          // AbortError — component unmounted before the lock was ever acquired.
+        });
+    }
+
+    return () => {
+      abort.abort(); // cancel a pending (not-yet-acquired) lock request
+      releaseLock?.(); // release an acquired lock so the next tab can take over
+    };
+    // Intentionally empty deps — lock is held for the full lifetime of this tab.
+  }, []);
 
   const clearSessionIdle = useCallback(() => {
     if (sessionIdleTimer.current) {
@@ -775,18 +830,19 @@ export function useMcpBridge(sessionId: string | null) {
       let ws: WebSocket | null = null;
       let isLocal = false;
 
-      if (isLocalMode()) {
-        // Try to reach the MCP server's local WS directly first.
-        ws = await findLocalServer();
-        if (ws) {
-          isLocal = true;
-          // Extract port from ws://127.0.0.1:PORT and persist it for the UI.
-          const port = Number(new URL(ws.url).port);
-          if (port) store.getState().setLocalPort(port);
-        }
+      // Always try the local MCP server first — the Claude extension runs a WS
+      // on 127.0.0.1 and a direct connection is always preferred over the relay.
+      // Parallel port-scan (300 ms max) keeps the overhead negligible even when
+      // no local server is running.
+      ws = await findLocalServer();
+      if (ws) {
+        isLocal = true;
+        // Extract port from ws://127.0.0.1:PORT and persist it for the UI.
+        const port = Number(new URL(ws.url).port);
+        if (port) store.getState().setLocalPort(port);
       }
 
-      // Fallback (or primary for web-app mode): Cloudflare relay.
+      // Fallback: Cloudflare relay (web-app mode or when local server absent).
       if (!ws && RELAY_URL && sessionId) {
         const wsBase = RELAY_URL.replace(/^http/, 'ws').replace(/\/$/, '');
         ws = new WebSocket(`${wsBase}/ws?session=${sessionId}&role=app`);
@@ -802,6 +858,38 @@ export function useMcpBridge(sessionId: string | null) {
       // In local mode the MCP server is already running; mark connected now
       // (no mcp_connecting event will arrive over the relay).
       if (isLocal) store.getState().setMcpConnected(true);
+
+      // ── Proactive local upgrade ───────────────────────────────────────────
+      // If we fell back to the relay (local server wasn't available yet) but
+      // we're running as an installed PWA, poll for the local server in the
+      // background.  As soon as it appears we tear down the relay connection
+      // and let connect() reattach directly — no manual page reload needed.
+      if (!isLocal && isLocalMode()) {
+        const tryUpgrade = async () => {
+          const currentWs = wsRef.current;
+          if (!currentWs || localModeRef.current) return; // already local or gone
+          if (currentWs.readyState !== WebSocket.OPEN) return; // will reconnect anyway
+
+          const probe = await findLocalServer();
+          if (!probe) {
+            // Not available yet — check again in 5 s.
+            localUpgradeRef.current = setTimeout(() => {
+              void tryUpgrade();
+            }, 5_000);
+            return;
+          }
+          // Found the local server.  Discard the probe socket — connect() will
+          // open a fresh one — and close the relay to trigger an immediate reconnect.
+          probe.close();
+          localUpgradeRef.current = null;
+          wsRef.current = null; // prevent the close handler scheduling a 5 s delay
+          currentWs.close(1000, 'upgrading to local connection');
+          connect(); // reconnects immediately; local server found → isLocal = true
+        };
+        localUpgradeRef.current = setTimeout(() => {
+          void tryUpgrade();
+        }, 5_000);
+      }
 
       // ── Open handler ────────────────────────────────────────────────────
       ws.addEventListener('open', () => {
@@ -885,21 +973,24 @@ export function useMcpBridge(sessionId: string | null) {
   }, [sessionId, handleCommand, store, clearSessionIdle]);
 
   useEffect(() => {
+    if (!isLeader) return;
     connect();
     return () => {
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
       if (heartbeatTimer.current) clearInterval(heartbeatTimer.current);
+      if (localUpgradeRef.current) clearTimeout(localUpgradeRef.current);
       clearSessionIdle();
       wsRef.current?.close(1000, 'unmount');
       wsRef.current = null;
     };
-  }, [connect, clearSessionIdle]);
+  }, [isLeader, connect, clearSessionIdle]);
 
   // When the browser tab becomes visible again (user switches back), reconnect
   // immediately if the WebSocket is gone — browsers throttle timers in hidden
   // tabs, so the pong-timeout may fire late and the reconnect timer may not
-  // have run yet.
+  // have run yet.  Only the leader tab manages the WebSocket.
   useEffect(() => {
+    if (!isLeader) return;
     const onVisibility = () => {
       if (document.visibilityState !== 'visible') return;
       // Reset pong clock — the heartbeat timer was throttled while hidden,
@@ -916,5 +1007,5 @@ export function useMcpBridge(sessionId: string | null) {
     };
     document.addEventListener('visibilitychange', onVisibility);
     return () => document.removeEventListener('visibilitychange', onVisibility);
-  }, [connect]);
+  }, [isLeader, connect]);
 }

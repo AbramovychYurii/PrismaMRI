@@ -71,12 +71,10 @@ test.describe('Import screen', () => {
   });
 
   test('import overlay is visible before loading a volume', async ({ page }) => {
-    // AppGrid is always in the DOM but ImportOverlay sits on top of it (z-index: 50).
-    // Check the import-specific UI (Examples heading) is visible, confirming the
-    // overlay is covering the stage canvas.
+    // The import screen is its own route (/). The viewer (AppGrid / Stage) is
+    // only mounted at /viewer, so "No volume loaded" is not in the DOM here.
+    // Verify the import UI is shown and the viewer stage is absent.
     await expect(page.getByRole('heading', { name: /examples/i })).toBeVisible();
-    // And the "No volume loaded" placeholder in the stage should be visible
-    // through the overlay or accessible in DOM.
-    await expect(page.getByText(/no volume loaded/i)).toBeAttached();
+    await expect(page.getByText(/no volume loaded/i)).not.toBeAttached();
   });
 });

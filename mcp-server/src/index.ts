@@ -46,6 +46,7 @@ import {
   type Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 import * as fs from 'node:fs';
+import * as http from 'node:http';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import WebSocket, { WebSocketServer } from 'ws';
@@ -206,18 +207,40 @@ function startLocalServer(): void {
       return;
     }
     const port = LOCAL_PORTS[portIndex++];
-    const srv = new WebSocketServer({ port, host: '127.0.0.1' });
 
-    srv.once('error', (e: NodeJS.ErrnoException) => {
+    // Wrap in an explicit HTTP server so we can respond to Private Network
+    // Access preflight requests.  Chrome (Chromium 104+) sends an OPTIONS
+    // request with `Access-Control-Request-Private-Network: true` before
+    // upgrading to WebSocket when the caller origin is a public HTTPS site
+    // (e.g. GitHub Pages hosted PWA) connecting to 127.0.0.1.  A bare
+    // WebSocketServer never answers those HTTP requests, so Chrome blocks
+    // the upgrade — causing findLocalServer() to time-out and fall back to
+    // the Cloudflare relay even when the local MCP server is running.
+    const httpServer = http.createServer((_req, res) => {
+      // Respond to all HTTP (non-upgrade) requests with the PNA header so
+      // the preflight succeeds.  The only callers are the same-machine PWA.
+      res.writeHead(200, {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Private-Network': 'true',
+        'Access-Control-Allow-Headers': '*',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      });
+      res.end();
+    });
+
+    const srv = new WebSocketServer({ server: httpServer });
+
+    httpServer.once('error', (e: NodeJS.ErrnoException) => {
       if (e.code === 'EADDRINUSE') {
         process.stderr.write(`[prismamri] Port ${port} busy, trying ${LOCAL_PORTS[portIndex] ?? 'none'}…\n`);
+        srv.close();
         tryNext();
       } else {
         process.stderr.write(`[prismamri] Local server error: ${e.message}\n`);
       }
     });
 
-    srv.once('listening', () => {
+    httpServer.listen(port, '127.0.0.1', () => {
       process.stderr.write(`[prismamri] Local WS ready — ws://127.0.0.1:${port}\n`);
 
       srv.on('connection', (socket: WebSocket) => {

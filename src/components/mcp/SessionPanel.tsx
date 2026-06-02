@@ -754,7 +754,7 @@ export function SessionPanel() {
                   ? 'Downloaded!'
                   : dxtState === 'err'
                     ? 'Download failed'
-                    : 'Download extension (.dxt)'}
+                    : 'Download Claude extension'}
               </ActionBtn>
               <Hint>
                 Then open{' '}
@@ -775,6 +775,26 @@ export function SessionPanel() {
           {/* ── CONNECTED via relay (Web) ── */}
           {mcpConnected && !local && (
             <>
+              <Row>
+                <Label style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                  Via Cloudflare relay
+                  <InfoTip text="Commands travel through the Cloudflare relay. No scan data is sent — only control messages and slice captures." />
+                </Label>
+                {RELAY_URL && (
+                  <Value style={{ fontSize: 10, opacity: 0.4 }}>
+                    {new URL(RELAY_URL).hostname}
+                  </Value>
+                )}
+              </Row>
+              {sessionId && (
+                <Row>
+                  <Label>Session ID</Label>
+                  <Value style={{ fontSize: 10, opacity: 0.4, letterSpacing: '0.02em' }}>
+                    {sessionId}
+                  </Value>
+                </Row>
+              )}
+              <Divider />
               <PromptSection />
               <ActionBtn
                 type="button"
