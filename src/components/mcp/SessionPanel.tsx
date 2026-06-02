@@ -504,6 +504,8 @@ Then call \`add_annotation\` with:
   - 🟢 \`comment\` — incidental / informational note, no danger
 - \`label\` — concise anatomical name of the finding (≤ 5 words)
 - \`summary\` — 1–3 sentences: what you see, size if measurable, clinical relevance
+- \`confidence\` — integer 0–100 reflecting how certain you are (never use 100; typical range 40–95)
+- \`size_mm\` — largest visible diameter in mm (only if a clear boundary is measurable; omit for diffuse findings)
 
 Only annotate genuine abnormalities or clinically notable incidental findings. Do not mark normal anatomy.
 

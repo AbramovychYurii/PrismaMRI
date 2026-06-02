@@ -49,7 +49,7 @@ Use this ordered recipe. Skip a step only when the previous step makes it irrele
 3. `navigate_to_slice` to the suspected lesion, then `capture_all_planes` through **the centre of the lesion** — not the centre of the volume.
 4. For each focal finding: `step_slice` ±1, ±2 with `capture_slice` to confirm the finding spans ≥3 contiguous slices (not a partial-volume artefact).
 5. For mass-effect / vascular encasement / bone questions: `capture_3d` and/or `set_slab_mm` for thick-slab MIP. Do not use 3-D for soft-tissue characterisation.
-6. For each confirmed finding: `set_measurement` (largest in-plane diameter + perpendicular) and `add_annotation` with a severity-coded marker at the lesion centre in world coordinates.
+6. For each confirmed finding: `set_measurement` (largest in-plane diameter + perpendicular) and `add_annotation` with a severity-coded marker at the lesion centre in world coordinates. Always include `confidence` (integer 0–100, never 100) and `size_mm` when a clear boundary is measurable.
 
 ### Window / Level presets
 

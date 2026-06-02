@@ -6,11 +6,12 @@
  *  • Collapsed → compact pill showing the count of findings + severity dot.
  *    Click to expand. Always present once at least one finding exists.
  *
- *  • Expanded → full card with the currently focused finding's severity,
- *    label, 1–3 sentence summary, location and prev/next navigation.
+ *  • Expanded → full card with left accent bar, severity, label, certainty
+ *    bar, summary (capped at 5 lines with "Show more"), coordinate tags,
+ *    optional size, divider, and right-aligned prev/next navigation.
  *    Auto-expands when a marker is focused (click on viewer / nav).
- *    The X button hides the expanded card AND clears the active finding;
- *    the collapsed pill stays visible so the user can reopen it.
+ *    The X button hides the expanded card AND clears the active finding.
+ *    "Show more" state resets to collapsed on every annotation switch.
  */
 
 import { SEVERITY_HEX, SEVERITY_LABEL, SEVERITY_RANK } from '@/constants';
@@ -33,12 +34,9 @@ function orderAll(list: AiAnnotation[]): AiAnnotation[] {
 }
 
 // ── Layout constants ────────────────────────────────────────────────────────
-// Rendered INSIDE <StageSection> (position: relative), so offsets are local to
-// the stage container — mirrors the ToolbarPill (top:22 / right:30) on the
-// opposite corner so both stage pills share the exact same visual weight.
 const SIDE_OFFSET = 30;
-const TOP_OFFSET = 22;
-const MOBILE_TOP = 12;
+const TOP_OFFSET  = 22;
+const MOBILE_TOP  = 12;
 const MOBILE_SIDE = 12;
 
 // ── Animations ──────────────────────────────────────────────────────────────
@@ -57,7 +55,7 @@ const auroraSlide = keyframes`
   to { background-position: 320% 0; }
 `;
 
-// ── Expanded card ───────────────────────────────────────────────────────────
+// ── Expanded card — row layout: [AccentBar | Body] ──────────────────────────
 
 const Card = styled.div`
   position: absolute;
@@ -73,6 +71,8 @@ const Card = styled.div`
   backdrop-filter: blur(14px);
   font-family: var(--mono);
   overflow: hidden;
+  display: flex;
+  flex-direction: row;
   animation: ${slideDown} 200ms cubic-bezier(0.22, 1, 0.36, 1);
 
   @media (max-width: 767px) {
@@ -82,17 +82,24 @@ const Card = styled.div`
   }
 `;
 
-const AccentStripe = styled.div<{ $color: string }>`
-  height: 3px;
+/** Left vertical accent stripe — full card height, severity-coloured. */
+const AccentBar = styled.div<{ $color: string }>`
+  width: 4px;
+  flex-shrink: 0;
   background: ${({ $color }) => $color};
+  border-radius: 12px 0 0 12px;
 `;
 
 const Body = styled.div`
+  flex: 1;
+  min-width: 0;
   padding: 13px 15px 14px;
   display: flex;
   flex-direction: column;
   gap: 9px;
 `;
+
+// ── Top row ─────────────────────────────────────────────────────────────────
 
 const TopRow = styled.div`
   display: flex;
@@ -100,7 +107,7 @@ const TopRow = styled.div`
   gap: 9px;
 `;
 
-const Chip = styled.span<{ $color: string }>`
+const SeverityChip = styled.span<{ $color: string }>`
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -145,32 +152,112 @@ const HeaderBtn = styled.button`
   &:hover { color: var(--ink); }
 `;
 
+// ── Title ────────────────────────────────────────────────────────────────────
+
 const Title = styled.h3`
   margin: 0;
-  font-size: 13.5px;
-  font-weight: 600;
+  font-size: 15px;
+  font-weight: 700;
   letter-spacing: 0.01em;
   color: var(--ink);
-  line-height: 1.35;
+  line-height: 1.3;
 `;
+
+// ── Certainty bar ────────────────────────────────────────────────────────────
+
+const CertaintyRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const CertaintyLabel = styled.span`
+  font-size: 9px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+  flex-shrink: 0;
+`;
+
+const CertaintyTrack = styled.div`
+  flex: 1;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 999px;
+  overflow: hidden;
+`;
+
+const CertaintyFill = styled.div<{ $pct: number; $color: string }>`
+  height: 100%;
+  width: ${({ $pct }) => $pct}%;
+  background: ${({ $color }) => $color};
+  border-radius: 999px;
+  transition: width 400ms cubic-bezier(0.22, 1, 0.36, 1);
+`;
+
+const CertaintyValue = styled.span`
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+  flex-shrink: 0;
+  min-width: 28px;
+  text-align: right;
+`;
+
+// ── Summary (capped at 5 lines) ──────────────────────────────────────────────
 
 const Summary = styled.p`
   margin: 0;
   font-size: 11.5px;
-  line-height: 1.55;
+  line-height: 1.6;
   color: var(--ink-2);
+`;
+
+
+// ── Tag row (coords + size) ──────────────────────────────────────────────────
+
+const TagRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 1px;
+`;
+
+const Tag = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  color: var(--ink-3);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 3px 7px;
+  font-variant-numeric: tabular-nums;
+`;
+
+const TagKey = styled.span`
+  color: var(--ink-4, var(--ink-3));
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+`;
+
+// ── Divider + right-aligned pagination ───────────────────────────────────────
+
+const Divider = styled.hr`
+  border: none;
+  border-top: 1px solid var(--rule);
+  margin: 2px 0 0;
 `;
 
 const Footer = styled.div`
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-top: 2px;
-`;
-
-const NavGroup = styled.div`
-  display: flex;
-  align-items: center;
+  justify-content: flex-end;
   gap: 4px;
 `;
 
@@ -189,7 +276,7 @@ const NavBtn = styled.button`
   &:hover { border-color: var(--rule-2); color: var(--ink); }
 `;
 
-const Index = styled.span`
+const NavIndex = styled.span`
   font-size: 10.5px;
   color: var(--ink-3);
   font-variant-numeric: tabular-nums;
@@ -198,7 +285,8 @@ const Index = styled.span`
   text-align: center;
 `;
 
-// ── Collapsed pill ──────────────────────────────────────────────────────────
+// ── Collapsed pill ───────────────────────────────────────────────────────────
+
 const PillWrap = styled.div`
   position: absolute;
   top: ${TOP_OFFSET - 0.8}px;
@@ -259,7 +347,6 @@ const PillLabel = styled.span`
 function SparkleIcon() {
   return (
     <>
-      {/* Gradient def — cross-SVG url() refs work in modern browsers */}
       <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden="true">
         <defs>
           <linearGradient id="hud-sparkle-grad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -282,19 +369,17 @@ function SparkleIcon() {
   );
 }
 
-// ── Component ───────────────────────────────────────────────────────────────
+// ── Component ────────────────────────────────────────────────────────────────
 
 export function AnnotationHud() {
-  // No view-gate needed — this component renders inside <StageSection>, which
-  // itself is only mounted in the viewer view.
-  const annotations = useVolumeStore((s) => s.aiAnnotations);
-  const activeId = useVolumeStore((s) => s.activeAnnotationId);
-  const focusAnnotation = useVolumeStore((s) => s.focusAnnotation);
+  const annotations    = useVolumeStore((s) => s.aiAnnotations);
+  const activeId       = useVolumeStore((s) => s.activeAnnotationId);
+  const focusAnnotation    = useVolumeStore((s) => s.focusAnnotation);
   const setActiveAnnotation = useVolumeStore((s) => s.setActiveAnnotation);
 
   const [open, setOpen] = useState(false);
 
-  // Auto-open when a finding becomes active (click on marker, nav button, etc.)
+  // ── Auto-open when a new finding is focused ───────────────────────────
   const prevActiveId = useRef<string | null>(null);
   useEffect(() => {
     if (activeId && activeId !== prevActiveId.current) {
@@ -303,7 +388,7 @@ export function AnnotationHud() {
     prevActiveId.current = activeId;
   }, [activeId]);
 
-  // Esc collapses the card (without clearing the active finding).
+  // ── Esc collapses the card ────────────────────────────────────────────
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -316,7 +401,7 @@ export function AnnotationHud() {
   if (annotations.length === 0) return null;
 
   const ordered = orderAll(annotations);
-  const active = activeId ? annotations.find((a) => a.id === activeId) : null;
+  const active  = activeId ? annotations.find((a) => a.id === activeId) : null;
 
   // ── Collapsed pill ────────────────────────────────────────────────────
   if (!open) {
@@ -339,25 +424,31 @@ export function AnnotationHud() {
   }
 
   // ── Expanded card ─────────────────────────────────────────────────────
-  // If somehow open but nothing active, fall back to the most severe.
   const shown = active ?? ordered[0];
   const color = SEVERITY_HEX[shown.severity];
-  const idx = ordered.findIndex((a) => a.id === shown.id);
+  const idx   = ordered.findIndex((a) => a.id === shown.id);
 
   const step = (delta: number) => {
     const next = (idx + delta + ordered.length) % ordered.length;
     focusAnnotation(ordered[next].id);
   };
 
+  const confidencePct = shown.confidence != null
+    ? Math.min(100, Math.max(0, shown.confidence))
+    : null;
+
   return (
     <Card aria-label="Finding summary" aria-live="polite">
-      <AccentStripe $color={color} />
+      {/* Left vertical accent bar */}
+      <AccentBar $color={color} />
+
       <Body>
+        {/* Severity chip + location + close */}
         <TopRow>
-          <Chip $color={color}>
+          <SeverityChip $color={color}>
             <ChipDot $color={color} />
             {SEVERITY_LABEL[shown.severity]}
-          </Chip>
+          </SeverityChip>
           <Location>{sliceInfo(shown.plane, shown.voxel)}</Location>
           <HeaderBtn
             type="button"
@@ -372,23 +463,47 @@ export function AnnotationHud() {
           </HeaderBtn>
         </TopRow>
 
+        {/* Title */}
         <Title>{shown.label}</Title>
+
+        {/* Certainty bar */}
+        {confidencePct != null && (
+          <CertaintyRow>
+            <CertaintyLabel>✦ Certainty</CertaintyLabel>
+            <CertaintyTrack>
+              <CertaintyFill $pct={confidencePct} $color={color} />
+            </CertaintyTrack>
+            <CertaintyValue>{confidencePct}%</CertaintyValue>
+          </CertaintyRow>
+        )}
+
+        {/* Summary */}
         {shown.summary && <Summary>{shown.summary}</Summary>}
 
+        {/* Coordinate tags + optional size */}
+        <TagRow>
+          <Tag><TagKey>X</TagKey>{shown.voxel.x}</Tag>
+          <Tag><TagKey>Y</TagKey>{shown.voxel.y}</Tag>
+          <Tag><TagKey>Z</TagKey>{shown.voxel.z}</Tag>
+          {shown.sizeMm != null && (
+            <Tag><TagKey>ø</TagKey>{shown.sizeMm} mm</Tag>
+          )}
+        </TagRow>
+
+        {/* Divider + right-aligned pagination */}
         {ordered.length > 1 && (
-          <Footer>
-            <NavGroup>
+          <>
+            <Divider />
+            <Footer>
               <NavBtn type="button" aria-label="Previous finding" onClick={() => step(-1)}>
                 <ChevronLeft size={15} />
               </NavBtn>
-              <Index>
-                {idx + 1} / {ordered.length}
-              </Index>
+              <NavIndex>{idx + 1} / {ordered.length}</NavIndex>
               <NavBtn type="button" aria-label="Next finding" onClick={() => step(1)}>
                 <ChevronRight size={15} />
               </NavBtn>
-            </NavGroup>
-          </Footer>
+            </Footer>
+          </>
         )}
       </Body>
     </Card>

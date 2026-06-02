@@ -720,6 +720,7 @@ export function useMcpBridge(sessionId: string | null) {
               : 'serious';
             const rawVoxel = voxelFromFrac(plane, fx, fy, cursor, volume.meta.dims);
             const snappedVoxel = snapToAnatomy(rawVoxel, plane, volume);
+            const rawConfidence = msg.confidence as number | undefined;
             const annotation: AiAnnotation = {
               id: crypto.randomUUID(),
               plane,
@@ -729,6 +730,8 @@ export function useMcpBridge(sessionId: string | null) {
               label: msg.label as string,
               summary: msg.summary as string | undefined,
               severity,
+              confidence: rawConfidence != null ? Math.min(100, Math.max(0, Math.round(rawConfidence))) : undefined,
+              sizeMm: msg.size_mm != null ? Number(msg.size_mm) : undefined,
             };
             store.getState().addAiAnnotation(annotation);
             // Focus the new finding so it's immediately visible to the user.

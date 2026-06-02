@@ -533,6 +533,19 @@ const TOOLS: Tool[] = [
           type: 'string',
           description: '1–3 sentence explanation shown when the user opens this finding.',
         },
+        confidence: {
+          type: 'number',
+          description:
+            'AI certainty as an integer 0–100. Practically never use 100 for medical findings ' +
+            '— the model should reflect genuine uncertainty. Typical range: 40–95.',
+        },
+        size_mm: {
+          type: 'number',
+          description:
+            'Largest in-plane diameter of the finding in millimetres. ' +
+            'Only include when a clear measurable boundary is visible (e.g. a lesion, defect, ' +
+            'or nodule). Omit for diffuse or poorly-defined findings.',
+        },
       },
       required: ['plane', 'fx', 'fy', 'label', 'severity'],
     },
@@ -777,13 +790,15 @@ async function handleTool(
 
     // ── add_annotation ───────────────────────────────────────────────────────
     case 'add_annotation': {
-      const { plane, fx, fy, label, severity = 'serious', summary } = args as {
+      const { plane, fx, fy, label, severity = 'serious', summary, confidence, size_mm } = args as {
         plane: string;
         fx: number;
         fy: number;
         label: string;
         severity?: string;
         summary?: string;
+        confidence?: number;
+        size_mm?: number;
       };
       const { id } = await command<{ id: string }>({
         action: 'add_annotation',
@@ -793,6 +808,8 @@ async function handleTool(
         label,
         severity,
         summary,
+        confidence,
+        size_mm,
       });
       return {
         content: [
