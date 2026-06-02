@@ -4,7 +4,6 @@ import type { ThreePreview } from '@/lib/volume/three-preview';
 import type {
   ActiveMeasurement,
   AiAnnotation,
-  AppView,
   ImportProgress,
   LoadedVolume,
   MeasurementPoint,
@@ -21,7 +20,6 @@ import type {
 import { create } from 'zustand';
 
 interface VolumeState {
-  view: AppView;
   volume: LoadedVolume | null;
   prepared3D: PreparedVolumeFor3D | null;
   histogram: VolumeHistogram | null;
@@ -61,7 +59,6 @@ interface VolumeState {
 }
 
 interface VolumeActions {
-  setView: (v: AppView) => void;
   setVolume: (v: LoadedVolume, p: PreparedVolumeFor3D, h: VolumeHistogram) => void;
   setCursor: (c: VolumeCursor) => void;
   setActivePlane: (p: SlicePlane) => void;
@@ -97,7 +94,6 @@ interface VolumeActions {
 const DEFAULT_SPACING: [number, number, number] = [1, 1, 1];
 
 const initialState: VolumeState = {
-  view: 'import',
   volume: null,
   prepared3D: null,
   histogram: null,
@@ -143,14 +139,11 @@ const initialState: VolumeState = {
 export const useVolumeStore = create<VolumeState & VolumeActions>((set) => ({
   ...initialState,
 
-  setView: (view) => set({ view }),
-
   setVolume: (volume, prepared3D, histogram) =>
     set({
       volume,
       prepared3D,
       histogram,
-      view: 'viewer',
       cursor: {
         x: Math.floor(volume.meta.dims[0] / 2),
         y: Math.floor(volume.meta.dims[1] / 2),

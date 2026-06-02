@@ -4,8 +4,10 @@ import { fetchBlobWithProgress } from '@/lib/fetch-with-progress';
 import { fromDirectoryHandle, fromFileList } from '@/lib/import/scan-folder';
 import type { ImportSource } from '@/lib/import/types';
 import { loadVolumeInWorker } from '@/lib/import/volume-client';
+import * as volumeDb from '@/lib/volumeDb';
 import { useVolumeStore } from '@/store';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 interface DirPickerWindow {
   showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>;
@@ -20,7 +22,7 @@ export function useViewerApp() {
   const setLoading = useVolumeStore((s) => s.setLoading);
   const setError = useVolumeStore((s) => s.setError);
   const setVolume = useVolumeStore((s) => s.setVolume);
-  const setView = useVolumeStore((s) => s.setView);
+  const navigate = useNavigate();
 
   useWindowLevel();
   useActivePlaneKeys();
@@ -58,6 +60,11 @@ export function useViewerApp() {
         );
         setVolume(volume, prepared3D, histogram);
         setLoading({ active: false, percent: 100, stage: 'done', message: 'Ready' });
+        navigate('/viewer');
+        // Save to IndexedDB in the background — don't block the UI.
+        volumeDb.saveVolume(volume, prepared3D, histogram).catch(() => {
+          // Non-critical: storage might be full or unavailable.
+        });
       } catch (err) {
         if (err instanceof DOMException && err.name === 'AbortError') {
           setLoading({ active: false, percent: 0, stage: 'idle', message: '' });
@@ -70,7 +77,7 @@ export function useViewerApp() {
         abortRef.current = null;
       }
     },
-    [setError, setLoading, setVolume],
+    [setError, setLoading, setVolume, navigate],
   );
 
   const cancelLoad = useCallback(() => {
@@ -169,7 +176,7 @@ export function useViewerApp() {
       } else if (e.key === 'Escape') {
         setShowShortcuts((v) => {
           if (v) return false;
-          setView('import');
+          navigate('/');
           return false;
         });
       } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'o') {
@@ -179,7 +186,7 @@ export function useViewerApp() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [openFolder, setView]);
+  }, [navigate, openFolder]);
 
   return {
     loadFromSource,

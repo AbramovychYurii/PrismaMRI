@@ -618,7 +618,6 @@ const CopyBtn = styled.button<{ $state: 'idle' | 'ok' | 'err' }>`
   }}
 `;
 
-
 // ── Shared prompt section ─────────────────────────────────────────────────────
 
 function PromptSection() {
@@ -679,10 +678,10 @@ function PromptSection() {
 export function SessionPanel() {
   const mcpConnected = useVolumeStore((s) => s.mcpConnected);
   const agentWorking = useVolumeStore((s) => s.agentSessionActive);
-  const localPort    = useVolumeStore((s) => s.localPort);
-  const dockOpen     = useVolumeStore((s) => s.toolbar.dock);
-  const sessionId    = useSessionId();
-  const local        = isLocalMode();
+  const localPort = useVolumeStore((s) => s.localPort);
+  const dockOpen = useVolumeStore((s) => s.toolbar.dock);
+  const sessionId = useSessionId();
+  const local = isLocalMode();
   const [expanded, setExpanded] = useState(false);
   const [dxtState, setDxtState] = useState<BtnState>('idle');
 
@@ -723,35 +722,52 @@ export function SessionPanel() {
     <>
       {pill}
       <Panel $dockOpen={dockOpen} role="complementary" aria-label="AI agent session panel">
-
         {/* ── Header — identical for all states ── */}
         <PanelHeader $connected={mcpConnected} onClick={toggle}>
-          <HeaderIcon><Bot size={14} /></HeaderIcon>
+          <HeaderIcon>
+            <Bot size={14} />
+          </HeaderIcon>
           <StatusDot $connected={mcpConnected} />
           <StatusText $connected={mcpConnected}>
             {mcpConnected ? 'AI Agent Connected' : 'Waiting for Agent'}
           </StatusText>
           {!local && <Badge>Beta</Badge>}
-          <CollapseBtn type="button" aria-label="Collapse panel"><X size={14} /></CollapseBtn>
+          <CollapseBtn type="button" aria-label="Collapse panel">
+            <X size={14} />
+          </CollapseBtn>
         </PanelHeader>
 
         {/* ── Body ── */}
         <PanelBody>
-
           {/* ── NOT CONNECTED: same for Web and PWA ── */}
           {!mcpConnected && (
             <>
               <ActionBtn type="button" $primary $state={dxtState} onClick={handleDownloadDxt}>
-                {dxtState === 'ok' ? <Check size={13} /> : dxtState === 'err' ? <X size={13} /> : <Download size={13} />}
-                {dxtState === 'ok' ? 'Downloaded!' : dxtState === 'err' ? 'Download failed' : 'Download extension (.dxt)'}
+                {dxtState === 'ok' ? (
+                  <Check size={13} />
+                ) : dxtState === 'err' ? (
+                  <X size={13} />
+                ) : (
+                  <Download size={13} />
+                )}
+                {dxtState === 'ok'
+                  ? 'Downloaded!'
+                  : dxtState === 'err'
+                    ? 'Download failed'
+                    : 'Download extension (.dxt)'}
               </ActionBtn>
               <Hint>
                 Then open{' '}
-                <OpenClaudeLink href="claude://" target="_blank" rel="noopener" title="Open Claude Desktop">
+                <OpenClaudeLink
+                  href="claude://"
+                  target="_blank"
+                  rel="noopener"
+                  title="Open Claude Desktop"
+                >
                   Claude Desktop
-                </OpenClaudeLink>
-                {' '}→ Settings → <strong style={{ color: 'var(--ink-2)' }}>Extensions</strong> → Install Extension.
-                {' '}Claude connects to this viewer automatically.
+                </OpenClaudeLink>{' '}
+                → Settings → <strong style={{ color: 'var(--ink-2)' }}>Extensions</strong> → Install
+                Extension. Claude connects to this viewer automatically.
               </Hint>
             </>
           )}
@@ -766,7 +782,7 @@ export function SessionPanel() {
                 onClick={() => {
                   const ok = window.confirm(
                     'Disconnect the current agent?\n\nThis ends the live session and ' +
-                    'invalidates the installed extension. To reconnect, download a fresh .dxt and reinstall it.',
+                      'invalidates the installed extension. To reconnect, download a fresh .dxt and reinstall it.',
                   );
                   if (!ok) return;
                   localStorage.setItem('prismamri-session-id', crypto.randomUUID());
@@ -789,13 +805,14 @@ export function SessionPanel() {
                   <InfoTip text="Claude connects directly to this app with no relay — no data leaves your machine. Lower latency, works offline." />
                 </Label>
                 <Value style={{ fontSize: 10.5, opacity: 0.45 }}>
-                  {localPort ? `PORT: ${localPort}` : `PORT: ${LOCAL_PORTS[0]}–${LOCAL_PORTS[LOCAL_PORTS.length - 1]}`}
+                  {localPort
+                    ? `PORT: ${localPort}`
+                    : `PORT: ${LOCAL_PORTS[0]}–${LOCAL_PORTS[LOCAL_PORTS.length - 1]}`}
                 </Value>
               </Row>
               <PromptSection />
             </>
           )}
-
         </PanelBody>
       </Panel>
     </>

@@ -3,9 +3,6 @@ export type Vec3 = [number, number, number];
 export type SlicePlane = 'coronal' | 'sagittal' | 'axial';
 export type MobileTab = '3d' | 'coronal' | 'sagittal' | 'axial' | 'controls';
 
-/** Which view the app is showing: import screen or volume viewer. */
-export type AppView = 'import' | 'viewer';
-
 export interface SliceWindowLevel {
   window: number;
   level: number;

@@ -1,5 +1,6 @@
 import { useVolumeStore } from '@/store';
 import { ChevronLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 
 // ── Styled components ──────────────────────────────────────────────────────
@@ -59,14 +60,12 @@ const DisclaimerBold = styled.b`
 `;
 
 export function SessionCell() {
-  const setView = useVolumeStore((s) => s.setView);
+  const navigate = useNavigate();
   const volume = useVolumeStore((s) => s.volume);
-
-  const handleBack = () => setView('import');
 
   return (
     <>
-      <BackButton type="button" onClick={handleBack} disabled={!volume}>
+      <BackButton type="button" onClick={() => navigate('/')} disabled={!volume}>
         <BackButtonInner>
           <ChevronLeft size={13} />
           Back to import

@@ -149,7 +149,7 @@ export function AppGrid() {
   const isMobile = useIsMobile();
   const railOpen = useVolumeStore((s) => s.toolbar.rail);
   const mobileTab = useVolumeStore((s) => s.mobileTab);
-  const view = useVolumeStore((s) => s.view);
+  const volumeLoaded = useVolumeStore((s) => s.volume !== null);
 
   // ── Desktop ──────────────────────────────────────────────────────────────
   if (!isMobile) {
@@ -190,7 +190,7 @@ export function AppGrid() {
       </MobileContent>
 
       {/* Tab bar only shown while viewing a loaded volume. */}
-      {view === 'viewer' && <MobileTabBar />}
+      {volumeLoaded && <MobileTabBar />}
     </MobileRoot>
   );
 }

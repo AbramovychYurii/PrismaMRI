@@ -167,12 +167,12 @@ function PanelsToggle({
 export function Dock() {
   const dockOpen = useVolumeStore((s) => s.toolbar.dock);
   const toggleToolbar = useVolumeStore((s) => s.toggleToolbar);
-  const view = useVolumeStore((s) => s.view);
+  const volumeLoaded = useVolumeStore((s) => s.volume !== null);
   const reduced = usePrefersReducedMotion();
 
   const handleToggle = () => toggleToolbar('dock');
 
-  if (view !== 'viewer') return null;
+  if (!volumeLoaded) return null;
 
   return (
     <>
