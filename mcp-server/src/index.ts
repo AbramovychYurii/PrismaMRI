@@ -243,10 +243,28 @@ function startLocalServer(): void {
     httpServer.listen(port, '127.0.0.1', () => {
       process.stderr.write(`[prismamri] Local WS ready — ws://127.0.0.1:${port}\n`);
 
+      let lastAcceptMs = 0;
+      const ACCEPT_COOLDOWN_MS = 2_000;
+
       srv.on('connection', (socket: WebSocket) => {
-        // Only one PWA at a time; replace any stale socket.
+        const now = Date.now();
+        // Reject newcomers while an existing healthy connection is active AND
+        // was accepted within the last 2 s.  This prevents the death spiral
+        // where two clients from different origins take turns superseding each
+        // other every second.  After the cooldown (or when the live socket is
+        // gone) a new connection is accepted normally.
+        if (
+          localSocket?.readyState === WebSocket.OPEN &&
+          now - lastAcceptMs < ACCEPT_COOLDOWN_MS
+        ) {
+          socket.close(1008, 'already connected');
+          return;
+        }
+
+        // Replace any stale or idle socket.
         localSocket?.close(1001, 'superseded by new connection');
         localSocket = socket;
+        lastAcceptMs = now;
         process.stderr.write('[prismamri] PWA connected (local).\n');
 
         // Server-side keepalive: ping the PWA every 20 s.

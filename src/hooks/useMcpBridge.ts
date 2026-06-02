@@ -840,6 +840,14 @@ export function useMcpBridge(sessionId: string | null) {
 
   // ── WebSocket lifecycle ──────────────────────────────────────────────────
 
+  // Refs so that connect() doesn't need sessionId/handleCommand in its deps
+  // and therefore never triggers an effect re-run (and disconnect) when those
+  // values change after the initial mount.
+  const sessionIdRef = useRef(sessionId);
+  sessionIdRef.current = sessionId;
+  const handleCommandRef = useRef(handleCommand);
+  handleCommandRef.current = handleCommand;
+
   const connect = useCallback(() => {
     // Bail out if already connected or a connection attempt is in flight.
     if (wsRef.current || connectingRef.current) return;
@@ -869,18 +877,24 @@ export function useMcpBridge(sessionId: string | null) {
       }
 
       // Fallback: Cloudflare relay (web-app mode or when local server absent).
-      if (!ws && RELAY_URL && sessionId) {
+      // Use the ref so we always get the latest sessionId even if it resolved
+      // after findLocalServer() started (avoids relay fallback with a null ID).
+      if (!ws && RELAY_URL && sessionIdRef.current) {
         const wsBase = RELAY_URL.replace(/^http/, 'ws').replace(/\/$/, '');
-        ws = new WebSocket(`${wsBase}/ws?session=${sessionId}&role=app`);
+        ws = new WebSocket(`${wsBase}/ws?session=${sessionIdRef.current}&role=app`);
         console.debug('[mcp-bridge] falling back to relay');
       }
 
-      connectingRef.current = false;
+      if (!ws) {
+        connectingRef.current = false;
+        return; // nothing to connect to — wait for next trigger
+      }
 
-      if (!ws) return; // nothing to connect to — wait for next trigger
-
+      // Register the socket BEFORE releasing the connecting guard so no
+      // concurrent connect() call can slip into the gap between the two.
       wsRef.current = ws;
       localModeRef.current = isLocal;
+      connectingRef.current = false;
 
       // In local mode the MCP server is already running; mark connected now
       // (no mcp_connecting event will arrive over the relay).
@@ -982,11 +996,13 @@ export function useMcpBridge(sessionId: string | null) {
           store.getState().setAgentSessionActive(false);
           return;
         }
-        if (msg.type === 'cmd') void handleCommand(msg);
+        if (msg.type === 'cmd') void handleCommandRef.current(msg);
       });
 
       // ── Close handler ───────────────────────────────────────────────────
-      ws.addEventListener('close', () => {
+      ws.addEventListener('close', (evt) => {
+        console.debug('[mcp-bridge] ws closed', evt.code, evt.reason || '(none)', { wasClean: evt.wasClean });
+
         // Always stop the heartbeat for this specific socket.
         if (heartbeatTimer.current) {
           clearInterval(heartbeatTimer.current);
@@ -1006,17 +1022,34 @@ export function useMcpBridge(sessionId: string | null) {
         localModeRef.current = false;
         store.getState().setMcpConnected(false);
         store.getState().setLocalPort(null);
+        const wasLocal = isLocal;
+        // code 1001 = superseded by another client connecting to the same port
+        // code 1008 = server rejected us (another healthy connection is active)
+        // Both indicate a competing client — back off with jitter so the two
+        // clients de-synchronise and one gets to stabilise.
+        const competing = evt.code === 1001 || evt.code === 1008;
+        const delay = wasLocal
+          ? competing
+            ? 2_000 + Math.floor(Math.random() * 3_000) // 2–5 s random
+            : 1_000
+          : 5_000;
+        console.debug('[mcp-bridge] scheduling reconnect in', delay, 'ms', competing ? '(backoff — competing client)' : '');
         reconnectTimer.current = setTimeout(() => {
           reconnectTimer.current = null;
           connect();
-        }, 5_000);
+        }, delay);
       });
 
-      ws.addEventListener('error', () => {
+      ws.addEventListener('error', (evt) => {
+        console.debug('[mcp-bridge] ws error', evt.type, ws.url);
         /* close fires next */
       });
     })();
-  }, [sessionId, handleCommand, store, clearSessionIdle]);
+  // sessionId and handleCommand are accessed via refs — removing them from deps
+  // prevents connect() from changing identity (and triggering an effect re-run
+  // that would tear down the live socket) every time sessionId resolves on mount.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [store, clearSessionIdle]);
 
   useEffect(() => {
     if (!isLeader) return;
