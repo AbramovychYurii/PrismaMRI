@@ -681,7 +681,10 @@ export function SessionPanel() {
   const localPort = useVolumeStore((s) => s.localPort);
   const dockOpen = useVolumeStore((s) => s.toolbar.dock);
   const sessionId = useSessionId();
-  const local = isLocalMode();
+  // Prefer the store's localPort over isLocalMode() — localPort is set only when
+  // the bridge actually connected directly to 127.0.0.1 (covers both PWA standalone
+  // and localhost dev-server cases that isLocalMode() would miss).
+  const local = localPort !== null || isLocalMode();
   const [expanded, setExpanded] = useState(false);
   const [dxtState, setDxtState] = useState<BtnState>('idle');
 

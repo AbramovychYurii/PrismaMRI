@@ -25,6 +25,7 @@ const RELAY_URL = import.meta.env.VITE_RELAY_URL as string | undefined;
 // The same extension works for both modes — no reinstall needed.
 
 const LOCAL_PORTS = [7389, 7390, 7391, 7392, 7393];
+const LAST_LOCAL_PORT_KEY = 'prismamri-last-local-port';
 
 function isLocalMode(): boolean {
   return (
@@ -60,7 +61,7 @@ function tryLocalPort(port: number, timeoutMs = 500): Promise<WebSocket> {
  * (300 ms) regardless of how many ports are tried — vs the sequential approach
  * which could take LOCAL_PORTS.length × timeoutMs (1.5 s).
  */
-async function findLocalServer(): Promise<WebSocket | null> {
+function scanAllLocalPorts(): Promise<WebSocket | null> {
   return new Promise((resolve) => {
     let settled = false;
     let pending = LOCAL_PORTS.length;
@@ -81,6 +82,26 @@ async function findLocalServer(): Promise<WebSocket | null> {
         });
     }
   });
+}
+
+/**
+ * Try the last known port first (from localStorage) to avoid noisy failed
+ * WebSocket attempts in the console on every reload.  Falls back to a full
+ * parallel scan of all LOCAL_PORTS when the cached port is stale or absent.
+ */
+async function findLocalServer(): Promise<WebSocket | null> {
+  const cached = localStorage.getItem(LAST_LOCAL_PORT_KEY);
+  if (cached) {
+    const port = Number(cached);
+    if (LOCAL_PORTS.includes(port)) {
+      try {
+        return await tryLocalPort(port, 300);
+      } catch {
+        // cached port no longer listening — fall through to full scan
+      }
+    }
+  }
+  return scanAllLocalPorts();
 }
 
 const SEVERITIES: AnnotationSeverity[] = ['critical', 'serious', 'moderate', 'comment'];
@@ -834,18 +855,24 @@ export function useMcpBridge(sessionId: string | null) {
       // on 127.0.0.1 and a direct connection is always preferred over the relay.
       // Parallel port-scan (300 ms max) keeps the overhead negligible even when
       // no local server is running.
+      console.debug('[mcp-bridge] scanning local ports…', { isLocalMode: isLocalMode() });
       ws = await findLocalServer();
+      console.debug('[mcp-bridge] findLocalServer →', ws ? `found ${ws.url}` : 'not found');
       if (ws) {
         isLocal = true;
         // Extract port from ws://127.0.0.1:PORT and persist it for the UI.
         const port = Number(new URL(ws.url).port);
-        if (port) store.getState().setLocalPort(port);
+        if (port) {
+          store.getState().setLocalPort(port);
+          localStorage.setItem(LAST_LOCAL_PORT_KEY, String(port));
+        }
       }
 
       // Fallback: Cloudflare relay (web-app mode or when local server absent).
       if (!ws && RELAY_URL && sessionId) {
         const wsBase = RELAY_URL.replace(/^http/, 'ws').replace(/\/$/, '');
         ws = new WebSocket(`${wsBase}/ws?session=${sessionId}&role=app`);
+        console.debug('[mcp-bridge] falling back to relay');
       }
 
       connectingRef.current = false;
@@ -868,9 +895,16 @@ export function useMcpBridge(sessionId: string | null) {
         const tryUpgrade = async () => {
           const currentWs = wsRef.current;
           if (!currentWs || localModeRef.current) return; // already local or gone
-          if (currentWs.readyState !== WebSocket.OPEN) return; // will reconnect anyway
+          // Relay not open yet — reschedule instead of bailing permanently
+          if (currentWs.readyState !== WebSocket.OPEN) {
+            console.debug('[mcp-bridge] upgrade: relay not open yet, retrying in 2s');
+            localUpgradeRef.current = setTimeout(() => { void tryUpgrade(); }, 2_000);
+            return;
+          }
 
+          console.debug('[mcp-bridge] upgrade: scanning for local server…');
           const probe = await findLocalServer();
+          console.debug('[mcp-bridge] upgrade probe →', probe ? `found ${probe.url}` : 'not found');
           if (!probe) {
             // Not available yet — check again in 5 s.
             localUpgradeRef.current = setTimeout(() => {
@@ -880,6 +914,7 @@ export function useMcpBridge(sessionId: string | null) {
           }
           // Found the local server.  Discard the probe socket — connect() will
           // open a fresh one — and close the relay to trigger an immediate reconnect.
+          console.debug('[mcp-bridge] upgrading to local connection');
           probe.close();
           localUpgradeRef.current = null;
           wsRef.current = null; // prevent the close handler scheduling a 5 s delay
@@ -952,14 +987,25 @@ export function useMcpBridge(sessionId: string | null) {
 
       // ── Close handler ───────────────────────────────────────────────────
       ws.addEventListener('close', () => {
-        wsRef.current = null;
-        localModeRef.current = false;
-        store.getState().setMcpConnected(false);
-        store.getState().setLocalPort(null);
+        // Always stop the heartbeat for this specific socket.
         if (heartbeatTimer.current) {
           clearInterval(heartbeatTimer.current);
           heartbeatTimer.current = null;
         }
+
+        // If wsRef was already replaced (e.g. by a local upgrade that raced
+        // ahead before this close event fired), do NOT clobber the new
+        // connection or schedule a redundant reconnect — connect() is already
+        // running or has already completed.
+        if (wsRef.current !== ws) {
+          console.debug('[mcp-bridge] close: skipping cleanup — wsRef already replaced');
+          return;
+        }
+
+        wsRef.current = null;
+        localModeRef.current = false;
+        store.getState().setMcpConnected(false);
+        store.getState().setLocalPort(null);
         reconnectTimer.current = setTimeout(() => {
           reconnectTimer.current = null;
           connect();
