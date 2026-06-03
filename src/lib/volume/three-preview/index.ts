@@ -40,6 +40,10 @@ export class ThreePreview {
   private raf = 0;
   private disposed = false;
   private dirty = true;
+  /** Timestamp of the last renderer.render() call — used to keep the GPU warm. */
+  private lastRenderAt = 0;
+  /** Interval between keepalive renders when the scene is otherwise idle (ms). */
+  private static readonly KEEPALIVE_MS = 8_000;
   /** Native device pixel ratio (capped at 2). Used to restore after interaction. */
   private readonly nativeDpr = Math.min(window.devicePixelRatio, 2);
 
@@ -70,6 +74,9 @@ export class ThreePreview {
       antialias: true,
       alpha: true,
       powerPreference: 'high-performance',
+      // Required so ctx.drawImage / toDataURL can read the WebGL buffer
+      // after renderer.render() without the content being swapped away.
+      preserveDrawingBuffer: true,
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.sortObjects = false;
@@ -404,9 +411,23 @@ export class ThreePreview {
       // override every snap animation frame.
       this.controls?.update();
     }
-    if (!this.dirty) return;
+    if (!this.dirty) {
+      // Keepalive: render to a 1×1 offscreen target when idle to keep the GPU
+      // and compiled shaders warm. Uses WebGLRenderTarget so the main canvas
+      // is never touched — no visible flash in the browser.
+      if (this.volume && ts - this.lastRenderAt > ThreePreview.KEEPALIVE_MS) {
+        const warm = new THREE.WebGLRenderTarget(1, 1);
+        this.renderer.setRenderTarget(warm);
+        this.renderer.render(this.scene, this.camera);
+        this.renderer.setRenderTarget(null);
+        warm.dispose();
+        this.lastRenderAt = ts;
+      }
+      return;
+    }
     this.updateCameraUniform();
     this.renderer.render(this.scene, this.camera);
+    this.lastRenderAt = ts;
     this.dirty = false;
   };
 
@@ -417,6 +438,80 @@ export class ThreePreview {
    * exported image is fully opaque and matches exactly what the user sees
    * (cursor planes, clip mode, colour LUT — everything included).
    */
+  /**
+   * Synchronous JPEG export for MCP captures.
+   *
+   * Renders directly at the capped resolution (≤ maxEdge px on the longest
+   * edge) rather than rendering at full viewport size and downscaling
+   * afterwards. This is critical for expensive presets (bone / tissue) that
+   * do per-voxel raycasting — rendering at 512 px instead of a 1600×1200
+   * retina viewport cuts the pixel count by ~10× and keeps the operation well
+   * inside the MCP tool timeout.
+   *
+   * Returns a raw base64 JPEG string (no data-URL prefix).
+   */
+  captureJpeg(maxEdge = 512, quality = 0.92): string {
+    const el = this.renderer.domElement;
+    const dpr = this.renderer.getPixelRatio();
+    const m = this.volume?.material;
+
+    // Capture size: keep aspect ratio, cap at maxEdge.
+    const cssW = Math.round(el.width / dpr);
+    const cssH = Math.round(el.height / dpr);
+    const scale = Math.min(1, maxEdge / Math.max(cssW, cssH));
+    const capW = Math.max(1, Math.round(cssW * scale));
+    const capH = Math.max(1, Math.round(cssH * scale));
+
+    // Save shader state.
+    const origSteps   = m?.uniforms.u_steps.value   as number | undefined;
+    const origShading = m?.uniforms.u_shading.value  as number | undefined;
+
+    // Reduce raycast cost for capture:
+    //  • 64 steps (vs 256) — 4× fewer per-fragment iterations; negligible quality
+    //    loss at ≤512 px for AI analysis thumbnails
+    //  • Phong shading off — eliminates 6 extra texture lookups per step for
+    //    gradient estimation
+    if (m) {
+      m.uniforms.u_steps.value   = 64;
+      m.uniforms.u_shading.value = 0;
+    }
+
+    // Render to an offscreen WebGLRenderTarget — the main canvas is never touched
+    // so the 3-D view in the browser is not affected.
+    const target = new THREE.WebGLRenderTarget(capW, capH);
+    this.renderer.setRenderTarget(target);
+    this.updateCameraUniform();
+    this.renderer.render(this.scene, this.camera);
+    this.renderer.setRenderTarget(null);
+
+    // Read pixels (WebGL origin is bottom-left → flip vertically).
+    const pixels = new Uint8Array(capW * capH * 4);
+    this.renderer.readRenderTargetPixels(target, 0, 0, capW, capH, pixels);
+    target.dispose();
+
+    const flipped = new Uint8ClampedArray(capW * capH * 4);
+    const rowBytes = capW * 4;
+    for (let y = 0; y < capH; y++) {
+      flipped.set(
+        pixels.subarray((capH - 1 - y) * rowBytes, (capH - y) * rowBytes),
+        y * rowBytes,
+      );
+    }
+
+    // Restore shader state.
+    if (m) {
+      m.uniforms.u_steps.value   = origSteps   ?? 256;
+      m.uniforms.u_shading.value = origShading ?? 1;
+    }
+
+    // Encode to JPEG via a temp 2D canvas.
+    const off = document.createElement('canvas');
+    off.width  = capW;
+    off.height = capH;
+    off.getContext('2d')!.putImageData(new ImageData(flipped, capW, capH), 0, 0);
+    return off.toDataURL('image/jpeg', quality).replace(/^data:[^;]+;base64,/, '');
+  }
+
   exportPNG(): Promise<Blob> {
     // Force one synchronous render so the WebGL buffer is current.
     this.updateCameraUniform();

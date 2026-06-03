@@ -266,32 +266,6 @@ function renderSliceForMcp(image: {
   return encodeForMcp(canvas);
 }
 
-/**
- * Decode a PNG blob into an Image, downscale to MCP limits, and re-encode as
- * JPEG. Used for 3-D captures which arrive as a PNG blob from the WebGL renderer.
- */
-function blobToMcpJpeg(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(blob);
-    const img = new Image();
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      const scale = Math.min(1, MCP_MAX_EDGE / Math.max(img.width, img.height));
-      const dw = Math.max(1, Math.round(img.width * scale));
-      const dh = Math.max(1, Math.round(img.height * scale));
-      const canvas = document.createElement('canvas');
-      canvas.width = dw;
-      canvas.height = dh;
-      canvas.getContext('2d')!.drawImage(img, 0, 0, dw, dh);
-      resolve(canvas.toDataURL('image/jpeg', MCP_JPEG_QUALITY).replace(/^data:[^;]+;base64,/, ''));
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error('Failed to decode blob'));
-    };
-    img.src = url;
-  });
-}
 
 const ACTION_LABELS: Record<string, string> = {
   get_state: 'Reading viewer state',
@@ -595,7 +569,16 @@ export function useMcpBridge() {
 
           // ── set_preset (3-D render) ───────────────────────────────────
           case 'set_preset': {
-            store.getState().setRenderPreset(msg.preset as 'mip' | 'tissue' | 'bone');
+            const preset = msg.preset as string;
+            if (preset === 'tissue') {
+              fail(
+                '"tissue" preset is not available via MCP — ' +
+                  'it requires full per-voxel compositing which exceeds the capture time budget. ' +
+                  'Use "bone" for skeletal/dental CT or "mip" for overview.',
+              );
+              break;
+            }
+            store.getState().setRenderPreset(preset as 'mip' | 'bone');
             ok();
             break;
           }
@@ -653,8 +636,7 @@ export function useMcpBridge() {
               break;
             }
             await waitForPaint();
-            const blob = await preview.exportPNG();
-            ok({ imageData: await blobToMcpJpeg(blob) });
+            ok({ imageData: preview.captureJpeg(MCP_MAX_EDGE, MCP_JPEG_QUALITY) });
             break;
           }
 
