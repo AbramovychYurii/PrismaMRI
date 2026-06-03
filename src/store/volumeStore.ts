@@ -1,6 +1,7 @@
 import { isSlicePlane } from '@/constants';
 import * as annotationsStorage from '@/lib/annotationsStorage';
 import type { ThreePreview } from '@/lib/volume/three-preview';
+import { deriveVolumeId } from '@/lib/volumeId';
 import type {
   ActiveMeasurement,
   AiAnnotation,
@@ -40,7 +41,9 @@ interface VolumeState {
   snapPlane: SlicePlane;
   /** Active tab on mobile layout. */
   mobileTab: MobileTab;
-  /** AI annotation findings placed by the MCP agent. */
+  /** Stable ID of the currently loaded volume (null when no volume is open). */
+  activeVolumeId: string | null;
+  /** AI annotation findings for the active volume only. */
   aiAnnotations: AiAnnotation[];
   /** Currently focused finding — drives the summary card + marker emphasis. */
   activeAnnotationId: string | null;
@@ -76,7 +79,7 @@ interface VolumeActions {
   setSlabMm: (mm: number) => void;
   requestSnapToView: (plane: SlicePlane) => void;
   setMobileTab: (tab: MobileTab) => void;
-  addAiAnnotation: (a: AiAnnotation) => void;
+  addAiAnnotation: (a: Omit<AiAnnotation, 'volumeId'>) => void;
   removeAiAnnotation: (id: string) => void;
   clearAiAnnotations: () => void;
   setActiveAnnotation: (id: string | null) => void;
@@ -124,9 +127,8 @@ const initialState: VolumeState = {
   snapSeq: 0,
   snapPlane: 'coronal',
   mobileTab: '3d',
-  // Hydrate from localStorage so previously placed findings survive reloads
-  // and volume switches. Cleared explicitly via `clearAiAnnotations`.
-  aiAnnotations: annotationsStorage.load(),
+  activeVolumeId: null,
+  aiAnnotations: [],
   activeAnnotationId: null,
   mcpConnected: false,
   localPort: null,
@@ -139,7 +141,9 @@ const initialState: VolumeState = {
 export const useVolumeStore = create<VolumeState & VolumeActions>((set) => ({
   ...initialState,
 
-  setVolume: (volume, prepared3D, histogram) =>
+  setVolume: (volume, prepared3D, histogram) => {
+    const activeVolumeId = deriveVolumeId(volume);
+    const aiAnnotations = annotationsStorage.load(activeVolumeId);
     set({
       volume,
       prepared3D,
@@ -157,10 +161,11 @@ export const useVolumeStore = create<VolumeState & VolumeActions>((set) => ({
       activePlane: initialState.activePlane,
       snapSeq: 0,
       error: null,
-      // Intentionally do NOT reset `aiAnnotations` here — findings persist
-      // across volume switches and are cleared only via `clearAiAnnotations`.
+      activeVolumeId,
+      aiAnnotations,
       activeAnnotationId: null,
-    }),
+    });
+  },
 
   setCursor: (cursor) =>
     set((state) => {
@@ -256,25 +261,28 @@ export const useVolumeStore = create<VolumeState & VolumeActions>((set) => ({
 
   addAiAnnotation: (a) =>
     set((state) => {
-      const next = [...state.aiAnnotations, a];
-      annotationsStorage.save(next);
+      if (!state.activeVolumeId) return {};
+      const tagged = { ...a, volumeId: state.activeVolumeId };
+      const next = [...state.aiAnnotations, tagged];
+      annotationsStorage.save(state.activeVolumeId, next);
       return { aiAnnotations: next };
     }),
 
   removeAiAnnotation: (id) =>
     set((state) => {
       const next = state.aiAnnotations.filter((a) => a.id !== id);
-      annotationsStorage.save(next);
+      if (state.activeVolumeId) annotationsStorage.save(state.activeVolumeId, next);
       return {
         aiAnnotations: next,
         activeAnnotationId: state.activeAnnotationId === id ? null : state.activeAnnotationId,
       };
     }),
 
-  clearAiAnnotations: () => {
-    annotationsStorage.clear();
-    set({ aiAnnotations: [], activeAnnotationId: null });
-  },
+  clearAiAnnotations: () =>
+    set((state) => {
+      if (state.activeVolumeId) annotationsStorage.clear(state.activeVolumeId);
+      return { aiAnnotations: [], activeAnnotationId: null };
+    }),
 
   setActiveAnnotation: (activeAnnotationId) => set({ activeAnnotationId }),
 

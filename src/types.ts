@@ -147,6 +147,8 @@ export type AnnotationSeverity = 'critical' | 'serious' | 'moderate' | 'comment'
 export interface AiAnnotation {
   /** Unique ID so React keys are stable. */
   id: string;
+  /** Stable identifier of the volume this finding belongs to (see deriveVolumeId). */
+  volumeId: string;
   /** Plane the agent was viewing when it placed the marker. */
   plane: SlicePlane;
   /** Horizontal fraction 0–1 from the left edge of the slice canvas. */

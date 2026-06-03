@@ -775,8 +775,7 @@ export function ReportModal({ finding, findingIndex, allFindings, onClose }: Pro
                 <ScopeName $active={scope === 'finding'}>This finding</ScopeName>
                 <ScopeDesc>
                   {finding.label.slice(0, 32)}
-                  {finding.label.length > 32 ? '…' : ''} · F-
-                  {String(findingIndex + 1).padStart(2, '0')}
+                  {finding.label.length > 32 ? '…' : ''}
                 </ScopeDesc>
               </ScopeBody>
               {/* pages label removed */}

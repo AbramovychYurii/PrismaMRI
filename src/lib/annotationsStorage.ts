@@ -1,35 +1,31 @@
 /**
- * annotationsStorage — persists the current AI annotation set in localStorage.
+ * annotationsStorage — persists AI annotation sets in localStorage,
+ * keyed by volume ID so findings from different files never bleed into each other.
  *
- * Design rules (intentional, not accidental):
+ * Storage format (v2):
+ *   { version: 2, volumes: { [volumeId]: { savedAt, annotations[] } } }
  *
- *  • Only ONE annotation set lives in storage at any time. Adding to a new
- *    volume overwrites the previous set silently — we never accumulate.
- *  • Annotations are cleared from storage only when the app explicitly calls
- *    `clear()` (e.g. via the "Clear all findings" action). Reloading the page,
- *    switching volumes, or closing the tab does NOT clear them.
- *  • The payload is a forward-compatible envelope (`{ version, savedAt,
- *    annotations }`) so future fields (volume hash, AI agent run id, …) can be
- *    layered in without breaking existing saves.
- *
- * Storage failures (quota, disabled storage, SSR) are swallowed — the in-memory
- * Zustand store remains the source of truth at runtime.
+ * Design rules:
+ *  • Each volume has its own slot — loading a new file never overwrites findings
+ *    from a previous one.
+ *  • `clear(volumeId)` removes one volume's slot; `clearAll()` wipes everything.
+ *  • Storage failures (quota, disabled, SSR) are swallowed — the in-memory
+ *    Zustand store is the source of truth at runtime.
  */
 
 import type { AiAnnotation } from '@/types';
 
-/** Storage key — single slot, fixed name. */
-const STORAGE_KEY = 'prismamri.annotations.v1';
+const STORAGE_KEY = 'prismamri.annotations.v2';
+const SCHEMA_VERSION = 2 as const;
 
-/** Schema version stored inside the payload so future migrations are possible
- *  without colliding on the storage key. */
-const SCHEMA_VERSION = 1 as const;
+interface VolumeSlot {
+  savedAt: string;
+  annotations: AiAnnotation[];
+}
 
 interface StoredEnvelope {
   version: typeof SCHEMA_VERSION;
-  /** ISO timestamp of the last write — useful for "saved examples" in the UI. */
-  savedAt: string;
-  annotations: AiAnnotation[];
+  volumes: Record<string, VolumeSlot>;
 }
 
 function safeLocalStorage(): Storage | null {
@@ -41,41 +37,56 @@ function safeLocalStorage(): Storage | null {
   }
 }
 
-/** Read the persisted set. Returns [] when there's nothing saved or the stored
- *  payload is malformed / from an unknown schema version. */
-export function load(): AiAnnotation[] {
-  const ls = safeLocalStorage();
-  if (!ls) return [];
+function readEnvelope(ls: Storage): StoredEnvelope {
   try {
     const raw = ls.getItem(STORAGE_KEY);
-    if (!raw) return [];
+    if (!raw) return { version: SCHEMA_VERSION, volumes: {} };
     const parsed = JSON.parse(raw) as Partial<StoredEnvelope>;
-    if (parsed?.version !== SCHEMA_VERSION) return [];
-    if (!Array.isArray(parsed.annotations)) return [];
-    return parsed.annotations;
+    if (parsed?.version !== SCHEMA_VERSION) return { version: SCHEMA_VERSION, volumes: {} };
+    return { version: SCHEMA_VERSION, volumes: parsed.volumes ?? {} };
   } catch {
-    return [];
+    return { version: SCHEMA_VERSION, volumes: {} };
   }
 }
 
-/** Overwrite the persisted set with the given annotations (single-slot). */
-export function save(annotations: AiAnnotation[]): void {
-  const ls = safeLocalStorage();
-  if (!ls) return;
+function writeEnvelope(ls: Storage, envelope: StoredEnvelope): void {
   try {
-    const envelope: StoredEnvelope = {
-      version: SCHEMA_VERSION,
-      savedAt: new Date().toISOString(),
-      annotations,
-    };
     ls.setItem(STORAGE_KEY, JSON.stringify(envelope));
   } catch {
     // Quota exceeded or other write error — ignore.
   }
 }
 
-/** Explicit clear. Use only when the user opts in (e.g. "Clear all findings"). */
-export function clear(): void {
+/** Read annotations for a specific volume. Returns [] when nothing is saved. */
+export function load(volumeId: string): AiAnnotation[] {
+  const ls = safeLocalStorage();
+  if (!ls) return [];
+  const envelope = readEnvelope(ls);
+  const slot = envelope.volumes[volumeId];
+  if (!slot || !Array.isArray(slot.annotations)) return [];
+  return slot.annotations;
+}
+
+/** Save annotations for a specific volume (overwrites that volume's slot). */
+export function save(volumeId: string, annotations: AiAnnotation[]): void {
+  const ls = safeLocalStorage();
+  if (!ls) return;
+  const envelope = readEnvelope(ls);
+  envelope.volumes[volumeId] = { savedAt: new Date().toISOString(), annotations };
+  writeEnvelope(ls, envelope);
+}
+
+/** Remove findings for one volume. */
+export function clear(volumeId: string): void {
+  const ls = safeLocalStorage();
+  if (!ls) return;
+  const envelope = readEnvelope(ls);
+  delete envelope.volumes[volumeId];
+  writeEnvelope(ls, envelope);
+}
+
+/** Wipe all findings for all volumes. */
+export function clearAll(): void {
   const ls = safeLocalStorage();
   if (!ls) return;
   try {

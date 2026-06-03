@@ -721,7 +721,7 @@ export function useMcpBridge(sessionId: string | null) {
             const rawVoxel = voxelFromFrac(plane, fx, fy, cursor, volume.meta.dims);
             const snappedVoxel = snapToAnatomy(rawVoxel, plane, volume);
             const rawConfidence = msg.confidence as number | undefined;
-            const annotation: AiAnnotation = {
+            const annotation: Omit<AiAnnotation, 'volumeId'> = {
               id: crypto.randomUUID(),
               plane,
               fx,
