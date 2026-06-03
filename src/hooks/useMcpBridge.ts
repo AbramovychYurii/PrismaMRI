@@ -843,6 +843,27 @@ export function useMcpBridge() {
   const handleCommandRef = useRef(handleCommand);
   handleCommandRef.current = handleCommand;
 
+  // Watchdog: if no ping is received from the server within this window,
+  // the connection is silently dead — close it so a reconnect can happen.
+  // Must be > server PING_INTERVAL_MS (8 s) + round-trip budget.
+  const PING_WATCHDOG_MS = 20_000;
+  const pingWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const resetPingWatchdog = useCallback((ws: WebSocket) => {
+    if (pingWatchdogRef.current) clearTimeout(pingWatchdogRef.current);
+    pingWatchdogRef.current = setTimeout(() => {
+      console.debug('[mcp-bridge] ping watchdog — no ping in', PING_WATCHDOG_MS, 'ms, closing');
+      ws.close(4000, 'ping watchdog timeout');
+    }, PING_WATCHDOG_MS);
+  }, []);
+
+  const clearPingWatchdog = useCallback(() => {
+    if (pingWatchdogRef.current) {
+      clearTimeout(pingWatchdogRef.current);
+      pingWatchdogRef.current = null;
+    }
+  }, []);
+
   const connect = useCallback(() => {
     // Bail out if already connected or a connection attempt is in flight.
     if (wsRef.current || connectingRef.current) return;
@@ -886,7 +907,8 @@ export function useMcpBridge() {
           clearTimeout(reconnectTimer.current);
           reconnectTimer.current = null;
         }
-        // Local mode: the MCP server pings us — we respond (see message handler).
+        // Start watchdog immediately — first ping should arrive within 8 s.
+        if (isLocal) resetPingWatchdog(ws);
       });
 
       // ── Message handler ─────────────────────────────────────────────────
@@ -899,8 +921,9 @@ export function useMcpBridge() {
         }
 
         if (msg.type === 'ping') {
-          // Local mode: server keepalive — send pong back.
+          // Local mode: server keepalive — send pong back and reset watchdog.
           wsRef.current?.send('{"type":"pong"}');
+          if (isLocal) resetPingWatchdog(ws);
           return;
         }
         if (msg.type === 'pong') {
@@ -932,6 +955,7 @@ export function useMcpBridge() {
         }
 
         wsRef.current = null;
+        clearPingWatchdog();
         store.getState().setMcpConnected(false);
         store.getState().setLocalPort(null);
         // code 1001 = superseded by another client connecting to the same port
@@ -962,7 +986,7 @@ export function useMcpBridge() {
     // handleCommand is accessed via ref — removing it from deps prevents connect()
     // from changing identity (and triggering a re-run) on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store, clearSessionIdle]);
+  }, [store, clearSessionIdle, resetPingWatchdog, clearPingWatchdog]);
 
   useEffect(() => {
     if (!isLeader) return;
@@ -970,10 +994,11 @@ export function useMcpBridge() {
     return () => {
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
       clearSessionIdle();
+      clearPingWatchdog();
       wsRef.current?.close(1000, 'unmount');
       wsRef.current = null;
     };
-  }, [isLeader, connect, clearSessionIdle]);
+  }, [isLeader, connect, clearSessionIdle, clearPingWatchdog]);
 
   // When the browser tab becomes visible again (user switches back), reconnect
   // immediately if the WebSocket is gone — browsers throttle timers in hidden

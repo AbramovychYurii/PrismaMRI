@@ -164,7 +164,7 @@ export const Panel = styled.div<{ $dockOpen: boolean }>`
   z-index: var(--z-modal);
   display: flex;
   flex-direction: column;
-  width: 400px;
+  width: 370px;
   background: rgba(14, 12, 9, 0.97);
   border: 1px solid var(--rule);
   border-radius: 10px;
@@ -194,7 +194,7 @@ export const PanelHeader = styled.div<{ $connected: boolean }>`
   transition: background 200ms;
   &:hover {
     background: ${({ $connected }) =>
-      $connected ? 'rgba(80,200,120,0.10)' : 'rgba(255,255,255,0.04)'};
+    $connected ? 'rgba(80,200,120,0.10)' : 'rgba(255,255,255,0.04)'};
   }
 `;
 
@@ -890,7 +890,7 @@ export function SessionPanel() {
                   ? 'Downloaded!'
                   : dxtState === 'err'
                     ? 'Download failed'
-                    : 'Download Claude Desktop Extension (.dxt)'}
+                    : 'Download Claude Desktop Extension'}
               </ActionBtn>
               <Hint>
                 Then open{' '}

@@ -244,15 +244,20 @@ function startLocalServer(): void {
       process.stderr.write(`[prismamri] Local WS ready — ws://127.0.0.1:${port}\n`);
 
       let lastAcceptMs = 0;
-      const ACCEPT_COOLDOWN_MS = 2_000;
+      // Cooldown raised to 3 s — gives the client's 1-second reconnect delay
+      // enough headroom so a legitimate fast reconnect isn't rejected as
+      // a competing client, which was causing spurious 1008/backoff cycles.
+      const ACCEPT_COOLDOWN_MS = 3_000;
+      // Ping every 8 s and terminate if no pong arrives within one interval.
+      // 20 s was too long: a silently-dead socket would block new connections
+      // for up to 20 s and the server never learned the client was gone.
+      const PING_INTERVAL_MS = 8_000;
 
       srv.on('connection', (socket: WebSocket) => {
         const now = Date.now();
         // Reject newcomers while an existing healthy connection is active AND
-        // was accepted within the last 2 s.  This prevents the death spiral
-        // where two clients from different origins take turns superseding each
-        // other every second.  After the cooldown (or when the live socket is
-        // gone) a new connection is accepted normally.
+        // was accepted within the cooldown window.  After the cooldown (or when
+        // the live socket is gone) a new connection is accepted normally.
         if (
           localSocket?.readyState === WebSocket.OPEN &&
           now - lastAcceptMs < ACCEPT_COOLDOWN_MS
@@ -267,15 +272,26 @@ function startLocalServer(): void {
         lastAcceptMs = now;
         process.stderr.write('[prismamri] PWA connected (local).\n');
 
-        // Server-side keepalive: ping the PWA every 20 s.
+        // ── Keepalive with pong watchdog ───────────────────────────────────
+        // Send a ping every PING_INTERVAL_MS.  If the client does not reply
+        // within the next interval the socket is terminated so a new
+        // connection can be established immediately (instead of waiting for
+        // the OS TCP stack to report the drop, which can take minutes).
+        let pongReceived = true; // treat first interval as if pong was received
         const hb = setInterval(() => {
+          if (!pongReceived) {
+            process.stderr.write('[prismamri] Pong timeout — terminating stale socket.\n');
+            socket.terminate(); // forceful close, triggers the 'close' event
+            return;
+          }
+          pongReceived = false;
           if (socket.readyState === WebSocket.OPEN) socket.send('{"type":"ping"}');
-        }, 20_000);
+        }, PING_INTERVAL_MS);
 
         socket.on('message', (raw: WebSocket.RawData) => {
           let msg: Record<string, unknown>;
           try { msg = JSON.parse(raw.toString()) as Record<string, unknown>; } catch { return; }
-          if (msg.type === 'pong') return; // keepalive ack
+          if (msg.type === 'pong') { pongReceived = true; return; }
           if (msg.type === 'result') handleResult(msg);
         });
 
