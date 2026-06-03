@@ -12,7 +12,6 @@
  */
 
 import { DOCK_H } from '@/components/dock/Dock';
-import { useSessionId } from '@/hooks/useSessionId';
 import { useVolumeStore } from '@/store/volumeStore';
 import JSZip from 'jszip';
 import {
@@ -23,7 +22,6 @@ import {
   ClipboardCheck,
   Download,
   Info,
-  Unplug,
   X,
   Zap,
 } from 'lucide-react';
@@ -33,7 +31,6 @@ import styled, { keyframes } from 'styled-components';
 
 // ── Environment ───────────────────────────────────────────────────────────────
 
-const RELAY_URL = import.meta.env.VITE_RELAY_URL as string | undefined;
 const SERVER_BUNDLE_URL = `${import.meta.env.BASE_URL}dxt-server/index.js`;
 const WS_LIB_URL = `${import.meta.env.BASE_URL}dxt-server/ws/`;
 
@@ -55,7 +52,7 @@ function isLocalMode(): boolean {
 
 // ── .dxt download ─────────────────────────────────────────────────────────────
 
-async function downloadDxt(sessionId: string, relayUrl: string): Promise<void> {
+async function downloadDxt(): Promise<void> {
   const [serverJs, wsIndex, wsLib] = await Promise.all([
     fetch(SERVER_BUNDLE_URL).then((r) => r.arrayBuffer()),
     fetch(`${WS_LIB_URL}index.js`).then((r) => r.text()),
@@ -97,10 +94,7 @@ async function downloadDxt(sessionId: string, relayUrl: string): Promise<void> {
       mcp_config: {
         command: 'node',
         args: ['${__dirname}/server/index.js'],
-        env: {
-          PRISMAMRI_SESSION: sessionId,
-          PRISMAMRI_RELAY_URL: relayUrl,
-        },
+        env: {},
       },
     },
     tools: [
@@ -200,7 +194,7 @@ export const PanelHeader = styled.div<{ $connected: boolean }>`
   transition: background 200ms;
   &:hover {
     background: ${({ $connected }) =>
-    $connected ? 'rgba(80,200,120,0.10)' : 'rgba(255,255,255,0.04)'};
+      $connected ? 'rgba(80,200,120,0.10)' : 'rgba(255,255,255,0.04)'};
   }
 `;
 
@@ -408,21 +402,6 @@ const CapabilityText = styled.span`
   letter-spacing: 0.02em;
 `;
 
-// ── Badge (remote mode only) ──────────────────────────────────────────────────
-
-const Badge = styled.span`
-  font-size: 8.5px;
-  font-family: var(--mono);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  padding: 1.5px 5px;
-  border-radius: 3px;
-  border: 1px solid rgba(255,181,71,0.35);
-  background: rgba(255,181,71,0.08);
-  color: var(--amber);
-  flex-shrink: 0;
-  line-height: 1;
-`;
 
 // ── InfoTip ───────────────────────────────────────────────────────────────────
 
@@ -768,7 +747,6 @@ export function SessionPanel() {
   const agentWorking = useVolumeStore((s) => s.agentSessionActive);
   const localPort = useVolumeStore((s) => s.localPort);
   const dockOpen = useVolumeStore((s) => s.toolbar.dock);
-  const sessionId = useSessionId();
   // Prefer the store's localPort over isLocalMode() — localPort is set only when
   // the bridge actually connected directly to 127.0.0.1 (covers both PWA standalone
   // and localhost dev-server cases that isLocalMode() would miss).
@@ -778,20 +756,17 @@ export function SessionPanel() {
   const [dxtState, setDxtState] = useState<BtnState>('idle');
 
   const handleDownloadDxt = useCallback(async () => {
-    if (!RELAY_URL || !sessionId) return;
     setDxtState('idle');
     try {
-      await downloadDxt(sessionId, RELAY_URL);
+      await downloadDxt();
       setDxtState('ok');
       setTimeout(() => setDxtState('idle'), 3000);
     } catch {
       setDxtState('err');
       setTimeout(() => setDxtState('idle'), 3000);
     }
-  }, [sessionId]);
+  }, []);
 
-  // Nothing to show if we have no relay config and the session is not local.
-  if (!local && (!RELAY_URL || !sessionId)) return null;
 
   const toggle = () => setExpanded((o) => !o);
 
@@ -823,7 +798,6 @@ export function SessionPanel() {
           <StatusText $connected={mcpConnected}>
             {mcpConnected ? 'AI Agent Connected' : 'Waiting for Agent'}
           </StatusText>
-          {!local && <Badge>Beta</Badge>}
           <CollapseBtn type="button" aria-label="Collapse panel">
             <X size={14} />
           </CollapseBtn>
@@ -917,48 +891,6 @@ export function SessionPanel() {
             </>
           )}
 
-          {/* ── CONNECTED via relay (Web) ── */}
-          {mcpConnected && !local && (
-            <>
-              <Row>
-                <Label style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                  Via Cloudflare relay
-                  <InfoTip text="Commands travel through the Cloudflare relay. No scan data is sent — only control messages and slice captures." />
-                </Label>
-                {RELAY_URL && (
-                  <Value style={{ fontSize: 10, opacity: 0.4 }}>
-                    {new URL(RELAY_URL).hostname}
-                  </Value>
-                )}
-              </Row>
-              {sessionId && (
-                <Row>
-                  <Label>Session ID</Label>
-                  <Value style={{ fontSize: 10, opacity: 0.4, letterSpacing: '0.02em' }}>
-                    {sessionId}
-                  </Value>
-                </Row>
-              )}
-              <Divider />
-              <PromptSection />
-              <ActionBtn
-                type="button"
-                $danger
-                onClick={() => {
-                  const ok = window.confirm(
-                    'Disconnect the current agent?\n\nThis ends the live session and ' +
-                    'invalidates the installed extension. To reconnect, download a fresh .dxt and reinstall it.',
-                  );
-                  if (!ok) return;
-                  localStorage.setItem('prismamri-session-id', crypto.randomUUID());
-                  window.location.reload();
-                }}
-              >
-                <Unplug size={12} />
-                Disconnect agent
-              </ActionBtn>
-            </>
-          )}
 
           {/* ── CONNECTED via local WS (PWA) ── */}
           {mcpConnected && local && (

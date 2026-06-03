@@ -1,8 +1,8 @@
 /**
- * useMcpBridge — WebSocket bridge between the app and the MCP server relay.
+ * useMcpBridge — WebSocket bridge between the app and the local MCP server.
  *
+ * Connects directly to the Claude Desktop extension on 127.0.0.1.
  * Handles all commands sent by the MCP server and sends results back.
- * Call once at the app root.  No-op when VITE_RELAY_URL is not set.
  */
 
 import { extractSliceGrayImage } from '@/lib/volume/slices';
@@ -17,24 +17,10 @@ import type {
 } from '@/types';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-const RELAY_URL = import.meta.env.VITE_RELAY_URL as string | undefined;
-
 // ── Local-mode detection & discovery ─────────────────────────────────────────
-// When running as an installed PWA (standalone display mode) or from localhost,
-// connect directly to the MCP server's local WS instead of going through relay.
-// The same extension works for both modes — no reinstall needed.
 
 const LOCAL_PORTS = [7389, 7390, 7391, 7392, 7393];
 const LAST_LOCAL_PORT_KEY = 'prismamri-last-local-port';
-
-function isLocalMode(): boolean {
-  return (
-    window.matchMedia('(display-mode: standalone)').matches ||
-    // iOS Safari sets navigator.standalone
-    (navigator as { standalone?: boolean }).standalone === true ||
-    ['localhost', '127.0.0.1'].includes(location.hostname)
-  );
-}
 
 /** Try to open ws://127.0.0.1:port within timeoutMs. Resolves with the open socket. */
 function tryLocalPort(port: number, timeoutMs = 500): Promise<WebSocket> {
@@ -347,22 +333,12 @@ const WL_PRESETS: Record<string, [number, number]> = {
 /** Milliseconds of command inactivity before the session banner is hidden. */
 const SESSION_IDLE_MS = 20_000;
 
-export function useMcpBridge(sessionId: string | null) {
+export function useMcpBridge() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const heartbeatTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const sessionIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** Timestamp of the last pong received from the relay (relay mode only). */
-  const lastPongAt = useRef<number>(Date.now());
   /** Prevents concurrent connect() calls while async port-scan is in flight. */
   const connectingRef = useRef(false);
-  /** True when the current socket is a direct local connection (not relay). */
-  const localModeRef = useRef(false);
-  /**
-   * When connected via relay in local mode, this timer periodically scans for
-   * a local MCP server and upgrades the connection as soon as one appears.
-   */
-  const localUpgradeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const store = useVolumeStore;
 
   // ── Leader election via Web Locks ────────────────────────────────────────────
@@ -881,11 +857,8 @@ export function useMcpBridge(sessionId: string | null) {
 
   // ── WebSocket lifecycle ──────────────────────────────────────────────────
 
-  // Refs so that connect() doesn't need sessionId/handleCommand in its deps
-  // and therefore never triggers an effect re-run (and disconnect) when those
-  // values change after the initial mount.
-  const sessionIdRef = useRef(sessionId);
-  sessionIdRef.current = sessionId;
+  // Ref so that connect() doesn't need handleCommand in its deps
+  // and therefore never triggers an effect re-run (and disconnect) when it changes.
   const handleCommandRef = useRef(handleCommand);
   handleCommandRef.current = handleCommand;
 
@@ -900,30 +873,17 @@ export function useMcpBridge(sessionId: string | null) {
       let ws: WebSocket | null = null;
       let isLocal = false;
 
-      // Always try the local MCP server first — the Claude extension runs a WS
-      // on 127.0.0.1 and a direct connection is always preferred over the relay.
-      // Parallel port-scan (300 ms max) keeps the overhead negligible even when
-      // no local server is running.
-      console.debug('[mcp-bridge] scanning local ports…', { isLocalMode: isLocalMode() });
+      // Scan local ports — parallel probe (300 ms max) keeps overhead negligible.
+      console.debug('[mcp-bridge] scanning local ports…');
       ws = await findLocalServer();
       console.debug('[mcp-bridge] findLocalServer →', ws ? `found ${ws.url}` : 'not found');
       if (ws) {
         isLocal = true;
-        // Extract port from ws://127.0.0.1:PORT and persist it for the UI.
         const port = Number(new URL(ws.url).port);
         if (port) {
           store.getState().setLocalPort(port);
           localStorage.setItem(LAST_LOCAL_PORT_KEY, String(port));
         }
-      }
-
-      // Fallback: Cloudflare relay (web-app mode or when local server absent).
-      // Use the ref so we always get the latest sessionId even if it resolved
-      // after findLocalServer() started (avoids relay fallback with a null ID).
-      if (!ws && RELAY_URL && sessionIdRef.current) {
-        const wsBase = RELAY_URL.replace(/^http/, 'ws').replace(/\/$/, '');
-        ws = new WebSocket(`${wsBase}/ws?session=${sessionIdRef.current}&role=app`);
-        console.debug('[mcp-bridge] falling back to relay');
       }
 
       if (!ws) {
@@ -934,54 +894,10 @@ export function useMcpBridge(sessionId: string | null) {
       // Register the socket BEFORE releasing the connecting guard so no
       // concurrent connect() call can slip into the gap between the two.
       wsRef.current = ws;
-      localModeRef.current = isLocal;
       connectingRef.current = false;
 
-      // In local mode the MCP server is already running; mark connected now
-      // (no mcp_connecting event will arrive over the relay).
+      // Local server is already running — mark connected immediately.
       if (isLocal) store.getState().setMcpConnected(true);
-
-      // ── Proactive local upgrade ───────────────────────────────────────────
-      // If we fell back to the relay (local server wasn't available yet) but
-      // we're running as an installed PWA, poll for the local server in the
-      // background.  As soon as it appears we tear down the relay connection
-      // and let connect() reattach directly — no manual page reload needed.
-      if (!isLocal && isLocalMode()) {
-        const tryUpgrade = async () => {
-          const currentWs = wsRef.current;
-          if (!currentWs || localModeRef.current) return; // already local or gone
-          // Relay not open yet — reschedule instead of bailing permanently
-          if (currentWs.readyState !== WebSocket.OPEN) {
-            console.debug('[mcp-bridge] upgrade: relay not open yet, retrying in 2s');
-            localUpgradeRef.current = setTimeout(() => {
-              void tryUpgrade();
-            }, 2_000);
-            return;
-          }
-
-          console.debug('[mcp-bridge] upgrade: scanning for local server…');
-          const probe = await findLocalServer();
-          console.debug('[mcp-bridge] upgrade probe →', probe ? `found ${probe.url}` : 'not found');
-          if (!probe) {
-            // Not available yet — check again in 5 s.
-            localUpgradeRef.current = setTimeout(() => {
-              void tryUpgrade();
-            }, 5_000);
-            return;
-          }
-          // Found the local server.  Discard the probe socket — connect() will
-          // open a fresh one — and close the relay to trigger an immediate reconnect.
-          console.debug('[mcp-bridge] upgrading to local connection');
-          probe.close();
-          localUpgradeRef.current = null;
-          wsRef.current = null; // prevent the close handler scheduling a 5 s delay
-          currentWs.close(1000, 'upgrading to local connection');
-          connect(); // reconnects immediately; local server found → isLocal = true
-        };
-        localUpgradeRef.current = setTimeout(() => {
-          void tryUpgrade();
-        }, 5_000);
-      }
 
       // ── Open handler ────────────────────────────────────────────────────
       ws.addEventListener('open', () => {
@@ -989,26 +905,7 @@ export function useMcpBridge(sessionId: string | null) {
           clearTimeout(reconnectTimer.current);
           reconnectTimer.current = null;
         }
-        lastPongAt.current = Date.now();
-
-        if (!isLocal) {
-          // Relay mode: we ping Cloudflare every 20 s to keep the Durable
-          // Object alive and detect silently-dead connections (no pong for 50 s).
-          heartbeatTimer.current = setInterval(() => {
-            const sock = wsRef.current;
-            if (!sock || sock.readyState !== WebSocket.OPEN) return;
-            if (document.visibilityState === 'hidden') {
-              lastPongAt.current = Date.now(); // don't penalise throttled tabs
-              return;
-            }
-            if (Date.now() - lastPongAt.current > 50_000) {
-              sock.close(1000, 'pong-timeout');
-              return;
-            }
-            sock.send('{"type":"ping"}');
-          }, 20_000);
-        }
-        // Local mode: the MCP server pings us — we just respond (see message handler).
+        // Local mode: the MCP server pings us — we respond (see message handler).
       });
 
       // ── Message handler ─────────────────────────────────────────────────
@@ -1026,7 +923,6 @@ export function useMcpBridge(sessionId: string | null) {
           return;
         }
         if (msg.type === 'pong') {
-          lastPongAt.current = Date.now();
           return;
         }
         if (msg.type === 'mcp_connecting') {
@@ -1048,36 +944,23 @@ export function useMcpBridge(sessionId: string | null) {
           wasClean: evt.wasClean,
         });
 
-        // Always stop the heartbeat for this specific socket.
-        if (heartbeatTimer.current) {
-          clearInterval(heartbeatTimer.current);
-          heartbeatTimer.current = null;
-        }
-
-        // If wsRef was already replaced (e.g. by a local upgrade that raced
-        // ahead before this close event fired), do NOT clobber the new
-        // connection or schedule a redundant reconnect — connect() is already
-        // running or has already completed.
+        // If wsRef was already replaced, do NOT clobber the new connection.
         if (wsRef.current !== ws) {
           console.debug('[mcp-bridge] close: skipping cleanup — wsRef already replaced');
           return;
         }
 
         wsRef.current = null;
-        localModeRef.current = false;
         store.getState().setMcpConnected(false);
         store.getState().setLocalPort(null);
-        const wasLocal = isLocal;
         // code 1001 = superseded by another client connecting to the same port
         // code 1008 = server rejected us (another healthy connection is active)
         // Both indicate a competing client — back off with jitter so the two
         // clients de-synchronise and one gets to stabilise.
         const competing = evt.code === 1001 || evt.code === 1008;
-        const delay = wasLocal
-          ? competing
-            ? 2_000 + Math.floor(Math.random() * 3_000) // 2–5 s random
-            : 1_000
-          : 5_000;
+        const delay = competing
+          ? 2_000 + Math.floor(Math.random() * 3_000) // 2–5 s random
+          : 1_000;
         console.debug(
           '[mcp-bridge] scheduling reconnect in',
           delay,
@@ -1095,9 +978,8 @@ export function useMcpBridge(sessionId: string | null) {
         /* close fires next */
       });
     })();
-    // sessionId and handleCommand are accessed via refs — removing them from deps
-    // prevents connect() from changing identity (and triggering an effect re-run
-    // that would tear down the live socket) every time sessionId resolves on mount.
+    // handleCommand is accessed via ref — removing it from deps prevents connect()
+    // from changing identity (and triggering a re-run) on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store, clearSessionIdle]);
 
@@ -1106,8 +988,6 @@ export function useMcpBridge(sessionId: string | null) {
     connect();
     return () => {
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
-      if (heartbeatTimer.current) clearInterval(heartbeatTimer.current);
-      if (localUpgradeRef.current) clearTimeout(localUpgradeRef.current);
       clearSessionIdle();
       wsRef.current?.close(1000, 'unmount');
       wsRef.current = null;
@@ -1122,9 +1002,6 @@ export function useMcpBridge(sessionId: string | null) {
     if (!isLeader) return;
     const onVisibility = () => {
       if (document.visibilityState !== 'visible') return;
-      // Reset pong clock — the heartbeat timer was throttled while hidden,
-      // so elapsed time is meaningless; don't trigger a false pong-timeout.
-      lastPongAt.current = Date.now();
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) return;
       // Cancel any pending slow reconnect and connect right now.
       if (reconnectTimer.current) {

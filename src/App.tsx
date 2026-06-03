@@ -1,13 +1,11 @@
 import { ImportOverlay } from '@/components/layout/ImportOverlay';
 import { ViewerActionsProvider } from '@/hooks/ViewerActionsContext';
 import { useMcpBridge } from '@/hooks/useMcpBridge';
-import { useSessionId } from '@/hooks/useSessionId';
 import { ViewerPage } from '@/pages/ViewerPage';
 import { Route, Routes } from 'react-router-dom';
 
 function Bridge() {
-  const sessionId = useSessionId();
-  useMcpBridge(sessionId);
+  useMcpBridge();
   return null;
 }
 
