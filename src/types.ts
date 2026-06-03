@@ -167,7 +167,7 @@ export interface AiAnnotation {
   summary?: string;
   /** Clinical severity — determines colour. */
   severity: AnnotationSeverity;
-  /** AI model certainty 0–100. Practically never 100 for medical findings. */
+  /** AI model confidence 0–100. Practically never 100 for medical findings. */
   confidence?: number;
   /** Largest in-plane diameter in mm — only present for measurable findings. */
   sizeMm?: number;

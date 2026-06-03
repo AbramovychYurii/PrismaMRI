@@ -463,8 +463,8 @@ export class ThreePreview {
     const capH = Math.max(1, Math.round(cssH * scale));
 
     // Save shader state.
-    const origSteps   = m?.uniforms.u_steps.value   as number | undefined;
-    const origShading = m?.uniforms.u_shading.value  as number | undefined;
+    const origSteps = m?.uniforms.u_steps.value as number | undefined;
+    const origShading = m?.uniforms.u_shading.value as number | undefined;
 
     // Reduce raycast cost for capture:
     //  • 64 steps (vs 256) — 4× fewer per-fragment iterations; negligible quality
@@ -472,7 +472,7 @@ export class ThreePreview {
     //  • Phong shading off — eliminates 6 extra texture lookups per step for
     //    gradient estimation
     if (m) {
-      m.uniforms.u_steps.value   = 64;
+      m.uniforms.u_steps.value = 64;
       m.uniforms.u_shading.value = 0;
     }
 
@@ -492,21 +492,18 @@ export class ThreePreview {
     const flipped = new Uint8ClampedArray(capW * capH * 4);
     const rowBytes = capW * 4;
     for (let y = 0; y < capH; y++) {
-      flipped.set(
-        pixels.subarray((capH - 1 - y) * rowBytes, (capH - y) * rowBytes),
-        y * rowBytes,
-      );
+      flipped.set(pixels.subarray((capH - 1 - y) * rowBytes, (capH - y) * rowBytes), y * rowBytes);
     }
 
     // Restore shader state.
     if (m) {
-      m.uniforms.u_steps.value   = origSteps   ?? 256;
+      m.uniforms.u_steps.value = origSteps ?? 256;
       m.uniforms.u_shading.value = origShading ?? 1;
     }
 
     // Encode to JPEG via a temp 2D canvas.
     const off = document.createElement('canvas');
-    off.width  = capW;
+    off.width = capW;
     off.height = capH;
     off.getContext('2d')!.putImageData(new ImageData(flipped, capW, capH), 0, 0);
     return off.toDataURL('image/jpeg', quality).replace(/^data:[^;]+;base64,/, '');

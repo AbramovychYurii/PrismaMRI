@@ -454,26 +454,26 @@ const FindingText = styled.div`
   line-height: 1.55;
 `;
 
-const CERTAINTY_COLOR_PREVIEW = '#60a5fa';
+const CONFIDENCE_COLOR_PREVIEW = '#60a5fa';
 
-const FindingCertaintyRow = styled.div`
+const FindingConfidenceRow = styled.div`
   display: flex;
   align-items: center;
   gap: 5px;
   margin-top: 7px;
 `;
 
-const FindingCertaintyLabel = styled.span`
+const FindingConfidenceLabel = styled.span`
   font-size: 8px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: #999;
 `;
 
-const FindingCertaintyValue = styled.span`
+const FindingConfidenceValue = styled.span`
   font-size: 9px;
   font-weight: 700;
-  color: ${CERTAINTY_COLOR_PREVIEW};
+  color: ${CONFIDENCE_COLOR_PREVIEW};
   flex-shrink: 0;
 `;
 
@@ -937,11 +937,11 @@ export function ReportModal({ finding, findingIndex, allFindings, onClose }: Pro
                         </FindingLocation>
                         {f.summary && <FindingText>{f.summary}</FindingText>}
                         {f.confidence != null && (
-                          <FindingCertaintyRow>
+                          <FindingConfidenceRow>
                             <AuroraSparkles size={10} strokeWidth={1.5} />
-                            <FindingCertaintyLabel>Certainty:</FindingCertaintyLabel>
-                            <FindingCertaintyValue>{f.confidence}%</FindingCertaintyValue>
-                          </FindingCertaintyRow>
+                            <FindingConfidenceLabel>Confidence:</FindingConfidenceLabel>
+                            <FindingConfidenceValue>{f.confidence}%</FindingConfidenceValue>
+                          </FindingConfidenceRow>
                         )}
                         {showImages &&
                           (thumb ? (

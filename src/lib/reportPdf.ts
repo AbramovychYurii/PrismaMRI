@@ -212,13 +212,13 @@ function drawFindingCard(
     cy += summaryH + 1;
   }
 
-  // Certainty — sparkle bullet + XX% (no bar)
+  // Confidence — sparkle bullet + XX% (no bar)
   if (finding.confidence != null) {
     doc.setFontSize(8.5);
     doc.setFont('courier', 'normal');
     // #60a5fa blue — independent of severity
     doc.setTextColor(96, 165, 250);
-    doc.text(`Certainty:  ${finding.confidence}%`, xText, cy + 3);
+    doc.text(`Confidence:  ${finding.confidence}%`, xText, cy + 3);
     setColor(doc, INK2); // restore
     cy += certLine;
   }

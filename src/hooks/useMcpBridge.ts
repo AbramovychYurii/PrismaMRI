@@ -266,7 +266,6 @@ function renderSliceForMcp(image: {
   return encodeForMcp(canvas);
 }
 
-
 const ACTION_LABELS: Record<string, string> = {
   get_state: 'Reading viewer state',
   overview: 'Getting volume overview',

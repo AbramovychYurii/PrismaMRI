@@ -6,7 +6,7 @@
  *  • Collapsed → compact pill showing the count of findings + severity dot.
  *    Click to expand. Always present once at least one finding exists.
  *
- *  • Expanded → full card with left accent bar, severity, label, certainty
+ *  • Expanded → full card with left accent bar, severity, label, confidence
  *    bar, summary (capped at 5 lines with "Show more"), coordinate tags,
  *    optional size, divider, and right-aligned prev/next navigation.
  *    Auto-expands when a marker is focused (click on viewer / nav).
@@ -166,28 +166,28 @@ const Title = styled.h3`
   line-height: 1.3;
 `;
 
-// ── Certainty bar ────────────────────────────────────────────────────────────
+// ── Confidence bar ───────────────────────────────────────────────────────────
 
-const CERTAINTY_COLOR = '#60a5fa'; // neutral blue — independent of severity
+const CONFIDENCE_COLOR = '#60a5fa'; // neutral blue — independent of severity
 
-const CertaintyRow = styled.div`
+const ConfidenceRow = styled.div`
   display: flex;
   align-items: center;
   gap: 5px;
 `;
 
-const CertaintyLabel = styled.span`
+const ConfidenceLabel = styled.span`
   font-size: 9px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink-3);
 `;
 
-const CertaintyValue = styled.span`
+const ConfidenceValue = styled.span`
   font-size: 11px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: ${CERTAINTY_COLOR};
+  color: ${CONFIDENCE_COLOR};
   flex-shrink: 0;
 `;
 
@@ -525,13 +525,13 @@ export function AnnotationHud() {
           {/* Title */}
           <Title>{shown.label}</Title>
 
-          {/* Certainty bar */}
+          {/* Confidence */}
           {confidencePct != null && (
-            <CertaintyRow>
+            <ConfidenceRow>
               <AuroraSparkles size={11} strokeWidth={1.5} />
-              <CertaintyLabel>Certainty:</CertaintyLabel>
-              <CertaintyValue>{confidencePct}%</CertaintyValue>
-            </CertaintyRow>
+              <ConfidenceLabel>Confidence:</ConfidenceLabel>
+              <ConfidenceValue>{confidencePct}%</ConfidenceValue>
+            </ConfidenceRow>
           )}
 
           {/* Summary */}

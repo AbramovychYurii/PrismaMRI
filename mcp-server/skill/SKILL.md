@@ -45,13 +45,17 @@ Do **not** proceed to Phase 2 until modality + (for MRI) sequence + indication a
 Use this ordered recipe. Skip a step only when the previous step makes it irrelevant.
 
 1. `apply_wl_preset` for the correct tissue (table below). On MRI, only override the scanner's WL if it is clearly clipped.
-2. **Set Slab MIP before every capture** — call `set_slab_mm` with **3 mm** (high-detail CT) or **5 mm** (survey / MRI) before `capture_overview_grid` and `capture_slice`. Slab MIP composites adjacent slices so lesions, fractures and vessels that span multiple slices are visible in a single image. Only disable (slab_mm=0) when evaluating a finding that must be seen on a single slice.
-3. `capture_overview_grid` with count=6 — slab-MIP thumbnails for full-anatomy survey.
-4. `navigate_to_slice` to the suspected lesion centre, then `capture_all_planes` — reviewing coronal + sagittal + axial simultaneously is the most reliable way to confirm a finding and determine its precise centre before annotating.
-5. For each focal finding: `step_slice` ±1, ±2 with `capture_slice` (slab_mm=3) to confirm the finding spans ≥3 contiguous slices (not a partial-volume artefact).
-6. For mass-effect / vascular encasement / bone questions: `capture_3d` for spatial overview. Do not use 3-D for soft-tissue signal characterisation.
-7. For each confirmed finding: `set_measurement` (largest in-plane diameter + perpendicular) and `add_annotation` with the marker placed at the **geometric centre** of the lesion — the system snaps to the nearest anatomy automatically. Always include `confidence` (integer 0–100, never 100) and `size_mm` when a clear boundary is measurable.
-8. After placing all markers verify their 3-D positions with `capture_3d` — if any marker appears anatomically wrong, remove and re-annotate using `capture_all_planes` for better localisation.
+2. **Spatial skeleton — always do this first:** call `set_render_preset("bone")` then `capture_3d`. The bone render gives an immediate full-volume spatial reference (skull, spine, ribs, pelvis, extremities) before any 2-D navigation. Do not skip — even for soft-tissue studies the skeleton orients every subsequent finding.
+3. **Set Slab MIP before every capture** — call `set_slab_mm` with **3 mm** (high-detail CT) or **5 mm** (survey / MRI) before `capture_overview_grid` and `capture_slice`. Slab MIP composites adjacent slices so lesions, fractures and vessels that span multiple slices are visible in a single image. Only disable (slab_mm=0) when evaluating a finding that must be seen on a single slice.
+4. `capture_overview_grid` with count=6 — slab-MIP thumbnails for full-anatomy survey.
+5. `navigate_to_slice` to the suspected lesion centre, then `capture_all_planes` — reviewing coronal + sagittal + axial simultaneously is the most reliable way to confirm a finding and determine its precise centre before annotating.
+6. For each focal finding: `step_slice` ±1, ±2 with `capture_slice` (slab_mm=3) to confirm the finding spans ≥3 contiguous slices (not a partial-volume artefact).
+7. For mass-effect / vascular encasement / bone questions: `capture_3d` for spatial overview. Do not use 3-D for soft-tissue signal characterisation.
+8. For each confirmed finding: `set_measurement` (largest in-plane diameter + perpendicular) and `add_annotation` with the marker placed at the **geometric centre** of the lesion — the system snaps to the nearest anatomy automatically.
+   - **`confidence`** — pass as the **separate integer `confidence` field** in `add_annotation` (0–100, never 100). Do **not** embed it in `summary` text.
+   - **`summary`** — 1–3 sentences describing morphology, signal, margins and effect only. No "confidence: X%" phrases inside `summary`.
+   - **`size_mm`** — include when a clear measurable boundary is visible.
+9. After placing all markers verify their 3-D positions with `capture_3d` — if any marker appears anatomically wrong, remove and re-annotate using `capture_all_planes` for better localisation.
 
 ### Window / Level presets
 
@@ -114,7 +118,11 @@ SIZE:        {a × b × c} mm   (or "subcentimetre" / "not measurable")
 SIGNAL/HU:   {T1 / T2 / FLAIR / DWI / ADC behaviour}   OR   {HU value, enhancement %}
 MARGINS:     {well-circumscribed | ill-defined | infiltrative | lobulated}
 EFFECT:      {mass effect / oedema / midline shift mm / vascular encasement / none}
-CONFIDENCE:  {confident | probable | possible | cannot assess}
+CONFIDENCE:  {integer 0–100 → this is the value passed as the separate `confidence` field
+              in add_annotation. NEVER embed it inside the summary or description text.
+              Guide: 40–60 = possible, 65–79 = probable, 80–95 = confident. Never 100.
+              Write "cannot assess" only when no slice shows the structure — omit the
+              confidence field from add_annotation in that case.}
 ```
 
 ## Phase 5 — Structured report (RSNA-style)
