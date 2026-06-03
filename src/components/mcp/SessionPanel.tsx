@@ -533,14 +533,21 @@ Record: modality (CT / MRI / CBCT), dims [W×H×D], voxel spacing in mm. Every s
 
 ## Step 2 · Windowing
 Call \`get_volume_overview\` → metadata and centre-slice overview of all three planes.
-Apply the modality-appropriate preset immediately — do not analyse with the default W/L:
-- CT bone / dental / skeletal → \`apply_wl_preset "bone"\`
-- CT soft tissue / abdomen / chest → \`apply_wl_preset "soft_tissue"\`
-- CT lung → \`apply_wl_preset "lung"\`
-- MRI T1 → \`apply_wl_preset "t1"\`
-- MRI T2 / FLAIR → \`apply_wl_preset "t2"\`
 
-For ambiguous modalities (e.g., CBCT), try both "bone" and "soft_tissue" and note which reveals more pathology.
+**Default W/L is usually correct — do not change it unless you have a clear reason.**
+The viewer auto-calibrates window and level when the file loads, and in most cases the default gives optimal contrast. Changing W/L blindly is a common source of near-black or washed-out images that make analysis impossible.
+
+**Workflow:**
+1. Examine the overview images. If anatomy is clearly visible with good contrast → proceed without touching W/L.
+2. Only if the images are too dark, too bright, or flat (no contrast between tissues) → apply a preset:
+   - CT bone / dental / skeletal → \`apply_wl_preset "bone"\`
+   - CT soft tissue / abdomen / chest → \`apply_wl_preset "soft_tissue"\`
+   - CT lung → \`apply_wl_preset "lung"\`
+   - MRI T1 → \`apply_wl_preset "t1"\`
+   - MRI T2 / FLAIR → \`apply_wl_preset "t2"\`
+3. After applying a preset, re-capture one slice and verify the result is visibly better before continuing. If the preset made things worse, revert with \`apply_wl_preset "default"\` to restore the file's original W/L.
+
+**Never call \`set_window_level\` with arbitrary values** — always use named presets or the file default.
 
 ## Step 3 · Systematic MIP survey — all three planes
 Work plane by plane in the order: **coronal → sagittal → axial**.
