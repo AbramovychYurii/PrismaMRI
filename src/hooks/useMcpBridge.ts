@@ -133,12 +133,30 @@ function clampVoxel(v: number, max: number): number {
   return Math.max(0, Math.min(max - 1, v));
 }
 
-function stripDataUrl(url: string): string {
-  return url.replace(/^data:image\/png;base64,/, '');
+/** Claude's practical limit for a single image payload sent via MCP. */
+const MCP_MAX_EDGE = 512;
+/** Quality for detailed single-slice captures — high enough to preserve fine anatomy. */
+const MCP_JPEG_QUALITY = 0.92;
+/** Quality for grid/overview captures where file size matters more than fine detail. */
+const MCP_JPEG_QUALITY_OVERVIEW = 0.82;
+
+/**
+ * Downscale a canvas so its longest edge is at most MCP_MAX_EDGE, then encode
+ * as JPEG. Keeps every image well under 1 MB after base64 encoding.
+ */
+function encodeForMcp(src: HTMLCanvasElement, quality = MCP_JPEG_QUALITY): string {
+  const scale = Math.min(1, MCP_MAX_EDGE / Math.max(src.width, src.height));
+  const dw = Math.max(1, Math.round(src.width * scale));
+  const dh = Math.max(1, Math.round(src.height * scale));
+  const out = document.createElement('canvas');
+  out.width = dw;
+  out.height = dh;
+  out.getContext('2d')!.drawImage(src, 0, 0, dw, dh);
+  return out.toDataURL('image/jpeg', quality).replace(/^data:[^;]+;base64,/, '');
 }
 
-function captureCanvas(canvas: HTMLCanvasElement): string {
-  return stripDataUrl(canvas.toDataURL('image/png'));
+function captureCanvas(canvas: HTMLCanvasElement, quality = MCP_JPEG_QUALITY): string {
+  return encodeForMcp(canvas, quality);
 }
 
 /** Wait for two animation frames so React has flushed all canvas draws. */
@@ -243,8 +261,8 @@ function halfSlabsFor(
   return Math.max(1, Math.round(slabMm / 2 / mmPerSlice));
 }
 
-/** Render a grayscale SliceImage to a base64 PNG at native slice resolution. */
-function renderSliceToPng(image: {
+/** Render a grayscale SliceImage, downscale to MCP limits, and encode as JPEG. */
+function renderSliceForMcp(image: {
   width: number;
   height: number;
   data: Uint8ClampedArray;
@@ -259,16 +277,30 @@ function renderSliceToPng(image: {
     0,
     0,
   );
-  return stripDataUrl(canvas.toDataURL('image/png'));
+  return encodeForMcp(canvas);
 }
 
-/** Convert a Blob to a base64 string (no data-URL prefix). */
-function blobToBase64(blob: Blob): Promise<string> {
+/**
+ * Decode a PNG blob into an Image, downscale to MCP limits, and re-encode as
+ * JPEG. Used for 3-D captures which arrive as a PNG blob from the WebGL renderer.
+ */
+function blobToMcpJpeg(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(stripDataUrl(reader.result as string));
-    reader.onerror = () => reject(new Error('Failed to read blob'));
-    reader.readAsDataURL(blob);
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const scale = Math.min(1, MCP_MAX_EDGE / Math.max(img.width, img.height));
+      const dw = Math.max(1, Math.round(img.width * scale));
+      const dh = Math.max(1, Math.round(img.height * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = dw;
+      canvas.height = dh;
+      canvas.getContext('2d')!.drawImage(img, 0, 0, dw, dh);
+      resolve(canvas.toDataURL('image/jpeg', MCP_JPEG_QUALITY).replace(/^data:[^;]+;base64,/, ''));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Failed to decode blob')); };
+    img.src = url;
   });
 }
 
@@ -620,7 +652,7 @@ export function useMcpBridge(sessionId: string | null) {
                 plane === 'coronal' ? cursor.y : plane === 'sagittal' ? cursor.x : cursor.z;
               const half = halfSlabsFor(plane, slabMm, volume.meta.spacing);
               const image = extractSliceGrayImage(volume, plane, index, wl, half);
-              ok({ imageData: renderSliceToPng(image), slabMm });
+              ok({ imageData: renderSliceForMcp(image), slabMm });
               break;
             }
 
@@ -643,7 +675,7 @@ export function useMcpBridge(sessionId: string | null) {
             }
             await waitForPaint();
             const blob = await preview.exportPNG();
-            ok({ imageData: await blobToBase64(blob) });
+            ok({ imageData: await blobToMcpJpeg(blob) });
             break;
           }
 
@@ -666,7 +698,7 @@ export function useMcpBridge(sessionId: string | null) {
           // ── overview_grid — N evenly-spaced slices on one plane ───────
           case 'overview_grid': {
             const plane = msg.plane as SlicePlane;
-            const count = Math.min(8, Math.max(2, (msg.count as number) ?? 5));
+            const count = Math.min(4, Math.max(2, (msg.count as number) ?? 4));
             const { cursor, volume } = store.getState();
             if (!cursor || !volume) {
               fail('No volume loaded');
@@ -696,7 +728,7 @@ export function useMcpBridge(sessionId: string | null) {
               if (plane === 'axial') cur.z = clampVoxel(slice - 1, dims[2]);
               store.getState().setCursor(cur);
               await waitForPaint();
-              images.push(captureCanvas(canvas));
+              images.push(captureCanvas(canvas, MCP_JPEG_QUALITY_OVERVIEW));
             }
 
             // Restore original position.
