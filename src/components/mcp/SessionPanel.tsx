@@ -170,7 +170,7 @@ export const Panel = styled.div<{ $dockOpen: boolean }>`
   z-index: var(--z-modal);
   display: flex;
   flex-direction: column;
-  width: 364px;
+  width: 400px;
   background: rgba(14, 12, 9, 0.97);
   border: 1px solid var(--rule);
   border-radius: 10px;
@@ -200,7 +200,7 @@ export const PanelHeader = styled.div<{ $connected: boolean }>`
   transition: background 200ms;
   &:hover {
     background: ${({ $connected }) =>
-      $connected ? 'rgba(80,200,120,0.10)' : 'rgba(255,255,255,0.04)'};
+    $connected ? 'rgba(80,200,120,0.10)' : 'rgba(255,255,255,0.04)'};
   }
 `;
 
@@ -343,6 +343,71 @@ const Divider = styled.div`
   margin: 2px 0;
 `;
 
+const HowItWorksBox = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+`;
+
+const HowItWorksTitle = styled.span`
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+`;
+
+const HowItWorksText = styled.p`
+  margin: 0;
+  font-size: 10px;
+  color: var(--ink-3);
+  line-height: 1.6;
+`;
+
+const CapabilitiesToggle = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--ink-3);
+  &:hover { color: var(--ink-2); }
+`;
+
+const CapabilityGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+`;
+
+const CapabilityItem = styled.div`
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 5px 7px;
+  border-radius: 5px;
+  border: 1px solid var(--rule);
+  background: rgba(255,255,255,0.02);
+`;
+
+const CapabilityDot = styled.span`
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #50c878;
+  flex-shrink: 0;
+  margin-top: 3px;
+`;
+
+const CapabilityText = styled.span`
+  font-size: 9px;
+  color: var(--ink-3);
+  line-height: 1.45;
+  letter-spacing: 0.02em;
+`;
+
 // ── Badge (remote mode only) ──────────────────────────────────────────────────
 
 const Badge = styled.span`
@@ -470,7 +535,7 @@ const MinimisedPill = styled.button<{ $connected: boolean; $working: boolean; $d
 
 const EXAMPLE_PROMPT = `Using the PrismaMRI tools, perform a systematic review of the medical volume currently open in the viewer and produce a structured report.
 
-> ⚠️ Research and educational use only — not a substitute for clinical judgment.
+⚠️ Research and educational use only — not a substitute for clinical judgment.
 
 ## Step 1 · Verify the volume
 Call \`get_viewer_state\`. If \`volumeLoaded\` is false, stop and ask the user to open a file first.
@@ -709,6 +774,7 @@ export function SessionPanel() {
   // and localhost dev-server cases that isLocalMode() would miss).
   const local = localPort !== null || isLocalMode();
   const [expanded, setExpanded] = useState(false);
+  const [capOpen, setCapOpen] = useState(false);
   const [dxtState, setDxtState] = useState<BtnState>('idle');
 
   const handleDownloadDxt = useCallback(async () => {
@@ -768,6 +834,59 @@ export function SessionPanel() {
           {/* ── NOT CONNECTED: same for Web and PWA ── */}
           {!mcpConnected && (
             <>
+              <HowItWorksBox>
+                <HowItWorksTitle>How it works</HowItWorksTitle>
+                <HowItWorksText>
+                  Install the extension once — Claude Desktop connects to this viewer automatically
+                  and gets full control over navigation, windowing, and annotations. No data leaves
+                  your machine.
+                </HowItWorksText>
+              </HowItWorksBox>
+
+              <HowItWorksBox>
+                <CapabilitiesToggle
+                  type="button"
+                  onClick={() => setCapOpen((o) => !o)}
+                  aria-expanded={capOpen}
+                >
+                  <HowItWorksTitle>What Claude can do</HowItWorksTitle>
+                  <PromptChevron $open={capOpen}>
+                    <ChevronDown size={11} />
+                  </PromptChevron>
+                </CapabilitiesToggle>
+
+                {capOpen && (
+                  <CapabilityGrid>
+                    <CapabilityItem>
+                      <CapabilityDot />
+                      <CapabilityText>Navigate slices &amp; planes</CapabilityText>
+                    </CapabilityItem>
+                    <CapabilityItem>
+                      <CapabilityDot />
+                      <CapabilityText>Capture 2-D &amp; 3-D views</CapabilityText>
+                    </CapabilityItem>
+                    <CapabilityItem>
+                      <CapabilityDot />
+                      <CapabilityText>Detect &amp; annotate findings</CapabilityText>
+                    </CapabilityItem>
+                    <CapabilityItem>
+                      <CapabilityDot />
+                      <CapabilityText>Full systematic scan review</CapabilityText>
+                    </CapabilityItem>
+                    <CapabilityItem>
+                      <CapabilityDot />
+                      <CapabilityText>Adjust W/L &amp; presets</CapabilityText>
+                    </CapabilityItem>
+                    <CapabilityItem>
+                      <CapabilityDot />
+                      <CapabilityText>Slab MIP &amp; measurements</CapabilityText>
+                    </CapabilityItem>
+                  </CapabilityGrid>
+                )}
+              </HowItWorksBox>
+
+              <Divider />
+
               <ActionBtn type="button" $primary $state={dxtState} onClick={handleDownloadDxt}>
                 {dxtState === 'ok' ? (
                   <Check size={13} />
@@ -780,7 +899,7 @@ export function SessionPanel() {
                   ? 'Downloaded!'
                   : dxtState === 'err'
                     ? 'Download failed'
-                    : 'Download Claude extension'}
+                    : 'Download Claude Desktop Extension (.dxt)'}
               </ActionBtn>
               <Hint>
                 Then open{' '}
@@ -828,7 +947,7 @@ export function SessionPanel() {
                 onClick={() => {
                   const ok = window.confirm(
                     'Disconnect the current agent?\n\nThis ends the live session and ' +
-                      'invalidates the installed extension. To reconnect, download a fresh .dxt and reinstall it.',
+                    'invalidates the installed extension. To reconnect, download a fresh .dxt and reinstall it.',
                   );
                   if (!ok) return;
                   localStorage.setItem('prismamri-session-id', crypto.randomUUID());

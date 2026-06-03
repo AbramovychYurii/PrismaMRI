@@ -299,7 +299,10 @@ function blobToMcpJpeg(blob: Blob): Promise<string> {
       canvas.getContext('2d')!.drawImage(img, 0, 0, dw, dh);
       resolve(canvas.toDataURL('image/jpeg', MCP_JPEG_QUALITY).replace(/^data:[^;]+;base64,/, ''));
     };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Failed to decode blob')); };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Failed to decode blob'));
+    };
     img.src = url;
   });
 }
