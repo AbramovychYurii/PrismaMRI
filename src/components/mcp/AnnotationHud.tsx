@@ -14,11 +14,13 @@
  *    "Show more" state resets to collapsed on every annotation switch.
  */
 
+import { ReportModal } from '@/components/mcp/ReportModal';
+import { AuroraSparkles } from '@/components/ui/AuroraSparkles';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { SEVERITY_HEX, SEVERITY_LABEL, SEVERITY_RANK } from '@/constants';
 import { useVolumeStore } from '@/store/volumeStore';
 import type { AiAnnotation, SlicePlane, VolumeCursor } from '@/types';
-import { ChevronLeft, ChevronRight, Sparkles, Trash2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, FileText, Sparkles, Trash2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 
@@ -166,45 +168,27 @@ const Title = styled.h3`
 
 // ── Certainty bar ────────────────────────────────────────────────────────────
 
+const CERTAINTY_COLOR = '#60a5fa'; // neutral blue — independent of severity
+
 const CertaintyRow = styled.div`
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 5px;
 `;
 
 const CertaintyLabel = styled.span`
   font-size: 9px;
-  letter-spacing: 0.13em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--ink-3);
-  white-space: nowrap;
-  flex-shrink: 0;
-`;
-
-const CertaintyTrack = styled.div`
-  flex: 1;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.07);
-  border-radius: 999px;
-  overflow: hidden;
-`;
-
-const CertaintyFill = styled.div<{ $pct: number; $color: string }>`
-  height: 100%;
-  width: ${({ $pct }) => $pct}%;
-  background: ${({ $color }) => $color};
-  border-radius: 999px;
-  transition: width 400ms cubic-bezier(0.22, 1, 0.36, 1);
 `;
 
 const CertaintyValue = styled.span`
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: var(--ink-2);
+  color: ${CERTAINTY_COLOR};
   flex-shrink: 0;
-  min-width: 28px;
-  text-align: right;
 `;
 
 // ── Summary (capped at 5 lines) ──────────────────────────────────────────────
@@ -259,6 +243,47 @@ const Footer = styled.div`
   align-items: center;
   justify-content: space-between;
   gap: 4px;
+`;
+
+const ReportBtn = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(196, 153, 70, 0.08);
+  border: 1px solid var(--amber);
+  border-radius: 6px;
+  padding: 4px 9px;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--amber);
+  transition: background 120ms, filter 120ms;
+  &:hover { background: rgba(196, 153, 70, 0.16); filter: brightness(1.1); }
+`;
+
+const HintText = styled.p`
+  position: absolute;
+  top: calc(${TOP_OFFSET}px + 100% + 8px);
+  left: ${SIDE_OFFSET}px;
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 10px;
+  color: var(--ink-4, var(--ink-3));
+  letter-spacing: 0.06em;
+  pointer-events: none;
+  white-space: nowrap;
+
+  strong {
+    color: var(--amber);
+    font-weight: 600;
+    letter-spacing: 0.1em;
+  }
+
+  @media (max-width: 767px) {
+    left: ${MOBILE_SIDE}px;
+  }
 `;
 
 const DismissBtn = styled.button`
@@ -408,6 +433,7 @@ export function AnnotationHud() {
 
   const [open, setOpen] = useState(false);
   const [confirmDismiss, setConfirmDismiss] = useState(false);
+  const [showReport, setShowReport] = useState(false);
 
   // ── Auto-open when a new finding is focused ───────────────────────────
   const prevActiveId = useRef<string | null>(null);
@@ -467,120 +493,142 @@ export function AnnotationHud() {
     shown.confidence != null ? Math.min(100, Math.max(0, shown.confidence)) : null;
 
   return (
-    <Card aria-label="Finding summary" aria-live="polite">
-      {/* Left vertical accent bar */}
-      <AccentBar $color={color} />
+    <>
+      <HintText>
+        Click <strong>REPORT</strong> to open the export dialog
+      </HintText>
+      <Card aria-label="Finding summary" aria-live="polite">
+        {/* Left vertical accent bar */}
+        <AccentBar $color={color} />
 
-      <Body>
-        {/* Severity chip + location + close */}
-        <TopRow>
-          <SeverityChip $color={color}>
-            <ChipDot $color={color} />
-            {SEVERITY_LABEL[shown.severity]}
-          </SeverityChip>
-          <Location>{sliceInfo(shown.plane, shown.voxel)}</Location>
-          <HeaderBtn
-            type="button"
-            aria-label="Close"
-            title="Close"
-            onClick={() => {
-              setActiveAnnotation(null);
-              setOpen(false);
-            }}
-          >
-            <X size={15} />
-          </HeaderBtn>
-        </TopRow>
+        <Body>
+          {/* Severity chip + location + close */}
+          <TopRow>
+            <SeverityChip $color={color}>
+              <ChipDot $color={color} />
+              {SEVERITY_LABEL[shown.severity]}
+            </SeverityChip>
+            <Location>{sliceInfo(shown.plane, shown.voxel)}</Location>
+            <HeaderBtn
+              type="button"
+              aria-label="Close"
+              title="Close"
+              onClick={() => {
+                setActiveAnnotation(null);
+                setOpen(false);
+              }}
+            >
+              <X size={15} />
+            </HeaderBtn>
+          </TopRow>
 
-        {/* Title */}
-        <Title>{shown.label}</Title>
+          {/* Title */}
+          <Title>{shown.label}</Title>
 
-        {/* Certainty bar */}
-        {confidencePct != null && (
-          <CertaintyRow>
-            <CertaintyLabel>✦ Certainty</CertaintyLabel>
-            <CertaintyTrack>
-              <CertaintyFill $pct={confidencePct} $color={color} />
-            </CertaintyTrack>
-            <CertaintyValue>{confidencePct}%</CertaintyValue>
-          </CertaintyRow>
+          {/* Certainty bar */}
+          {confidencePct != null && (
+            <CertaintyRow>
+              <AuroraSparkles size={11} strokeWidth={1.5} />
+              <CertaintyLabel>Certainty:</CertaintyLabel>
+              <CertaintyValue>{confidencePct}%</CertaintyValue>
+            </CertaintyRow>
+          )}
+
+          {/* Summary */}
+          {shown.summary && <Summary>{shown.summary}</Summary>}
+
+          {/* Coordinate tags + optional size */}
+          <TagRow>
+            <Tag>
+              <TagKey>X</TagKey>
+              {shown.voxel.x}
+            </Tag>
+            <Tag>
+              <TagKey>Y</TagKey>
+              {shown.voxel.y}
+            </Tag>
+            <Tag>
+              <TagKey>Z</TagKey>
+              {shown.voxel.z}
+            </Tag>
+            {shown.sizeMm != null && (
+              <Tag>
+                <TagKey>ø</TagKey>
+                {shown.sizeMm} mm
+              </Tag>
+            )}
+          </TagRow>
+
+          {/* Divider + footer: Dismiss (left) + pagination (right) */}
+          <Divider />
+          <Footer>
+            <NavGroup>
+              <ReportBtn
+                type="button"
+                aria-label="Generate report"
+                onClick={() => setShowReport(true)}
+              >
+                <FileText size={11} />
+                Report
+              </ReportBtn>
+              <DismissBtn
+                type="button"
+                aria-label="Dismiss finding"
+                onClick={() => setConfirmDismiss(true)}
+              >
+                <Trash2 size={11} />
+                Dismiss
+              </DismissBtn>
+            </NavGroup>
+
+            {ordered.length > 1 && (
+              <NavGroup>
+                <NavBtn type="button" aria-label="Previous finding" onClick={() => step(-1)}>
+                  <ChevronLeft size={15} />
+                </NavBtn>
+                <NavIndex>
+                  {idx + 1} / {ordered.length}
+                </NavIndex>
+                <NavBtn type="button" aria-label="Next finding" onClick={() => step(1)}>
+                  <ChevronRight size={15} />
+                </NavBtn>
+              </NavGroup>
+            )}
+          </Footer>
+        </Body>
+
+        {showReport && (
+          <ReportModal
+            finding={shown}
+            findingIndex={idx}
+            allFindings={ordered}
+            onClose={() => setShowReport(false)}
+          />
         )}
 
-        {/* Summary */}
-        {shown.summary && <Summary>{shown.summary}</Summary>}
-
-        {/* Coordinate tags + optional size */}
-        <TagRow>
-          <Tag>
-            <TagKey>X</TagKey>
-            {shown.voxel.x}
-          </Tag>
-          <Tag>
-            <TagKey>Y</TagKey>
-            {shown.voxel.y}
-          </Tag>
-          <Tag>
-            <TagKey>Z</TagKey>
-            {shown.voxel.z}
-          </Tag>
-          {shown.sizeMm != null && (
-            <Tag>
-              <TagKey>ø</TagKey>
-              {shown.sizeMm} mm
-            </Tag>
-          )}
-        </TagRow>
-
-        {/* Divider + footer: Dismiss (left) + pagination (right) */}
-        <Divider />
-        <Footer>
-          <DismissBtn
-            type="button"
-            aria-label="Dismiss finding"
-            onClick={() => setConfirmDismiss(true)}
-          >
-            <Trash2 size={11} />
-            Dismiss
-          </DismissBtn>
-
-          {ordered.length > 1 && (
-            <NavGroup>
-              <NavBtn type="button" aria-label="Previous finding" onClick={() => step(-1)}>
-                <ChevronLeft size={15} />
-              </NavBtn>
-              <NavIndex>
-                {idx + 1} / {ordered.length}
-              </NavIndex>
-              <NavBtn type="button" aria-label="Next finding" onClick={() => step(1)}>
-                <ChevronRight size={15} />
-              </NavBtn>
-            </NavGroup>
-          )}
-        </Footer>
-      </Body>
-
-      {confirmDismiss && (
-        <ConfirmModal
-          title="Remove finding?"
-          message={`"${shown.label}" will be permanently removed from the viewer.`}
-          confirmLabel="Dismiss"
-          cancelLabel="Keep"
-          danger
-          onCancel={() => setConfirmDismiss(false)}
-          onConfirm={() => {
-            setConfirmDismiss(false);
-            const nextIdx = ordered.length > 1 ? (idx + 1) % ordered.length : -1;
-            removeAiAnnotation(shown.id);
-            if (nextIdx >= 0) {
-              const neighbour = ordered[nextIdx === ordered.length - 1 ? idx - 1 : nextIdx];
-              if (neighbour && neighbour.id !== shown.id) focusAnnotation(neighbour.id);
-            } else {
-              setActiveAnnotation(null);
-              setOpen(false);
-            }
-          }}
-        />
-      )}
-    </Card>
+        {confirmDismiss && (
+          <ConfirmModal
+            title="Remove finding?"
+            message={`"${shown.label}" will be permanently removed from the viewer.`}
+            confirmLabel="Dismiss"
+            cancelLabel="Keep"
+            danger
+            onCancel={() => setConfirmDismiss(false)}
+            onConfirm={() => {
+              setConfirmDismiss(false);
+              const nextIdx = ordered.length > 1 ? (idx + 1) % ordered.length : -1;
+              removeAiAnnotation(shown.id);
+              if (nextIdx >= 0) {
+                const neighbour = ordered[nextIdx === ordered.length - 1 ? idx - 1 : nextIdx];
+                if (neighbour && neighbour.id !== shown.id) focusAnnotation(neighbour.id);
+              } else {
+                setActiveAnnotation(null);
+                setOpen(false);
+              }
+            }}
+          />
+        )}
+      </Card>
+    </>
   );
 }
