@@ -140,7 +140,7 @@ function drawFindingCard(
   thumb: { data: string; ar: number } | null,
 ): number {
   const rgb = SEVERITY_RGB[finding.severity];
-  const x0    = ML;
+  const x0 = ML;
   const BAR_W = 1.5;
   const xText = x0 + BAR_W + 8; // 8 mm gap between bar and content
 

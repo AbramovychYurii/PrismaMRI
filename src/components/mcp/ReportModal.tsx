@@ -42,6 +42,11 @@ const Backdrop = styled.div`
   backdrop-filter: blur(4px);
   animation: ${fadeIn} 150ms ease;
   padding: 20px;
+
+  @media (max-width: 640px) {
+    padding: 0;
+    align-items: stretch;
+  }
 `;
 
 const Shell = styled.div`
@@ -54,6 +59,15 @@ const Shell = styled.div`
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.9);
   animation: ${slideUp} 180ms cubic-bezier(0.22, 1, 0.36, 1);
   font-family: var(--mono);
+
+  @media (max-width: 640px) {
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    border: none;
+    position: relative;
+  }
 `;
 
 // ── Left panel ───────────────────────────────────────────────────────────────
@@ -67,6 +81,20 @@ const LeftPanel = styled.div`
   flex-direction: column;
   padding: 24px 20px 20px;
   gap: 20px;
+
+  @media (max-width: 640px) {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--rule-2);
+    flex-shrink: 0;
+    overflow-y: auto;
+    /* leave room for the floating close button */
+    padding: 16px 16px 16px;
+    padding-top: 52px;
+    gap: 14px;
+    max-height: none;
+    flex: 0 0 auto;
+  }
 `;
 
 const PanelLabel = styled.span`
@@ -259,6 +287,33 @@ const CloseBtn = styled.button`
   color: var(--ink-3);
   line-height: 0;
   &:hover { color: var(--ink); }
+
+  @media (max-width: 640px) {
+    display: none;
+  }
+`;
+
+const MobileCloseBtn = styled.button`
+  display: none;
+
+  @media (max-width: 640px) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    z-index: 10;
+    background: rgba(30, 27, 20, 0.9);
+    border: 1px solid var(--rule-2);
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    color: var(--ink-3);
+    line-height: 0;
+    &:hover { color: var(--ink); }
+  }
 `;
 
 const PreviewScroll = styled.div`
@@ -694,6 +749,9 @@ export function ReportModal({ finding, findingIndex, allFindings, onClose }: Pro
       }}
     >
       <Shell>
+        <MobileCloseBtn type="button" aria-label="Close" onClick={onClose}>
+          <X size={16} />
+        </MobileCloseBtn>
         {/* ── Left: export controls ──────────────────────────────────────── */}
         <LeftPanel>
           <div>

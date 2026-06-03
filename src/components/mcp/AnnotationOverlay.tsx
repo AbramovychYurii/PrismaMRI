@@ -65,17 +65,19 @@ const Pin = styled.button<{ $color: string; $active: boolean }>`
   }
 `;
 
-const PinLabel = styled.span<{ $color: string; $side: 'left' | 'right'; $vSide: 'top' | 'bottom' | 'center' }>`
+const PinLabel = styled.span<{
+  $color: string;
+  $side: 'left' | 'right';
+  $vSide: 'top' | 'bottom' | 'center';
+}>`
   position: absolute;
-  ${({ $side }) => $side === 'right'
-    ? 'left: calc(100% + 7px);'
-    : 'right: calc(100% + 7px);'}
+  ${({ $side }) => ($side === 'right' ? 'left: calc(100% + 7px);' : 'right: calc(100% + 7px);')}
   ${({ $vSide }) =>
     $vSide === 'center'
       ? 'top: 50%; transform: translateY(-50%);'
       : $vSide === 'top'
-      ? 'top: 0;'
-      : 'bottom: 0;'}
+        ? 'top: 0;'
+        : 'bottom: 0;'}
   font-family: var(--mono);
   font-size: 10px;
   letter-spacing: 0.06em;
