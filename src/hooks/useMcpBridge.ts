@@ -845,8 +845,8 @@ export function useMcpBridge() {
 
   // Watchdog: if no ping is received from the server within this window,
   // the connection is silently dead — close it so a reconnect can happen.
-  // Must be > server PING_INTERVAL_MS (8 s) + round-trip budget.
-  const PING_WATCHDOG_MS = 20_000;
+  // Server pings every 15 s; allow 2 intervals + generous buffer = 40 s.
+  const PING_WATCHDOG_MS = 40_000;
   const pingWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const resetPingWatchdog = useCallback((ws: WebSocket) => {
@@ -1000,24 +1000,46 @@ export function useMcpBridge() {
     };
   }, [isLeader, connect, clearSessionIdle, clearPingWatchdog]);
 
-  // When the browser tab becomes visible again (user switches back), reconnect
-  // immediately if the WebSocket is gone — browsers throttle timers in hidden
-  // tabs, so the pong-timeout may fire late and the reconnect timer may not
-  // have run yet.  Only the leader tab manages the WebSocket.
+  // Visibility-aware connection management.
+  //
+  // HIDDEN  → close the WebSocket gracefully (code 1000).  This immediately
+  //           frees the server slot so no zombie connection lingers.  Chrome
+  //           freezes background-tab JS for 10–30+ s, which would cause pong
+  //           timeouts and a repeated disconnect / reconnect cycle.
+  //
+  // VISIBLE → reconnect immediately if the socket is gone.  Also reset the
+  //           ping watchdog so the fresh connection gets a full 40 s window
+  //           before it is considered stale.
+  //
+  // Only the leader tab manages the WebSocket.
   useEffect(() => {
     if (!isLeader) return;
     const onVisibility = () => {
-      if (document.visibilityState !== 'visible') return;
-      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) return;
-      // Cancel any pending slow reconnect and connect right now.
+      if (document.visibilityState === 'hidden') {
+        // Graceful close — server is notified immediately, slot is freed.
+        clearPingWatchdog();
+        if (reconnectTimer.current) {
+          clearTimeout(reconnectTimer.current);
+          reconnectTimer.current = null;
+        }
+        const ws = wsRef.current;
+        if (ws) {
+          wsRef.current = null;
+          ws.close(1000, 'tab hidden');
+        }
+        return;
+      }
+
+      // Tab is visible again — reconnect if needed.
+      if (wsRef.current?.readyState === WebSocket.OPEN) return;
       if (reconnectTimer.current) {
         clearTimeout(reconnectTimer.current);
         reconnectTimer.current = null;
       }
-      wsRef.current = null; // ensure connect() doesn't bail out early
+      wsRef.current = null;
       connect();
     };
     document.addEventListener('visibilitychange', onVisibility);
     return () => document.removeEventListener('visibilitychange', onVisibility);
-  }, [isLeader, connect]);
+  }, [isLeader, connect, clearPingWatchdog]);
 }

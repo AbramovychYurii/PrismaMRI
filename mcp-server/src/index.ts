@@ -248,10 +248,12 @@ function startLocalServer(): void {
       // enough headroom so a legitimate fast reconnect isn't rejected as
       // a competing client, which was causing spurious 1008/backoff cycles.
       const ACCEPT_COOLDOWN_MS = 3_000;
-      // Ping every 8 s and terminate if no pong arrives within one interval.
-      // 20 s was too long: a silently-dead socket would block new connections
-      // for up to 20 s and the server never learned the client was gone.
-      const PING_INTERVAL_MS = 8_000;
+      // Ping every 15 s.  Chrome freezes background tabs for 10–30+ s, so
+      // 8 s was too short — a perfectly healthy connection was being killed
+      // because the frozen tab couldn't reply in time.  Two consecutive
+      // missed pongs (= up to 30 s of JS freeze tolerance) are required
+      // before the socket is terminated.
+      const PING_INTERVAL_MS = 15_000;
 
       srv.on('connection', (socket: WebSocket) => {
         const now = Date.now();
@@ -273,16 +275,23 @@ function startLocalServer(): void {
         process.stderr.write('[prismamri] PWA connected (local).\n');
 
         // ── Keepalive with pong watchdog ───────────────────────────────────
-        // Send a ping every PING_INTERVAL_MS.  If the client does not reply
-        // within the next interval the socket is terminated so a new
-        // connection can be established immediately (instead of waiting for
-        // the OS TCP stack to report the drop, which can take minutes).
+        // Send a ping every PING_INTERVAL_MS.  Require TWO consecutive missed
+        // pongs before terminating — this tolerates Chrome's background-tab JS
+        // freeze (which can last 10–30 s) without killing healthy connections.
+        // A truly dead socket will be detected after at most 2 × PING_INTERVAL_MS.
         let pongReceived = true; // treat first interval as if pong was received
+        let missedPongs = 0;
         const hb = setInterval(() => {
           if (!pongReceived) {
-            process.stderr.write('[prismamri] Pong timeout — terminating stale socket.\n');
-            socket.terminate(); // forceful close, triggers the 'close' event
-            return;
+            missedPongs++;
+            if (missedPongs >= 2) {
+              process.stderr.write('[prismamri] Two consecutive pong timeouts — terminating stale socket.\n');
+              socket.terminate(); // forceful close, triggers the 'close' event
+              return;
+            }
+            process.stderr.write(`[prismamri] Pong timeout #${missedPongs} — giving one more interval.\n`);
+          } else {
+            missedPongs = 0;
           }
           pongReceived = false;
           if (socket.readyState === WebSocket.OPEN) socket.send('{"type":"ping"}');

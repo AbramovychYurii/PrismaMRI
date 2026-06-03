@@ -194,7 +194,7 @@ export const PanelHeader = styled.div<{ $connected: boolean }>`
   transition: background 200ms;
   &:hover {
     background: ${({ $connected }) =>
-    $connected ? 'rgba(80,200,120,0.10)' : 'rgba(255,255,255,0.04)'};
+      $connected ? 'rgba(80,200,120,0.10)' : 'rgba(255,255,255,0.04)'};
   }
 `;
 
