@@ -65,11 +65,17 @@ const Pin = styled.button<{ $color: string; $active: boolean }>`
   }
 `;
 
-const PinLabel = styled.span<{ $color: string }>`
+const PinLabel = styled.span<{ $color: string; $side: 'left' | 'right'; $vSide: 'top' | 'bottom' | 'center' }>`
   position: absolute;
-  top: 50%;
-  left: calc(100% + 7px);
-  transform: translateY(-50%);
+  ${({ $side }) => $side === 'right'
+    ? 'left: calc(100% + 7px);'
+    : 'right: calc(100% + 7px);'}
+  ${({ $vSide }) =>
+    $vSide === 'center'
+      ? 'top: 50%; transform: translateY(-50%);'
+      : $vSide === 'top'
+      ? 'top: 0;'
+      : 'bottom: 0;'}
   font-family: var(--mono);
   font-size: 10px;
   letter-spacing: 0.06em;
@@ -97,6 +103,8 @@ function PinItem({
   onSelect: (id: string) => void;
 }) {
   const color = SEVERITY_HEX[annotation.severity];
+  const labelSide = annotation.fx > 0.55 ? 'left' : 'right';
+  const labelVSide = annotation.fy < 0.15 ? 'top' : annotation.fy > 0.85 ? 'bottom' : 'center';
   return (
     <Pin
       type="button"
@@ -111,7 +119,11 @@ function PinItem({
       }}
       onPointerDown={(e) => e.stopPropagation()}
     >
-      {active && <PinLabel $color={color}>{annotation.label}</PinLabel>}
+      {active && (
+        <PinLabel $color={color} $side={labelSide} $vSide={labelVSide}>
+          {annotation.label}
+        </PinLabel>
+      )}
     </Pin>
   );
 }
