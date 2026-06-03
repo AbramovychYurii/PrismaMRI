@@ -14,10 +14,11 @@
  *    "Show more" state resets to collapsed on every annotation switch.
  */
 
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { SEVERITY_HEX, SEVERITY_LABEL, SEVERITY_RANK } from '@/constants';
 import { useVolumeStore } from '@/store/volumeStore';
 import type { AiAnnotation, SlicePlane, VolumeCursor } from '@/types';
-import { ChevronLeft, ChevronRight, Sparkles, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Sparkles, Trash2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 
@@ -256,7 +257,35 @@ const Divider = styled.hr`
 const Footer = styled.div`
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
+  gap: 4px;
+`;
+
+const DismissBtn = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 4px 9px;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  transition: border-color 120ms, color 120ms, background 120ms;
+  &:hover {
+    border-color: #e05252aa;
+    color: #e05252;
+    background: rgba(224, 82, 82, 0.07);
+  }
+`;
+
+const NavGroup = styled.div`
+  display: flex;
+  align-items: center;
   gap: 4px;
 `;
 
@@ -375,8 +404,10 @@ export function AnnotationHud() {
   const activeId = useVolumeStore((s) => s.activeAnnotationId);
   const focusAnnotation = useVolumeStore((s) => s.focusAnnotation);
   const setActiveAnnotation = useVolumeStore((s) => s.setActiveAnnotation);
+  const removeAiAnnotation = useVolumeStore((s) => s.removeAiAnnotation);
 
   const [open, setOpen] = useState(false);
+  const [confirmDismiss, setConfirmDismiss] = useState(false);
 
   // ── Auto-open when a new finding is focused ───────────────────────────
   const prevActiveId = useRef<string | null>(null);
@@ -500,11 +531,20 @@ export function AnnotationHud() {
           )}
         </TagRow>
 
-        {/* Divider + right-aligned pagination */}
-        {ordered.length > 1 && (
-          <>
-            <Divider />
-            <Footer>
+        {/* Divider + footer: Dismiss (left) + pagination (right) */}
+        <Divider />
+        <Footer>
+          <DismissBtn
+            type="button"
+            aria-label="Dismiss finding"
+            onClick={() => setConfirmDismiss(true)}
+          >
+            <Trash2 size={11} />
+            Dismiss
+          </DismissBtn>
+
+          {ordered.length > 1 && (
+            <NavGroup>
               <NavBtn type="button" aria-label="Previous finding" onClick={() => step(-1)}>
                 <ChevronLeft size={15} />
               </NavBtn>
@@ -514,10 +554,33 @@ export function AnnotationHud() {
               <NavBtn type="button" aria-label="Next finding" onClick={() => step(1)}>
                 <ChevronRight size={15} />
               </NavBtn>
-            </Footer>
-          </>
-        )}
+            </NavGroup>
+          )}
+        </Footer>
       </Body>
+
+      {confirmDismiss && (
+        <ConfirmModal
+          title="Remove finding?"
+          message={`"${shown.label}" will be permanently removed from the viewer.`}
+          confirmLabel="Dismiss"
+          cancelLabel="Keep"
+          danger
+          onCancel={() => setConfirmDismiss(false)}
+          onConfirm={() => {
+            setConfirmDismiss(false);
+            const nextIdx = ordered.length > 1 ? (idx + 1) % ordered.length : -1;
+            removeAiAnnotation(shown.id);
+            if (nextIdx >= 0) {
+              const neighbour = ordered[nextIdx === ordered.length - 1 ? idx - 1 : nextIdx];
+              if (neighbour && neighbour.id !== shown.id) focusAnnotation(neighbour.id);
+            } else {
+              setActiveAnnotation(null);
+              setOpen(false);
+            }
+          }}
+        />
+      )}
     </Card>
   );
 }

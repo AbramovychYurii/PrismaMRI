@@ -37,7 +37,7 @@ const PresetBtn = styled.button<{ $active: boolean; $hover: boolean }>`
   border-radius: 4px;
   border: 1px solid
     ${({ $active, $hover }) =>
-    $active ? 'var(--amber)' : $hover ? 'var(--ink-4)' : 'var(--rule-2)'};
+      $active ? 'var(--amber)' : $hover ? 'var(--ink-4)' : 'var(--rule-2)'};
   background: ${({ $active, $hover }) =>
     $active ? 'rgba(196,153,70,0.12)' : $hover ? 'rgba(255,255,255,0.04)' : 'transparent'};
   cursor: pointer;
@@ -110,8 +110,8 @@ const SlabBtn = styled.button<{ $active: boolean }>`
 
   &:hover {
     ${({ $active }) =>
-    !$active &&
-    `
+      !$active &&
+      `
       background: rgba(255,255,255,0.04);
       border-color: var(--ink-4);
     `}
