@@ -35,18 +35,16 @@ const auroraSlide = keyframes`
 `;
 
 // ── Pill entrance animations ────────────────────────────────────────────────
-// One-time, layered effect when findings first appear:
-//   • Pill drops in from above with a soft elastic overshoot.
-//   • Aurora gradient ring spins up — accelerates briefly, then settles.
-//   • A specular highlight sweeps across the pill once.
-//   • Sparkle icon pulses (scale + glow) twice.
-//   • Count digits scale-pop as they tick up.
+// One-time, calm effect when findings first appear:
+//   • Pill fades + glides in from slightly above — no overshoot, no blur snap.
+//   • Aurora gradient ring slowly spins up to its continuous loop.
+//   • A subtle specular highlight sweeps across the pill once.
+//   • Sparkle icon does a single gentle scale-up.
+//   • Count digits fade up softly.
 
 const pillEntrance = keyframes`
-  0%   { transform: translateY(-22px) scale(0.85); opacity: 0; filter: blur(4px); }
-  60%  { transform: translateY(2px)   scale(1.04); opacity: 1; filter: blur(0); }
-  80%  { transform: translateY(-1px)  scale(0.99); }
-  100% { transform: translateY(0)     scale(1);    opacity: 1; }
+  0%   { transform: translateY(-8px) scale(0.98); opacity: 0; }
+  100% { transform: translateY(0)    scale(1);    opacity: 1; }
 `;
 
 const ringSpinUp = keyframes`
@@ -56,23 +54,19 @@ const ringSpinUp = keyframes`
 
 const specularSweep = keyframes`
   0%   { transform: translateX(-160%) skewX(-18deg); opacity: 0; }
-  30%  { opacity: 0.55; }
-  60%  { opacity: 0.55; }
+  40%  { opacity: 0.3; }
+  60%  { opacity: 0.3; }
   100% { transform: translateX(260%) skewX(-18deg);  opacity: 0; }
 `;
 
 const sparklePulse = keyframes`
-  0%, 100% { transform: scale(1)    rotate(0);   filter: drop-shadow(0 0 5px rgba(180,160,255,.45)); }
-  20%      { transform: scale(1.25) rotate(-8deg); filter: drop-shadow(0 0 14px rgba(200,180,255,.95)); }
-  40%      { transform: scale(0.98) rotate(0);   filter: drop-shadow(0 0 5px rgba(180,160,255,.45)); }
-  60%      { transform: scale(1.18) rotate(8deg); filter: drop-shadow(0 0 12px rgba(200,180,255,.85)); }
-  80%      { transform: scale(1)    rotate(0);   filter: drop-shadow(0 0 5px rgba(180,160,255,.45)); }
+  0%, 100% { transform: scale(1);   filter: drop-shadow(0 0 4px rgba(180,160,255,.4)); }
+  50%      { transform: scale(1.1); filter: drop-shadow(0 0 8px rgba(200,180,255,.7)); }
 `;
 
 const digitTick = keyframes`
-  0%   { transform: translateY(-6px) scale(0.7); opacity: 0; }
-  60%  { transform: translateY(1px)  scale(1.15); opacity: 1; }
-  100% { transform: translateY(0)    scale(1); }
+  0%   { transform: translateY(-3px); opacity: 0; }
+  100% { transform: translateY(0);    opacity: 1; }
 `;
 
 // ── Expanded card — row layout: [AccentBar | Body] ──────────────────────────
@@ -396,23 +390,23 @@ export const PillWrap = styled.div<{ $entrance: boolean }>`
   padding: 1.6px;
   background: linear-gradient(110deg, #ff8a3c, #ffd24a, #7ee0c0, #7aa7ff, #c79bff, #ff8a3c);
   background-size: 320% 100%;
-  /* Ring colour glide: spins up fast during entrance, then settles to the
+  /* Ring colour glide: spins up gently during entrance, then settles to the
      slow continuous loop.  Driven by two stacked animations during entrance. */
   animation:
     ${({ $entrance }) =>
       $entrance
         ? css`
-            ${pillEntrance} 720ms cubic-bezier(0.34, 1.4, 0.64, 1) both,
-            ${ringSpinUp} 1200ms cubic-bezier(0.22, 1, 0.36, 1) both,
-            ${auroraSlide} 7s linear 1200ms infinite
+            ${pillEntrance} 540ms cubic-bezier(0.22, 1, 0.36, 1) both,
+            ${ringSpinUp} 1600ms cubic-bezier(0.22, 1, 0.36, 1) both,
+            ${auroraSlide} 9s linear 1600ms infinite
           `
         : css`
-            ${auroraSlide} 7s linear infinite
+            ${auroraSlide} 9s linear infinite
           `};
   box-shadow:
     0 4px 18px rgba(0, 0, 0, 0.55),
-    0 0 ${({ $entrance }) => ($entrance ? '40px' : '0px')} rgba(150, 130, 255, 0.35);
-  transition: transform 160ms ease, filter 160ms ease, box-shadow 800ms ease 600ms;
+    0 0 ${({ $entrance }) => ($entrance ? '18px' : '0px')} rgba(150, 130, 255, 0.22);
+  transition: transform 160ms ease, filter 160ms ease, box-shadow 1000ms ease 400ms;
 
   &:hover {
     transform: translateY(-1px);
@@ -458,7 +452,7 @@ export const Specular = styled.span<{ $entrance: boolean }>`
   background: linear-gradient(
     90deg,
     rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.55) 50%,
+    rgba(255, 255, 255, 0.4) 50%,
     rgba(255, 255, 255, 0) 100%
   );
   filter: blur(2px);
@@ -466,7 +460,7 @@ export const Specular = styled.span<{ $entrance: boolean }>`
   ${({ $entrance }) =>
     $entrance &&
     css`
-      animation: ${specularSweep} 900ms cubic-bezier(0.22, 1, 0.36, 1) 280ms both;
+      animation: ${specularSweep} 1100ms cubic-bezier(0.22, 1, 0.36, 1) 360ms both;
     `}
 
   @media (prefers-reduced-motion: reduce) {
@@ -482,7 +476,7 @@ export const SparkleWrap = styled.span<{ $entrance: boolean }>`
   ${({ $entrance }) =>
     $entrance &&
     css`
-      animation: ${sparklePulse} 1100ms cubic-bezier(0.4, 0, 0.2, 1) 260ms both;
+      animation: ${sparklePulse} 1400ms cubic-bezier(0.4, 0, 0.2, 1) 320ms both;
     `}
 
   @media (prefers-reduced-motion: reduce) {
@@ -500,7 +494,7 @@ export const PillCount = styled.span<{ $entrance: boolean }>`
   ${({ $entrance }) =>
     $entrance &&
     css`
-      animation: ${digitTick} 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+      animation: ${digitTick} 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
     `}
 
   @media (prefers-reduced-motion: reduce) {
