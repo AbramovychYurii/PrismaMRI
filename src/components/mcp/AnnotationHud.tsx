@@ -123,6 +123,11 @@ const Card = styled.div`
     width: calc(100vw - ${MOBILE_SIDE * 2}px);
     top: ${MOBILE_TOP}px;
     left: ${MOBILE_SIDE}px;
+    /*
+     * Constrain to available viewport: full height minus header (48px),
+     * tab bar (56px), card top offset (12px) and bottom gap (12px).
+     */
+    max-height: calc(100dvh - 128px);
   }
 `;
 
@@ -141,6 +146,13 @@ const Body = styled.div`
   display: flex;
   flex-direction: column;
   gap: 9px;
+
+  @media (max-width: 767px) {
+    /* Allow body to scroll when card height is capped. */
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
 `;
 
 // ── Top row ─────────────────────────────────────────────────────────────────
@@ -149,6 +161,16 @@ const TopRow = styled.div`
   display: flex;
   align-items: center;
   gap: 9px;
+
+  @media (max-width: 767px) {
+    position: sticky;
+    top: 0;
+    background: rgba(16, 14, 10, 0.97);
+    z-index: 1;
+    /* compensate body padding so it spans full width */
+    margin: -13px -15px 0;
+    padding: 13px 15px 9px;
+  }
 `;
 
 const SeverityChip = styled.span<{ $color: string }>`
@@ -284,6 +306,16 @@ const Footer = styled.div`
   align-items: center;
   justify-content: space-between;
   gap: 4px;
+
+  @media (max-width: 767px) {
+    position: sticky;
+    bottom: 0;
+    background: rgba(16, 14, 10, 0.97);
+    z-index: 1;
+    /* compensate body padding so it spans full width */
+    margin: 0 -15px -14px;
+    padding: 9px 15px 14px;
+  }
 `;
 
 const ReportBtn = styled.button`
