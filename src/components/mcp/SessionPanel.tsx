@@ -178,7 +178,13 @@ export const Panel = styled.div<{ $dockOpen: boolean }>`
 
   @media (max-width: 767px) {
     width: calc(100vw - 24px);
-    bottom: ${({ $dockOpen }) => ($dockOpen ? DOCK_H + 12 : 12)}px;
+    /*
+     * On mobile the MinimisedPill sits at bottom: 12px inside StageSection,
+     * which itself sits above the 56 px tab bar.
+     * Pill viewport-bottom ≈ 56 + 12 = 68 px; pill height ≈ 44 px.
+     * Position the panel to open directly above the pill with an 8 px gap.
+     */
+    bottom: 120px;
     right: 12px;
   }
 `;
