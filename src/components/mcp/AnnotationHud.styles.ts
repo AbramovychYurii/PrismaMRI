@@ -290,8 +290,8 @@ export const ReportBtn = styled.button`
   display: flex;
   align-items: center;
   gap: 5px;
-  background: rgba(196, 153, 70, 0.08);
-  border: 1px solid var(--amber);
+  background: rgba(182, 173, 153, 0.06);
+  border: 1px solid var(--ink-2);
   border-radius: 6px;
   padding: 4px 9px;
   cursor: pointer;
@@ -299,9 +299,9 @@ export const ReportBtn = styled.button`
   font-size: 10px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--amber);
+  color: var(--ink-2);
   transition: background 120ms, filter 120ms;
-  &:hover { background: rgba(196, 153, 70, 0.16); filter: brightness(1.1); }
+  &:hover { background: rgba(182, 173, 153, 0.12); filter: brightness(1.15); }
 `;
 
 export const HintText = styled.p`
@@ -317,7 +317,7 @@ export const HintText = styled.p`
   white-space: nowrap;
 
   strong {
-    color: var(--amber);
+    color: var(--ink-2);
     font-weight: 600;
     letter-spacing: 0.1em;
   }
