@@ -43,7 +43,7 @@ const PanelWrap = styled.div<{ $isLast: boolean; $isActive: boolean }>`
   min-height: 0;
   background: var(--surface-deep);
   border-bottom: ${({ $isLast }) => ($isLast ? 'none' : '1px solid var(--rule)')};
-  overflow: hidden;
+  overflow: visible;
   cursor: ${({ $isActive }) => ($isActive ? 'crosshair' : 'pointer')};
   touch-action: none;
 `;

@@ -11,7 +11,7 @@ const RailAside = styled.aside`
   border-bottom: 1px solid var(--rule);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
 `;
 
 // ── Constants ──────────────────────────────────────────────────────────────

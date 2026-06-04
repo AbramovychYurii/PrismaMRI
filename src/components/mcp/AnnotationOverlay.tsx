@@ -38,7 +38,7 @@ const Overlay = styled.div`
   inset: 0;
   pointer-events: none;
   z-index: var(--z-panel-top);
-  overflow: hidden;
+  overflow: visible;
 `;
 
 const Pin = styled.button<{ $color: string; $active: boolean }>`
