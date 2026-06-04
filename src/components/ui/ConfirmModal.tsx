@@ -16,7 +16,7 @@
  */
 
 import { X } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import styled, { keyframes } from 'styled-components';
 
@@ -113,11 +113,18 @@ const CancelBtn = styled.button`
   background: transparent;
   color: var(--ink-2);
   cursor: pointer;
-  transition: border-color 100ms, color 100ms, background 100ms;
+  outline: none;
+  transition: border-color 100ms, color 100ms, background 100ms, box-shadow 100ms;
   &:hover {
     border-color: var(--ink-4);
     color: var(--ink);
     background: rgba(255, 255, 255, 0.04);
+  }
+  &:focus-visible {
+    border-color: var(--ink);
+    color: var(--ink);
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.15);
   }
 `;
 
@@ -129,7 +136,8 @@ const ConfirmBtn = styled.button<{ $danger?: boolean }>`
   padding: 7px 14px;
   border-radius: 6px;
   cursor: pointer;
-  transition: filter 120ms, opacity 120ms;
+  outline: none;
+  transition: filter 120ms, opacity 120ms, box-shadow 120ms;
 
   ${({ $danger }) =>
     $danger
@@ -138,12 +146,14 @@ const ConfirmBtn = styled.button<{ $danger?: boolean }>`
     background: rgba(224, 82, 82, 0.12);
     color: #e05252;
     &:hover { filter: brightness(1.15); }
+    &:focus-visible { box-shadow: 0 0 0 2px rgba(224,82,82,0.35); filter: brightness(1.1); }
   `
       : `
     border: 1px solid var(--amber);
     background: rgba(196, 153, 70, 0.12);
     color: var(--amber);
     &:hover { filter: brightness(1.12); }
+    &:focus-visible { box-shadow: 0 0 0 2px rgba(196,153,70,0.35); filter: brightness(1.08); }
   `}
 `;
 
@@ -180,13 +190,24 @@ export function ConfirmModal({
     return () => document.removeEventListener('keydown', onKey);
   }, [onCancel]);
 
+  // Auto-focus the safe (cancel) button when the modal opens, so that
+  // pressing Enter immediately keeps the item — never accidentally destroys
+  // it.  Defer with rAF so the focus call lands after the portal mounts
+  // and the entry animation begins.
+  const cancelBtnRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => cancelBtnRef.current?.focus());
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   return createPortal(
     <Backdrop
       onClick={(e) => {
         if (e.target === e.currentTarget) onCancel();
       }}
     >
-      <Dialog as="dialog" open aria-labelledby="confirm-modal-title">
+      {/* biome-ignore lint/a11y/useSemanticElements: <explanation> */}
+      <Dialog role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
         <Head>
           <Title id="confirm-modal-title">{title}</Title>
           <CloseBtn type="button" aria-label="Cancel" onClick={onCancel}>
@@ -197,7 +218,7 @@ export function ConfirmModal({
         {message && <Message>{message}</Message>}
 
         <Actions>
-          <CancelBtn type="button" onClick={onCancel}>
+          <CancelBtn ref={cancelBtnRef} type="button" onClick={onCancel}>
             {cancelLabel}
           </CancelBtn>
           <ConfirmBtn type="button" $danger={danger} onClick={onConfirm}>

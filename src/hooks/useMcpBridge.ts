@@ -461,8 +461,12 @@ export function useMcpBridge() {
                 axial: centre.z + 1,
               },
               images: {
-                coronal: renderSliceForMcp(extractSliceGrayImage(volume, 'coronal', centre.y, wl, 0)),
-                sagittal: renderSliceForMcp(extractSliceGrayImage(volume, 'sagittal', centre.x, wl, 0)),
+                coronal: renderSliceForMcp(
+                  extractSliceGrayImage(volume, 'coronal', centre.y, wl, 0),
+                ),
+                sagittal: renderSliceForMcp(
+                  extractSliceGrayImage(volume, 'sagittal', centre.x, wl, 0),
+                ),
                 axial: renderSliceForMcp(extractSliceGrayImage(volume, 'axial', centre.z, wl, 0)),
               },
             });
@@ -644,9 +648,11 @@ export function useMcpBridge() {
               break;
             }
             ok({
-              coronal:  renderSliceForMcp(extractSliceGrayImage(volume, 'coronal',  cursor.y, wl, 0)),
-              sagittal: renderSliceForMcp(extractSliceGrayImage(volume, 'sagittal', cursor.x, wl, 0)),
-              axial:    renderSliceForMcp(extractSliceGrayImage(volume, 'axial',    cursor.z, wl, 0)),
+              coronal: renderSliceForMcp(extractSliceGrayImage(volume, 'coronal', cursor.y, wl, 0)),
+              sagittal: renderSliceForMcp(
+                extractSliceGrayImage(volume, 'sagittal', cursor.x, wl, 0),
+              ),
+              axial: renderSliceForMcp(extractSliceGrayImage(volume, 'axial', cursor.z, wl, 0)),
             });
             break;
           }

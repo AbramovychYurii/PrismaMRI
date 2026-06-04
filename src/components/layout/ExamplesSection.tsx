@@ -335,8 +335,8 @@ function ExampleCard({
           <AuroraSparkles size={10} strokeWidth={1.8} />
           AI
           <AiTooltip role="tooltip">
-            Includes a pre-recorded AI analysis. Open the example and click “Show example AI
-            report” in the AI Agent panel to load the findings.
+            Includes a pre-recorded AI analysis. Open the example and click “Show example AI report”
+            in the AI Agent panel to load the findings.
           </AiTooltip>
         </AiBadge>
       )}

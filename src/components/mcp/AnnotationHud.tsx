@@ -22,7 +22,7 @@ import { useVolumeStore } from '@/store/volumeStore';
 import type { AiAnnotation, SlicePlane, VolumeCursor } from '@/types';
 import { ChevronLeft, ChevronRight, FileText, Sparkles, Trash2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import styled, { keyframes } from 'styled-components';
+import styled, { css, keyframes } from 'styled-components';
 
 function sliceInfo(plane: SlicePlane, v: VolumeCursor): string {
   if (plane === 'coronal') return `Coronal · slice ${v.y + 1}`;
@@ -56,6 +56,47 @@ const popIn = keyframes`
 
 const auroraSlide = keyframes`
   to { background-position: 320% 0; }
+`;
+
+// ── Pill entrance animations ────────────────────────────────────────────────
+// One-time, layered effect when findings first appear:
+//   • Pill drops in from above with a soft elastic overshoot.
+//   • Aurora gradient ring spins up — accelerates briefly, then settles.
+//   • A specular highlight sweeps across the pill once.
+//   • Sparkle icon pulses (scale + glow) twice.
+//   • Count digits scale-pop as they tick up.
+
+const pillEntrance = keyframes`
+  0%   { transform: translateY(-22px) scale(0.85); opacity: 0; filter: blur(4px); }
+  60%  { transform: translateY(2px)   scale(1.04); opacity: 1; filter: blur(0); }
+  80%  { transform: translateY(-1px)  scale(0.99); }
+  100% { transform: translateY(0)     scale(1);    opacity: 1; }
+`;
+
+const ringSpinUp = keyframes`
+  0%   { background-position: 0% 0; }
+  100% { background-position: 320% 0; }
+`;
+
+const specularSweep = keyframes`
+  0%   { transform: translateX(-160%) skewX(-18deg); opacity: 0; }
+  30%  { opacity: 0.55; }
+  60%  { opacity: 0.55; }
+  100% { transform: translateX(260%) skewX(-18deg);  opacity: 0; }
+`;
+
+const sparklePulse = keyframes`
+  0%, 100% { transform: scale(1)    rotate(0);   filter: drop-shadow(0 0 5px rgba(180,160,255,.45)); }
+  20%      { transform: scale(1.25) rotate(-8deg); filter: drop-shadow(0 0 14px rgba(200,180,255,.95)); }
+  40%      { transform: scale(0.98) rotate(0);   filter: drop-shadow(0 0 5px rgba(180,160,255,.45)); }
+  60%      { transform: scale(1.18) rotate(8deg); filter: drop-shadow(0 0 12px rgba(200,180,255,.85)); }
+  80%      { transform: scale(1)    rotate(0);   filter: drop-shadow(0 0 5px rgba(180,160,255,.45)); }
+`;
+
+const digitTick = keyframes`
+  0%   { transform: translateY(-6px) scale(0.7); opacity: 0; }
+  60%  { transform: translateY(1px)  scale(1.15); opacity: 1; }
+  100% { transform: translateY(0)    scale(1); }
 `;
 
 // ── Expanded card — row layout: [AccentBar | Body] ──────────────────────────
@@ -340,7 +381,7 @@ const NavIndex = styled.span`
 
 // ── Collapsed pill ───────────────────────────────────────────────────────────
 
-const PillWrap = styled.div`
+const PillWrap = styled.div<{ $entrance: boolean }>`
   position: absolute;
   top: ${TOP_OFFSET - 0.8}px;
   left: ${SIDE_OFFSET - 0.8}px;
@@ -349,9 +390,23 @@ const PillWrap = styled.div`
   padding: 1.6px;
   background: linear-gradient(110deg, #ff8a3c, #ffd24a, #7ee0c0, #7aa7ff, #c79bff, #ff8a3c);
   background-size: 320% 100%;
-  animation: ${auroraSlide} 7s linear infinite;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55);
-  transition: transform 160ms ease, filter 160ms ease;
+  /* Ring colour glide: spins up fast during entrance, then settles to the
+     slow continuous loop.  Driven by two stacked animations during entrance. */
+  animation:
+    ${({ $entrance }) =>
+      $entrance
+        ? css`
+            ${pillEntrance} 720ms cubic-bezier(0.34, 1.4, 0.64, 1) both,
+            ${ringSpinUp} 1200ms cubic-bezier(0.22, 1, 0.36, 1) both,
+            ${auroraSlide} 7s linear 1200ms infinite
+          `
+        : css`
+            ${auroraSlide} 7s linear infinite
+          `};
+  box-shadow:
+    0 4px 18px rgba(0, 0, 0, 0.55),
+    0 0 ${({ $entrance }) => ($entrance ? '40px' : '0px')} rgba(150, 130, 255, 0.35);
+  transition: transform 160ms ease, filter 160ms ease, box-shadow 800ms ease 600ms;
 
   &:hover {
     transform: translateY(-1px);
@@ -360,6 +415,7 @@ const PillWrap = styled.div`
 
   @media (prefers-reduced-motion: reduce) {
     animation: none;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55);
   }
 
   @media (max-width: 767px) {
@@ -369,6 +425,7 @@ const PillWrap = styled.div`
 `;
 
 const Pill = styled.button`
+  position: relative;
   display: flex;
   align-items: center;
   gap: 11px;
@@ -381,14 +438,68 @@ const Pill = styled.button`
   animation: ${popIn} 160ms ease;
   -webkit-tap-highlight-color: transparent;
   white-space: nowrap;
+  overflow: hidden; /* clip the specular sweep */
 `;
 
-const PillCount = styled.span`
+/** Diagonal specular highlight that streaks across the pill once. */
+const Specular = styled.span<{ $entrance: boolean }>`
+  pointer-events: none;
+  position: absolute;
+  top: -20%;
+  left: 0;
+  width: 38%;
+  height: 140%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.55) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  filter: blur(2px);
+  opacity: 0;
+  ${({ $entrance }) =>
+    $entrance &&
+    css`
+      animation: ${specularSweep} 900ms cubic-bezier(0.22, 1, 0.36, 1) 280ms both;
+    `}
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+`;
+
+const SparkleWrap = styled.span<{ $entrance: boolean }>`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center;
+  ${({ $entrance }) =>
+    $entrance &&
+    css`
+      animation: ${sparklePulse} 1100ms cubic-bezier(0.4, 0, 0.2, 1) 260ms both;
+    `}
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+`;
+
+const PillCount = styled.span<{ $entrance: boolean }>`
   font-size: 14px;
   font-weight: 700;
   color: #f2ece2;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
+  display: inline-block;
+  ${({ $entrance }) =>
+    $entrance &&
+    css`
+      animation: ${digitTick} 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    `}
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
 `;
 
 const PillLabel = styled.span`
@@ -435,6 +546,54 @@ export function AnnotationHud() {
   const [confirmDismiss, setConfirmDismiss] = useState(false);
   const [showReport, setShowReport] = useState(false);
 
+  // ── Pill entrance animation ───────────────────────────────────────────
+  // The pill plays its full multi-layer entrance only the first time it
+  // appears for a given run.  Subsequent re-renders (collapse/expand,
+  // annotation count changes) reuse the static look + continuous ring slide.
+  // `entranceKey` is bumped when the pill transitions from "no findings"
+  // → "≥1 finding" so each batch of new findings re-triggers the animation.
+  const [entranceKey, setEntranceKey] = useState(0);
+  const [entranceActive, setEntranceActive] = useState(false);
+  const hadFindingsRef = useRef(false);
+  const reduceMotion = useRef(
+    typeof window !== 'undefined' &&
+      window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
+  );
+
+  useEffect(() => {
+    const has = annotations.length > 0;
+    if (has && !hadFindingsRef.current) {
+      setEntranceKey((k) => k + 1);
+      setEntranceActive(true);
+      const t = setTimeout(() => setEntranceActive(false), 1400);
+      hadFindingsRef.current = true;
+      return () => clearTimeout(t);
+    }
+    if (!has) hadFindingsRef.current = false;
+  }, [annotations.length]);
+
+  // ── Count-up: ticks the displayed number from 0 → final over ~520 ms ──
+  const [displayedCount, setDisplayedCount] = useState(annotations.length);
+  useEffect(() => {
+    if (!entranceActive || reduceMotion.current) {
+      setDisplayedCount(annotations.length);
+      return;
+    }
+    const target = annotations.length;
+    const duration = 520;
+    const start = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / duration);
+      // easeOutCubic
+      const eased = 1 - (1 - t) ** 3;
+      setDisplayedCount(Math.round(target * eased));
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [entranceActive, annotations.length]);
+
   // ── Auto-open when a new finding is focused ───────────────────────────
   const prevActiveId = useRef<string | null>(null);
   useEffect(() => {
@@ -461,8 +620,11 @@ export function AnnotationHud() {
 
   // ── Collapsed pill ────────────────────────────────────────────────────
   if (!open) {
+    // `key` forces a full remount on each entrance so all keyframe
+    // animations restart cleanly (avoids needing to toggle the animation
+    // property by hand).
     return (
-      <PillWrap>
+      <PillWrap key={entranceKey} $entrance={entranceActive}>
         <Pill
           type="button"
           onClick={() => {
@@ -471,8 +633,11 @@ export function AnnotationHud() {
           }}
           aria-label={`Show ${annotations.length} AI findings`}
         >
-          <SparkleIcon />
-          <PillCount>{annotations.length}</PillCount>
+          <Specular aria-hidden="true" $entrance={entranceActive} />
+          <SparkleWrap $entrance={entranceActive}>
+            <SparkleIcon />
+          </SparkleWrap>
+          <PillCount $entrance={entranceActive}>{displayedCount}</PillCount>
           <PillLabel>FINDINGS</PillLabel>
         </Pill>
       </PillWrap>

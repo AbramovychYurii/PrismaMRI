@@ -784,6 +784,9 @@ export function SessionPanel() {
     try {
       setAiAnnotations(sampleReport.annotations);
       setSampleState('ok');
+      // Collapse the panel so the user immediately sees the AnnotationHud
+      // entrance animation and the annotated findings on the volume.
+      setExpanded(false);
       setTimeout(() => setSampleState('idle'), 3000);
     } catch {
       setSampleState('err');

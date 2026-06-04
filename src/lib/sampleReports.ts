@@ -33,8 +33,8 @@ export const SAMPLE_REPORTS: Record<string, SampleReport> = {
       {
         id: '65d3622c-473e-40b1-a6a9-ac8456b53469',
         plane: 'coronal',
-        fx: 0.72,
-        fy: 0.62,
+        fx: 0.7,
+        fy: 0.6,
         voxel: { x: 288, y: 146, z: 76 },
         label: 'Angulated impacted tooth',
         summary:
@@ -46,7 +46,7 @@ export const SAMPLE_REPORTS: Record<string, SampleReport> = {
       {
         id: '7bea9328-391c-4592-a8aa-39f2fbe2c132',
         plane: 'axial',
-        fx: 0.32,
+        fx: 0.35,
         fy: 0.18,
         voxel: { x: 128, y: 72, z: 56 },
         label: 'Anterior tooth crowding',
@@ -72,7 +72,7 @@ export const SAMPLE_REPORTS: Record<string, SampleReport> = {
         id: '690f8fd9-f3b6-403c-bf08-3815ac3149bb',
         plane: 'sagittal',
         fx: 0.58,
-        fy: 0.38,
+        fy: 0.41,
         voxel: { x: 286, y: 232, z: 124 },
         label: 'Partially erupted wisdom tooth',
         summary:
