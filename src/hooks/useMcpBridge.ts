@@ -123,8 +123,6 @@ function clampVoxel(v: number, max: number): number {
 const MCP_MAX_EDGE = 512;
 /** Quality for detailed single-slice captures — high enough to preserve fine anatomy. */
 const MCP_JPEG_QUALITY = 0.92;
-/** Quality for grid/overview captures where file size matters more than fine detail. */
-const MCP_JPEG_QUALITY_OVERVIEW = 0.82;
 
 /**
  * Downscale a canvas so its longest edge is at most MCP_MAX_EDGE, then encode
@@ -430,8 +428,8 @@ export function useMcpBridge() {
 
           // ── overview — metadata + centre captures of all 3 planes ──────
           case 'overview': {
-            const { volume, cursor: cur } = store.getState();
-            if (!volume || !cur) {
+            const { volume, wl } = store.getState();
+            if (!volume) {
               fail('No volume loaded');
               break;
             }
@@ -442,12 +440,9 @@ export function useMcpBridge() {
               y: Math.floor(dims[1] / 2),
               z: Math.floor(dims[2] / 2),
             };
+            // Update UI crosshair without waiting for canvas repaint —
+            // images are rendered directly from the voxel buffer (background-safe).
             store.getState().setCursor(centre);
-            await waitForPaint();
-            // Extra tick — three canvases all need to redraw.
-            await new Promise((r) => setTimeout(r, 80));
-
-            const refs = store.getState().canvasRefs;
             ok({
               meta: {
                 dims,
@@ -466,9 +461,9 @@ export function useMcpBridge() {
                 axial: centre.z + 1,
               },
               images: {
-                coronal: refs.coronal ? captureCanvas(refs.coronal) : null,
-                sagittal: refs.sagittal ? captureCanvas(refs.sagittal) : null,
-                axial: refs.axial ? captureCanvas(refs.axial) : null,
+                coronal: renderSliceForMcp(extractSliceGrayImage(volume, 'coronal', centre.y, wl, 0)),
+                sagittal: renderSliceForMcp(extractSliceGrayImage(volume, 'sagittal', centre.x, wl, 0)),
+                axial: renderSliceForMcp(extractSliceGrayImage(volume, 'axial', centre.z, wl, 0)),
               },
             });
             break;
@@ -640,59 +635,51 @@ export function useMcpBridge() {
           }
 
           // ── capture_all — all 3 planes at once ────────────────────────
+          // Software-rendered directly from the voxel buffer — no canvas,
+          // no requestAnimationFrame, works in background tabs.
           case 'capture_all': {
-            await waitForPaint();
-            const refs = store.getState().canvasRefs;
-            if (!refs.coronal || !refs.sagittal || !refs.axial) {
-              fail('One or more plane canvases not available');
+            const { volume, cursor, wl } = store.getState();
+            if (!volume || !cursor) {
+              fail('No volume loaded');
               break;
             }
             ok({
-              coronal: captureCanvas(refs.coronal),
-              sagittal: captureCanvas(refs.sagittal),
-              axial: captureCanvas(refs.axial),
+              coronal:  renderSliceForMcp(extractSliceGrayImage(volume, 'coronal',  cursor.y, wl, 0)),
+              sagittal: renderSliceForMcp(extractSliceGrayImage(volume, 'sagittal', cursor.x, wl, 0)),
+              axial:    renderSliceForMcp(extractSliceGrayImage(volume, 'axial',    cursor.z, wl, 0)),
             });
             break;
           }
 
           // ── overview_grid — N evenly-spaced slices on one plane ───────
+          // Software-rendered directly from the voxel buffer.  No cursor
+          // navigation, no requestAnimationFrame, no canvas dependency —
+          // fully background-safe and much faster than the canvas path.
           case 'overview_grid': {
             const plane = msg.plane as SlicePlane;
             const count = Math.min(4, Math.max(2, (msg.count as number) ?? 4));
-            const { cursor, volume } = store.getState();
-            if (!cursor || !volume) {
+            const { volume, wl } = store.getState();
+            if (!volume) {
               fail('No volume loaded');
               break;
             }
 
             const dims = volume.meta.dims;
             const total = sliceTotal(dims, plane);
-            const canvas = store.getState().canvasRefs[plane];
-            if (!canvas) {
-              fail(`Canvas for ${plane} not available`);
-              break;
-            }
+            // Default 3 mm slab for overview grid — improves lesion visibility
+            // without obscuring fine margins.
+            const half = halfSlabsFor(plane, 3, volume.meta.spacing);
 
             // Build evenly-spaced 1-based indices.
             const indices = Array.from({ length: count }, (_, i) =>
               Math.round(1 + (i / (count - 1)) * (total - 1)),
             );
 
-            const saved = { ...cursor };
-            const images: string[] = [];
+            const images = indices.map((slice) => {
+              const idx = slice - 1; // 0-based
+              return renderSliceForMcp(extractSliceGrayImage(volume, plane, idx, wl, half));
+            });
 
-            for (const slice of indices) {
-              const cur = { ...store.getState().cursor! };
-              if (plane === 'coronal') cur.y = clampVoxel(slice - 1, dims[1]);
-              if (plane === 'sagittal') cur.x = clampVoxel(slice - 1, dims[0]);
-              if (plane === 'axial') cur.z = clampVoxel(slice - 1, dims[2]);
-              store.getState().setCursor(cur);
-              await waitForPaint();
-              images.push(captureCanvas(canvas, MCP_JPEG_QUALITY_OVERVIEW));
-            }
-
-            // Restore original position.
-            store.getState().setCursor(saved);
             ok({ images, indices, total });
             break;
           }
@@ -1000,38 +987,21 @@ export function useMcpBridge() {
     };
   }, [isLeader, connect, clearSessionIdle, clearPingWatchdog]);
 
-  // Visibility-aware connection management.
+  // When the browser tab becomes visible again (user switches back), reconnect
+  // immediately if the WebSocket is gone.
   //
-  // HIDDEN  → close the WebSocket gracefully (code 1000).  This immediately
-  //           frees the server slot so no zombie connection lingers.  Chrome
-  //           freezes background-tab JS for 10–30+ s, which would cause pong
-  //           timeouts and a repeated disconnect / reconnect cycle.
-  //
-  // VISIBLE → reconnect immediately if the socket is gone.  Also reset the
-  //           ping watchdog so the fresh connection gets a full 40 s window
-  //           before it is considered stale.
-  //
-  // Only the leader tab manages the WebSocket.
+  // NOTE: we do NOT close the connection on visibility=hidden.  The PWA tab
+  // goes to the background whenever the user switches to Claude Desktop to run
+  // an analysis — closing the socket at that moment would immediately break
+  // every in-flight MCP command.  Instead, the server-side pong watchdog
+  // (2 × 15 s = 30 s tolerance) handles truly dead connections, which is
+  // enough headroom for Chrome's background-tab throttling.
   useEffect(() => {
     if (!isLeader) return;
     const onVisibility = () => {
-      if (document.visibilityState === 'hidden') {
-        // Graceful close — server is notified immediately, slot is freed.
-        clearPingWatchdog();
-        if (reconnectTimer.current) {
-          clearTimeout(reconnectTimer.current);
-          reconnectTimer.current = null;
-        }
-        const ws = wsRef.current;
-        if (ws) {
-          wsRef.current = null;
-          ws.close(1000, 'tab hidden');
-        }
-        return;
-      }
-
-      // Tab is visible again — reconnect if needed.
+      if (document.visibilityState !== 'visible') return;
       if (wsRef.current?.readyState === WebSocket.OPEN) return;
+      // Cancel any pending slow reconnect and connect right now.
       if (reconnectTimer.current) {
         clearTimeout(reconnectTimer.current);
         reconnectTimer.current = null;
@@ -1041,5 +1011,5 @@ export function useMcpBridge() {
     };
     document.addEventListener('visibilitychange', onVisibility);
     return () => document.removeEventListener('visibilitychange', onVisibility);
-  }, [isLeader, connect, clearPingWatchdog]);
+  }, [isLeader, connect]);
 }

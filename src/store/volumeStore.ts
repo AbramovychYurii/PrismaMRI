@@ -80,6 +80,8 @@ interface VolumeActions {
   requestSnapToView: (plane: SlicePlane) => void;
   setMobileTab: (tab: MobileTab) => void;
   addAiAnnotation: (a: Omit<AiAnnotation, 'volumeId'>) => void;
+  /** Atomically replace all annotations for the active volume (used by demo loader). */
+  setAiAnnotations: (list: Omit<AiAnnotation, 'volumeId'>[]) => void;
   removeAiAnnotation: (id: string) => void;
   clearAiAnnotations: () => void;
   setActiveAnnotation: (id: string | null) => void;
@@ -266,6 +268,15 @@ export const useVolumeStore = create<VolumeState & VolumeActions>((set) => ({
       const next = [...state.aiAnnotations, tagged];
       annotationsStorage.save(state.activeVolumeId, next);
       return { aiAnnotations: next };
+    }),
+
+  setAiAnnotations: (list) =>
+    set((state) => {
+      if (!state.activeVolumeId) return {};
+      const volumeId = state.activeVolumeId;
+      const tagged = list.map((a) => ({ ...a, volumeId }));
+      annotationsStorage.save(volumeId, tagged);
+      return { aiAnnotations: tagged, activeAnnotationId: null };
     }),
 
   removeAiAnnotation: (id) =>

@@ -17,6 +17,7 @@ This skill is tuned with evidence from peer-reviewed studies on multimodal LLM p
 4. **No clinical decisions, no therapy.** Output is a *descriptive read*, not management advice. End every report with the disclaimer block.
 5. **Measurements must come from tools.** Use `set_measurement` / `get_measurement` and the spacing reported by `get_volume_overview` — never estimate sizes from a screenshot.
 6. **Prefer descriptive terms over named diagnoses.** "Ring-enhancing lesion with surrounding T2 hyperintensity" — not "glioblastoma".
+7. **`capture_all_planes` is mandatory before every `add_annotation` call — no exceptions.** A structure that appears round or cystic on one plane may be a cross-section of a tilted tooth, vessel, duct, or nerve canal. Single-plane appearance is *never* sufficient to characterise a finding. If `capture_all_planes` shows the "lesion" is an oblique cut through a known anatomical structure, do not annotate it as pathology.
 
 ## When this skill activates
 
@@ -51,9 +52,12 @@ Use this ordered recipe. Skip a step only when the previous step makes it irrele
 5. `navigate_to_slice` to the suspected lesion centre, then `capture_all_planes` — reviewing coronal + sagittal + axial simultaneously is the most reliable way to confirm a finding and determine its precise centre before annotating.
 6. For each focal finding: `step_slice` ±1, ±2 with `capture_slice` (slab_mm=3) to confirm the finding spans ≥3 contiguous slices (not a partial-volume artefact).
 7. For mass-effect / vascular encasement / bone questions: `capture_3d` for spatial overview. Do not use 3-D for soft-tissue signal characterisation.
-8. For each confirmed finding: `set_measurement` (largest in-plane diameter + perpendicular) and `add_annotation` with the marker placed at the **geometric centre** of the lesion — the system snaps to the nearest anatomy automatically.
-   - **`confidence`** — pass as the **separate integer `confidence` field** in `add_annotation` (0–100, never 100). Do **not** embed it in `summary` text.
-   - **`summary`** — 1–3 sentences describing morphology, signal, margins and effect only. No "confidence: X%" phrases inside `summary`.
+8. For each confirmed finding:
+   - **Before annotating** — run `capture_all_planes` at the finding location and explicitly confirm the finding is visible on ≥2 of the 3 planes. If it disappears on orthogonal planes, it is likely a partial-volume artefact or oblique cross-section of a normal structure — do NOT annotate.
+   - `set_measurement` (largest in-plane diameter + perpendicular).
+   - `add_annotation` with the marker placed at the **geometric centre** of the lesion.
+   - **`confidence`** — pass as the **separate integer `confidence` field** (0–100, never 100). Do **not** embed it in `summary` text.
+   - **`summary`** — 1–3 sentences describing morphology, signal, margins and effect only.
    - **`size_mm`** — include when a clear measurable boundary is visible.
 9. After placing all markers verify their 3-D positions with `capture_3d` — if any marker appears anatomically wrong, remove and re-annotate using `capture_all_planes` for better localisation.
 
@@ -106,7 +110,89 @@ Liver → biliary tree → gallbladder → pancreas → spleen → adrenals → 
 Alignment → vertebral-body marrow signal → discs at each level (height, hydration, herniation) → canal diameter → cord signal → conus level → exit foramina each level → paraspinal soft tissue → SI joints if visible.
 
 ### Maxillofacial CBCT / dental CT
-Symmetry → mandibular condyles & TMJ → maxillary & frontal sinuses → nasal cavity & septum → dentition (each quadrant in order) → alveolar bone → mandibular canal & mental foramina → soft tissue if visible.
+
+**Mandatory opening sequence:**
+1. `set_render_preset("bone")` + `capture_3d` — full dental arch, mandibular condyles, zygomatic arches, sinus floors in one view.
+2. `capture_overview_grid` coronal (count=6) — all teeth and alveolar bone in cross-section.
+3. `capture_overview_grid` sagittal (count=6) — mandibular canal, sinus floors, tooth roots.
+4. `capture_overview_grid` axial (count=6) — occlusal plane, tooth axes, buccal/lingual cortical plates.
+
+**Checklist (walk in order):**
+1. **Symmetry** — compare left/right condylar size, ramus height, alveolar crest level
+2. **TMJ** — condylar morphology (flat/eroded/osteophyte), joint space, articular eminence
+3. **Sinuses** — maxillary (mucosa thickening, opacification, oroantral communication), frontal, ethmoid
+4. **Nasal cavity & septum**
+5. **Dentition — each quadrant in order (UR → UL → LL → LR):**
+   - Presence / absence / supernumerary teeth
+   - Crown integrity, enamel continuity
+   - Pulp chamber size and shape
+   - Root number, morphology, length, curvature
+   - Periapical status (PDL space, lamina dura)
+   - Impacted / retained / transposed teeth (see below)
+6. **Alveolar bone** — crestal height, buccal/lingual plate continuity, interdental bone
+7. **Mandibular canal** — cortication, displacement by roots or pathology
+8. **Mental foramina** — bilateral, size, variants
+9. **Pathological lucencies / densities** — see differential table below
+
+---
+
+#### CT HU reference — dental structures
+
+| Structure              | Approximate HU     |
+| ---------------------- | ------------------ |
+| Enamel                 | 2 500 – 3 000      |
+| Dentin                 | 700 – 1 200        |
+| Cementum               | 700 – 1 000        |
+| Pulp (soft tissue)     | 0 – 80             |
+| Cortical bone          | 600 – 1 800        |
+| Cancellous bone        | 150 – 700          |
+| PDL space              | –100 – 50 (soft)   |
+| Air (sinus/cavity)     | –1 000 – –800      |
+| Soft tissue (gingiva)  | 30 – 100           |
+
+**Key rule:** enamel is the brightest structure in any dental CT — if you see an extremely bright cap (≥ 2 500 HU) on any plane, that region contains tooth enamel. Never call a structure containing enamel a cyst or tumour without accounting for the tooth.
+
+---
+
+#### Impacted / tilted tooth — identification rule
+
+An impacted tooth tilted at any angle will appear as a **round or oval high-density structure** on the axial plane — this is the most common source of misidentification (cyst, calcification, foreign body).
+
+**Three-plane confirmation workflow:**
+1. `capture_all_planes` at the suspicious location.
+2. On at least ONE plane the tooth's long axis will be visible:
+   - Bright enamel cap (≥ 2 500 HU) at the crown end
+   - Slightly less bright dentin body
+   - Dark pulp canal running through the centre
+   - PDL space (thin dark line) surrounding the root
+   - Intact or disrupted lamina dura
+3. If all three components (enamel / dentin / pulp) are identifiable → the structure is a tooth, not a cyst.
+4. Measure the pericoronal space in the plane showing the largest diameter.
+
+**Impacted tooth vs. dentigerous cyst — key differentiator:**
+
+| Feature                    | Impacted tooth (normal)     | Dentigerous cyst               |
+| -------------------------- | --------------------------- | ------------------------------ |
+| Pericoronal lucency width  | ≤ 2–3 mm                    | > 3–4 mm (by convention ≥ 3 mm on CBCT) |
+| Lucency margins            | corticated, follows follicle | well-corticated, scalloped     |
+| Root displacement          | none or minor               | root displaced / diverged      |
+| Expansion of cortex        | absent                      | present in larger cysts        |
+| Tooth inside the lucency   | crown centred in follicle   | crown within cystic cavity     |
+
+**Anti-pattern:** Do NOT call a pericoronal space a "cyst" unless its widest dimension exceeds **3 mm** on the plane of largest measurement AND cortical expansion or root displacement is present. A normal follicle space is always present around an unerupted crown.
+
+---
+
+#### Common periapical / interradicular lucency differential
+
+| Appearance                          | Most likely                  | Distinguish by                          |
+| ----------------------------------- | ---------------------------- | --------------------------------------- |
+| Round lucency at root apex, corticated | Periapical granuloma / cyst | Size > 10 mm + corticated → radicular cyst |
+| Ill-defined lucency at root apex    | Periapical abscess           | Loss of lamina dura, PDL widening        |
+| Lateral root lucency                | Lateral periodontal cyst / accessory canal | Position relative to root |
+| Lucency between roots               | Furcation involvement        | Furcation location, bone loss pattern    |
+| Multilocular lucency, large         | Ameloblastoma / OKC          | Expansion, scalloping, age               |
+| Unilocular with impacted tooth      | Dentigerous cyst             | See table above                          |
 
 ## Phase 4 — Describe each finding
 
@@ -173,6 +259,9 @@ DISCLAIMER
 - Do not give sizes in pixels — always millimetres derived from `get_volume_overview` spacing.
 - Do not extrapolate beyond the imaged volume.
 - Do not name a specific diagnosis without imaging features that justify it.
+- **Do not characterise a round/oval structure from a single plane.** A tilted tooth, oblique vessel, nerve canal, or salivary duct all appear as a round density on the perpendicular plane. Always call `capture_all_planes` first.
+- **Do not call a pericoronal space a cyst** unless it is ≥ 3 mm wide AND shows cortical expansion or root displacement. A normal follicle is always present.
+- **Do not annotate before `capture_all_planes` confirms the finding on ≥ 2 planes.** This is hard constraint #7 — not a suggestion.
 
 ## Reference: MRI signal cheatsheet
 

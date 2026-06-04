@@ -12,6 +12,7 @@
  */
 
 import { DOCK_H } from '@/components/dock/Dock';
+import { getSampleReport } from '@/lib/sampleReports';
 import { useVolumeStore } from '@/store/volumeStore';
 import JSZip from 'jszip';
 import {
@@ -22,6 +23,7 @@ import {
   ClipboardCheck,
   Download,
   Info,
+  Sparkles,
   X,
   Zap,
 } from 'lucide-react';
@@ -515,101 +517,96 @@ const EXAMPLE_PROMPT = `Using the PrismaMRI tools, perform a systematic review o
 
 ⚠️ Research and educational use only — not a substitute for clinical judgment.
 
-## Core principle: MIP-first, thin slices only when justified
-**Always use Slab MIP as the default capture mode.** A 3–5 mm slab composites adjacent slices, dramatically improving lesion conspicuity, filling partial-volume gaps, and revealing fine structures (vessels, hairline fractures, subtle cortical breaks) that single slices routinely miss. Drop to a thinner slab or single slice only when you have a specific reason — see the decision ladder below.
+## Core principle: MIP-first, three-plane confirmation before every annotation
+**Always use Slab MIP as the default capture mode.** A 3–5 mm slab composites adjacent slices, dramatically improving lesion conspicuity, filling partial-volume gaps, and revealing fine structures (vessels, hairline fractures, subtle cortical breaks) that single slices routinely miss. Drop to a thinner slab or single slice only when you have a specific reason.
 
 **Slab thickness decision ladder:**
 - **5 mm MIP** → default for all survey captures and overview grids (maximum sensitivity, fewest missed findings)
-- **3 mm MIP** → targeted detail on a known region of interest; use when 5 mm obscures fine margins or overlapping structures
-- **Single slice (slab_mm=0)** → only for: (a) precise boundary delineation before measuring, or (b) structures so small that any slab averaging degrades them (e.g., < 2 mm nodule, thin cortical plate)
+- **3 mm MIP** → targeted detail on a known region of interest; use when 5 mm obscures fine margins
+- **Single slice (slab_mm=0)** → only for: (a) precise boundary delineation before measuring, or (b) structures < 2 mm where slab averaging degrades them
 
 Set the slab once with \`set_slab_mm\` before each capture group; it persists until you change it.
 
 ---
 
-## Step 1 · Verify the volume
-Call \`get_viewer_state\`. If \`volumeLoaded\` is false, stop and ask the user to open a file first.
-Record: modality (CT / MRI / CBCT), dims [W×H×D], voxel spacing in mm. Every size estimate depends on spacing — note it explicitly before measuring anything.
+## Step 1 · Volume and spatial context
+1. Call \`get_viewer_state\`. If \`volumeLoaded\` is false, stop and ask the user to open a file first.
+   Record: modality (CT / MRI / CBCT), dims [W×H×D], voxel spacing in mm. Every size estimate depends on spacing.
+2. Call \`set_render_preset "bone"\`, then \`capture_3d\` — this gives the full 3-D spatial skeleton before any 2-D navigation. Use it to understand the global anatomy, identify dominant structures, and orient your slice survey.
 
-## Step 2 · Windowing
-Call \`get_volume_overview\` → metadata and centre-slice overview of all three planes.
+## Step 2 · Volume overview and windowing
+Call \`get_volume_overview\` — this returns metadata and centre-slice captures of all three planes in one call. These centre slices are your anatomical reference point; no additional navigation needed at this stage.
 
 **Default W/L is usually correct — do not change it unless you have a clear reason.**
-The viewer auto-calibrates window and level when the file loads, and in most cases the default gives optimal contrast. Changing W/L blindly is a common source of near-black or washed-out images that make analysis impossible.
-
-**Workflow:**
-1. Examine the overview images. If anatomy is clearly visible with good contrast → proceed without touching W/L.
-2. Only if the images are too dark, too bright, or flat (no contrast between tissues) → apply a preset:
-   - CT bone / dental / skeletal → \`apply_wl_preset "bone"\`
-   - CT soft tissue / abdomen / chest → \`apply_wl_preset "soft_tissue"\`
-   - CT lung → \`apply_wl_preset "lung"\`
-   - MRI T1 → \`apply_wl_preset "t1"\`
-   - MRI T2 / FLAIR → \`apply_wl_preset "t2"\`
-3. After applying a preset, re-capture one slice and verify the result is visibly better before continuing. If the preset made things worse, revert with \`apply_wl_preset "default"\` to restore the file's original W/L.
+The viewer auto-calibrates W/L on load. Only override if images are visibly clipped, washed-out, or flat:
+- CT bone / dental / skeletal → \`apply_wl_preset "bone"\`
+- CT soft tissue / abdomen → \`apply_wl_preset "soft_tissue"\`
+- CT lung → \`apply_wl_preset "lung"\`
+- MRI T1 → \`apply_wl_preset "t1"\` · MRI T2/FLAIR → \`apply_wl_preset "t2"\`
 
 **Never call \`set_window_level\` with arbitrary values** — always use named presets or the file default.
 
 ## Step 3 · Systematic MIP survey — all three planes
-Work plane by plane in the order: **coronal → sagittal → axial**.
+Work plane by plane: **coronal → sagittal → axial**.
 
 For each plane:
-1. \`set_slab_mm 5\` — establish the 5 mm default.
-2. \`capture_overview_grid\` with \`count=4\` — four evenly-spaced 5 mm MIP thumbnails covering the full extent of the anatomy. This is your primary screening pass.
-3. Identify every region with a potential finding. List them before moving on.
-4. For each flagged region: \`navigate_to_slice\`, then \`capture_slice\` (slab still 5 mm) to examine it at full resolution.
-5. If the 5 mm slab obscures fine detail on a specific finding: \`set_slab_mm 3\`, recapture, then restore to 5 mm (\`set_slab_mm 5\`) before continuing.
-6. For every suspected abnormality: \`capture_all_planes\` at that slice — the three-plane view is mandatory before annotating, as it disambiguates projection artefacts and confirms 3-D extent.
+1. \`set_slab_mm 5\`
+2. \`capture_overview_grid\` count=4 — full-extent screening pass with 5 mm MIP thumbnails.
+3. List every region with a potential finding before moving on.
+4. For each flagged region: \`navigate_to_slice\` → \`capture_slice\` (slab 5 mm) for detail.
+5. If 5 mm obscures fine margins: \`set_slab_mm 3\`, recapture, restore to 5 mm.
 
-After completing all three planes, review your findings list and cross-check: does the same lesion appear consistently across all planes? Inconsistency suggests artefact.
+After all three planes: cross-check your findings list — does every suspected lesion appear on more than one plane? A structure visible only on one plane is likely an artefact or an oblique cross-section of a normal structure.
 
-## Step 4 · Annotate confirmed findings
-For each confirmed abnormality call \`add_annotation\`:
+## Step 4 · Three-plane confirmation (mandatory before any annotation)
 
-**Localisation** — use the plane where the finding is most clearly centred.
-- \`fx\` = horizontal centre of finding ÷ image width (0 = left, 1 = right)
-- \`fy\` = vertical centre of finding ÷ image height (0 = top, 1 = bottom)
-Aim for the geometric centre; the system snaps to the nearest anatomy automatically.
+**This step cannot be skipped.** Before calling \`add_annotation\` for any finding:
 
-**Fields:**
-- \`severity\`:
-  - \`critical\` — immediate risk; cannot be deferred
-  - \`serious\` — significant; needs timely attention
-  - \`moderate\` — mild or chronic; monitor
-  - \`comment\` — incidental or informational; no danger
+1. \`navigate_to_slice\` to the finding centre, then **\`capture_all_planes\`** — view the finding simultaneously on coronal, sagittal and axial.
+2. Ask yourself:
+   - Is the finding visible on **at least 2 of the 3 planes**? If no → do not annotate; it is likely an artefact or partial-volume effect.
+   - On each plane where it appears, does the shape and density make sense for the proposed diagnosis?
+   - Could this be an **oblique cross-section of a normal structure** — a tilted tooth, vessel, nerve canal, duct, or tendon? A tilted tubular structure always appears round or oval on the perpendicular plane.
+3. \`step_slice\` ±1, ±2 with \`capture_slice\` (slab_mm=3) to confirm the finding spans ≥3 contiguous slices.
+4. Only after confirming on multiple planes and multiple slices → proceed to annotate.
+
+### Annotating confirmed findings — \`add_annotation\` fields
+- **Plane** — use the plane where the finding is most clearly centred and measurable.
+- \`fx\` / \`fy\` — geometric centre of the finding (0–1 fraction of image width/height).
+- \`severity\`: \`critical\` immediate risk · \`serious\` timely attention · \`moderate\` monitor · \`comment\` incidental
 - \`label\` — concise anatomical name, ≤ 5 words
-- \`summary\` — 3–5 sentences covering in order:
-  1. Morphology: shape, margins, density/signal intensity relative to surroundings
-  2. Size: largest in-plane diameter derived from voxel spacing × pixel count (omit if margins unclear)
-  3. Location: precise anatomical name + relationship to adjacent structures
-  4. Top 2–3 differential diagnoses ranked by probability with one-line reasoning each
-  5. Clinical relevance and urgency
-- \`confidence\` — 0–100; never exceed 92 for pathological findings; calibrate to genuine uncertainty
+- \`summary\` — 3–5 sentences: (1) morphology + margins, (2) size if measurable, (3) precise location, (4) top 2–3 differentials with one-line reasoning each, (5) clinical relevance. **Do not include "confidence: X%" in summary text.**
+- \`confidence\` — integer 0–100 as a **separate field**, never embedded in summary. Never exceed 92 for pathological findings.
 - \`size_mm\` — largest in-plane diameter in mm (omit for diffuse or ill-defined findings)
 
-Annotate abnormalities only. Do not mark normal anatomy. Do not wait until the end — annotate immediately after \`capture_all_planes\` confirms the finding.
+### Differential ranking rule
+Rank by: morphology → margins → density/signal → location → associated structures → patient age (if known).
+State reasoning explicitly: *"Most likely X because [one feature]; Y is possible if [condition]."*
 
-### Differential diagnosis — ranking rules
-Rank differentials by: lesion morphology → margins → density/signal → location → associated structures → patient age context (if known).
-Always state the reasoning: *"Most likely X because [one specific feature]; Y is possible if [condition]."*
+### Common misidentification traps
+- **Round structure on one plane** — may be an oblique cut through a tube (vessel, duct, nerve, root canal, impacted tooth). Always verify on orthogonal planes.
+- **Hyperdense rim around a dark centre** — may be cortical bone + cancellous interior, not a cystic wall.
+- **Partial-volume at a bone edge** — appears as a soft-tissue density "lesion" adjacent to dense cortex. Check ≥3 slices and orthogonal planes.
+- **MIP projection artefact** — a vessel running parallel to the slab can mimic a nodule. Switch to slab_mm=0 on that slice to resolve.
 
 ## Step 5 · 3-D spatial verification
 After all annotations are placed:
-1. \`set_render_preset "bone"\` for skeletal/dental CT, \`"tissue"\` for soft-tissue or MRI, \`"mip"\` for angiography/airway.
-2. \`capture_3d\` — confirm every marker lands at the correct anatomical site on the 3-D model.
-3. If a marker looks misplaced: remove it, re-examine with \`capture_all_planes\` using \`slab_mm 3\`, re-annotate.
+1. \`set_render_preset "bone"\` (skeletal/dental CT) or \`"mip"\` (angiography/airway).
+2. \`capture_3d\` — confirm every marker lands at the correct anatomical site.
+3. If a marker looks misplaced: remove it, re-examine with \`capture_all_planes\` + slab_mm 3, re-annotate.
 
 ## Step 6 · Structured report
 Present the final report in this exact structure:
 
-**Technique** — modality, dims, voxel spacing mm, W/L preset applied, slab thickness used for survey vs. detail.
+**Technique** — modality, dims, voxel spacing mm, W/L preset applied, slab thickness used.
 
-**Findings** — one paragraph per anatomical region, ordered most-severe first. Each paragraph must include: anatomical location (name + approximate voxel coords), size if measurable, morphology description, top differential.
+**Findings** — one paragraph per anatomical region, most-severe first. Each abnormal finding must include: anatomical location (name + approximate voxel coords), size if measurable, morphology, top differential.
 
 **Impression** — 3–5 sentences. Lead with the most clinically significant conclusion. Include confidence levels for critical/serious findings.
 
-**Differentials** — for each serious/critical finding: numbered list of differentials with likelihood reasoning.
+**Differentials** — for each serious/critical finding: numbered list with likelihood reasoning.
 
-**Recommendations** — specific next steps: additional imaging sequences or planes, clinical correlation needed, specialist referral type, urgency tier (routine / urgent / emergent).`;
+**Recommendations** — specific next steps: additional sequences or planes, clinical correlation, specialist referral type, urgency (routine / urgent / emergent).`;
 
 const PromptBox = styled.div`
   position: relative;
@@ -765,6 +762,8 @@ export function SessionPanel() {
   const agentWorking = useVolumeStore((s) => s.agentSessionActive);
   const localPort = useVolumeStore((s) => s.localPort);
   const dockOpen = useVolumeStore((s) => s.toolbar.dock);
+  const activeVolumeId = useVolumeStore((s) => s.activeVolumeId);
+  const setAiAnnotations = useVolumeStore((s) => s.setAiAnnotations);
   // Prefer the store's localPort over isLocalMode() — localPort is set only when
   // the bridge actually connected directly to 127.0.0.1 (covers both PWA standalone
   // and localhost dev-server cases that isLocalMode() would miss).
@@ -772,6 +771,25 @@ export function SessionPanel() {
   const [expanded, setExpanded] = useState(false);
   const [capOpen, setCapOpen] = useState(false);
   const [dxtState, setDxtState] = useState<BtnState>('idle');
+  const [sampleState, setSampleState] = useState<BtnState>('idle');
+
+  // Example-report button is visible only when:
+  //  • the agent is not connected (nothing to demo against the real model), AND
+  //  • the loaded volume is one of the curated demo files in SAMPLE_REPORTS.
+  const sampleReport = getSampleReport(activeVolumeId);
+
+  const handleLoadSample = useCallback(() => {
+    if (!sampleReport) return;
+    setSampleState('idle');
+    try {
+      setAiAnnotations(sampleReport.annotations);
+      setSampleState('ok');
+      setTimeout(() => setSampleState('idle'), 3000);
+    } catch {
+      setSampleState('err');
+      setTimeout(() => setSampleState('idle'), 3000);
+    }
+  }, [sampleReport, setAiAnnotations]);
 
   const handleDownloadDxt = useCallback(async () => {
     setDxtState('idle');
@@ -905,6 +923,31 @@ export function SessionPanel() {
                 → Settings → <strong style={{ color: 'var(--ink-2)' }}>Extensions</strong> → Install
                 Extension. Claude connects to this viewer automatically.
               </Hint>
+
+              {sampleReport && (
+                <>
+                  <Divider />
+                  <ActionBtn type="button" $state={sampleState} onClick={handleLoadSample}>
+                    {sampleState === 'ok' ? (
+                      <Check size={13} />
+                    ) : sampleState === 'err' ? (
+                      <X size={13} />
+                    ) : (
+                      <Sparkles size={13} />
+                    )}
+                    {sampleState === 'ok'
+                      ? 'Example loaded!'
+                      : sampleState === 'err'
+                        ? 'Could not load example'
+                        : 'Show example AI report'}
+                  </ActionBtn>
+                  <Hint>
+                    Loads a pre-recorded AI analysis of this sample volume so you can preview the
+                    annotated findings without installing the extension. Replaces any existing
+                    findings for this file.
+                  </Hint>
+                </>
+              )}
             </>
           )}
 

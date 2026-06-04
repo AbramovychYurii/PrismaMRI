@@ -1,3 +1,4 @@
+import { AuroraSparkles } from '@/components/ui/AuroraSparkles';
 import { useViewerActions } from '@/hooks';
 import { useHover } from '@/hooks/useHover';
 import { useVolumeStore } from '@/store';
@@ -16,6 +17,8 @@ interface ExampleMeta {
   description: string;
   tag: string;
   thumbnail: string;
+  /** Has a pre-recorded AI report available via the SessionPanel demo button. */
+  hasAiReport?: boolean;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -40,6 +43,7 @@ const EXAMPLES: ExampleMeta[] = [
     description: 'Upper jaw — high-resolution dental CT.',
     tag: 'CT',
     thumbnail: `${BASE}examples/thumbnails/maxillofacial_CBCT.jpg`,
+    hasAiReport: true,
   },
   {
     id: 'dog_frontal_thorax_injured_paw_CT',
@@ -184,6 +188,58 @@ const ModalityBadge = styled.span`
   z-index: var(--z-panel-header);
 `;
 
+const AiBadge = styled.span`
+  position: absolute;
+  top: 16px;
+  right: 50px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: #50c878;
+  background: rgba(80, 200, 120, 0.08);
+  border: 1px solid rgba(80, 200, 120, 0.35);
+  border-radius: 2px;
+  padding: 2px 5px;
+  z-index: var(--z-panel-header);
+  transition: background 150ms, border-color 150ms;
+  &:hover {
+    background: rgba(80, 200, 120, 0.16);
+    border-color: rgba(80, 200, 120, 0.6);
+  }
+`;
+
+// Custom tooltip — appears instantly on hover (native title= has a ~700 ms delay).
+const AiTooltip = styled.span`
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 220px;
+  padding: 8px 10px;
+  background: rgba(14, 12, 9, 0.96);
+  border: 1px solid var(--rule-2);
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  color: var(--ink-2);
+  text-transform: none;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-2px);
+  transition: opacity 80ms, transform 80ms;
+  z-index: calc(var(--z-panel-header) + 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+
+  ${AiBadge}:hover & {
+    opacity: 1;
+    transform: translateY(0);
+  }
+`;
+
 const ThumbnailWrap = styled.div`
   width: 100%;
   aspect-ratio: 1;
@@ -263,6 +319,27 @@ function ExampleCard({
       {/* Decorative corner brackets */}
       <CornerTL aria-hidden="true" $hover={showHover} />
       <CornerTR aria-hidden="true" $hover={showHover} />
+
+      {/* AI report availability — only when a pre-recorded example exists for this file */}
+      {example.hasAiReport && (
+        <AiBadge
+          aria-label="Includes pre-recorded AI report"
+          // Swallow clicks so the badge doesn't trigger the card's onClick
+          // (which would load the volume).  The badge is informational only.
+          onClick={(e) => {
+            e.stopPropagation();
+            e.preventDefault();
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <AuroraSparkles size={10} strokeWidth={1.8} />
+          AI
+          <AiTooltip role="tooltip">
+            Includes a pre-recorded AI analysis. Open the example and click “Show example AI
+            report” in the AI Agent panel to load the findings.
+          </AiTooltip>
+        </AiBadge>
+      )}
 
       {/* Modality badge — ink-2 = 8.9:1 contrast on dark overlay → passes WCAG AA */}
       <ModalityBadge aria-label={`Modality: ${example.tag}`}>{example.tag}</ModalityBadge>

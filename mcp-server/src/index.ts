@@ -92,7 +92,7 @@ if (SKILL_INSTRUCTIONS && SKILL_INSTRUCTIONS.length > 0) {
 //
 // Skip by setting PRISMAMRI_SKIP_SKILL_INSTALL=1.
 const SKILL_NAME = 'prisma-mri-radiology';
-const SKILL_VERSION = '1.1.0'; // bump when SKILL.md changes substantively
+const SKILL_VERSION = '1.2.0'; // bump when SKILL.md changes substantively
 
 function claudeCodeDir(): string {
   return path.join(os.homedir(), '.claude');
