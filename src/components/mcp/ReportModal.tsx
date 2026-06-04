@@ -67,6 +67,7 @@ const Shell = styled.div`
     border-radius: 0;
     border: none;
     position: relative;
+    overflow-y: auto;
   }
 `;
 
@@ -256,9 +257,15 @@ const SpinIcon = styled(Loader)`
 
 const RightPanel = styled.div`
   flex: 1;
+  min-height: 0;
   background: rgba(12, 11, 8, 0.98);
   display: flex;
   flex-direction: column;
+
+  @media (max-width: 640px) {
+    flex: none;
+    min-height: 0;
+  }
 `;
 
 const PreviewHeader = styled.div`
@@ -318,10 +325,17 @@ const MobileCloseBtn = styled.button`
 
 const PreviewScroll = styled.div`
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 20px;
   /* block so Doc stretches to fit all content vertically */
   display: block;
+
+  @media (max-width: 640px) {
+    flex: none;
+    overflow-y: visible;
+    padding-bottom: 32px;
+  }
 `;
 
 // Document
