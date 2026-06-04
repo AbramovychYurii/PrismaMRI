@@ -1,25 +1,57 @@
+/**
+ * SlicePanel — single 2-D plane viewer (rail and fullscreen).
+ *
+ * One panel per plane is rendered inside the Rail aside. Each panel reads its
+ * own slice from the active volume, draws it onto a canvas via
+ * `useSlicePanelCore`, and overlays crosshair + measurement + AI markers.
+ *
+ * Expanding a panel mounts an `ExpandedSlicePanel` portal that renders the
+ * same content fullscreen with larger controls.
+ *
+ * All visual styling lives in `SlicePanel.styles.ts`.
+ */
+
 import { AnnotationOverlay } from '@/components/mcp/AnnotationOverlay';
 import { MeasureMenu } from '@/components/rail/MeasureMenu';
 import { SliceScrubber } from '@/components/rail/SliceScrubber';
 import { Tooltip } from '@/components/ui/Tooltip';
-import { PLANE_FOOTER, PLANE_GLYPH, accentRgba } from '@/constants';
+import { PLANE_FOOTER, PLANE_GLYPH } from '@/constants';
 import { useHalfSlabs } from '@/hooks/useHalfSlabs';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { axisColor, axisGlow, cursorFromClick, useSlicePanelCore } from '@/hooks/useSlicePanelCore';
 import { useVolumeStore } from '@/store/volumeStore';
 import type { SlicePlane } from '@/types';
 import { ChevronsUpDown, Download, Maximize2, Minimize2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import styled from 'styled-components';
+import {
+  ActiveBorder,
+  ButtonTray,
+  CrossCenter,
+  CrossDot,
+  CrossH,
+  CrossV,
+  CrosshairOverlay,
+  FullscreenOverlay,
+  MEASURE_DOT_PX,
+  MEASURE_DOT_SHADOW,
+  MeasureDot,
+  MeasureLine,
+  MobileCounter,
+  MobileRightCol,
+  PanelFooter,
+  PanelHeader,
+  PanelWrap,
+  PlaneGlyph,
+  PlaneLabel,
+  PlaneLabelAccent,
+  SliceCounter,
+  SliceDim,
+  StyledCanvas,
+  TrayBtn,
+} from './SlicePanel.styles';
 
-// ── Tuning knobs ──────────────────────────────────────────────────────────
-
-/** Fixed pixel size of measurement dots on 2-D slice panels. */
-const MEASURE_DOT_PX = 8;
-
-/** Pre-computed box-shadow for measurement dots (constant size). */
-const MEASURE_DOT_SHADOW = `0 0 ${MEASURE_DOT_PX * 0.7}px var(--measure), 0 0 ${MEASURE_DOT_PX * 1.6}px var(--measure-glow)`;
+// ── Helpers ────────────────────────────────────────────────────────────────
 
 /** Downloads the current canvas slice as a PNG file. */
 function downloadSlice(canvas: HTMLCanvasElement | null, plane: SlicePlane, idx: number): void {
@@ -35,258 +67,13 @@ function downloadSlice(canvas: HTMLCanvasElement | null, plane: SlicePlane, idx:
   }, 'image/png');
 }
 
-// ── Styled components ──────────────────────────────────────────────────────
+// ── Inline style constants (avoid per-render object allocations) ──────────
 
-const PanelWrap = styled.div<{ $isLast: boolean; $isActive: boolean }>`
-  position: relative;
-  flex: 1;
-  min-height: 0;
-  background: var(--surface-deep);
-  border-bottom: ${({ $isLast }) => ($isLast ? 'none' : '1px solid var(--rule)')};
-  overflow: visible;
-  cursor: ${({ $isActive }) => ($isActive ? 'crosshair' : 'pointer')};
-  touch-action: none;
-`;
-
-const StyledCanvas = styled.canvas`
-  width: 100%;
-  height: 100%;
-  display: block;
-`;
-
-const CrosshairOverlay = styled.div`
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: var(--z-overlay-local);
-`;
-
-const CrossH = styled.div<{ $color: string; $glow: string }>`
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: ${({ $color }) => $color};
-  opacity: 0.7;
-  box-shadow: 0 0 4px ${({ $glow }) => $glow};
-`;
-
-const CrossV = styled.div<{ $color: string; $glow: string }>`
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: ${({ $color }) => $color};
-  opacity: 0.7;
-  box-shadow: 0 0 4px ${({ $glow }) => $glow};
-`;
-
-const CrossCenter = styled.div`
-  position: absolute;
-  width: 14px;
-  height: 14px;
-  transform: translate(-50%, -50%);
-`;
-
-const CrossDot = styled.span`
-  position: absolute;
-  inset: 4px;
-  border: 1px solid var(--teal);
-  border-radius: 99px;
-  opacity: 0.7;
-`;
-
-const PanelHeader = styled.div`
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  padding: 0 62px 0 14px;
-  background: linear-gradient(
-    to bottom,
-    rgba(8, 7, 5, 0.92),
-    rgba(8, 7, 5, 0.55) 70%,
-    transparent
-  );
-  z-index: var(--z-panel-header);
-  gap: 12px;
-  min-width: 0;
-`;
-
-const PlaneGlyph = styled.span<{ $color: string }>`
-  font-family: var(--serif);
-  font-style: italic;
-  font-size: 18px;
-  line-height: 1;
-  font-weight: 500;
-  color: ${({ $color }) => $color};
-`;
-
-const PlaneLabel = styled.span`
-  font-family: var(--mono);
-  font-size: 10.5px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--ink-2);
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-`;
-
-const PlaneLabelAccent = styled.b<{ $color: string }>`
-  font-weight: 600;
-  color: ${({ $color }) => $color};
-`;
-
-const SliceCounter = styled.span`
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--ink-2);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.04em;
-  flex-shrink: 0;
-  margin-right: 3px;
-`;
-
-const SliceDim = styled.span`
-  color: var(--ink-3);
-`;
-
-const PanelFooter = styled.div<{ $scrubVisible: boolean }>`
-  position: absolute;
-  bottom: 8px;
-  left: 14px;
-  right: ${({ $scrubVisible }) => ($scrubVisible ? '48px' : '14px')};
-  z-index: var(--z-panel-header);
-  display: flex;
-  justify-content: space-between;
-  font-family: var(--mono);
-  font-size: 9.5px;
-  color: var(--ink-3);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  pointer-events: none;
-  transition: right 160ms ease;
-`;
-
-const ActiveBorder = styled.div`
-  position: absolute;
-  inset: 0;
-  z-index: var(--z-panel-chrome);
-  border: 1.5px solid var(--amber);
-  pointer-events: none;
-  box-shadow: inset 0 0 0 1px ${accentRgba('amber', 0.15)};
-`;
-
-const MeasureLine = styled.svg`
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  pointer-events: none;
-  z-index: var(--z-panel-top);
-  overflow: visible;
-`;
-
-const MeasureDot = styled.div`
-  position: absolute;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: var(--measure);
-  pointer-events: none;
-  z-index: var(--z-panel-top);
-`;
-
-const ButtonTray = styled.div`
-  position: absolute;
-  top: 5px;
-  right: 8px;
-  z-index: var(--z-panel-top);
-  display: flex;
-  gap: 7px;
-  pointer-events: auto;
-`;
-
-/**
- * Mobile-only right column: stacks Scrubber → Eye icon → Counter
- * using flex-column + gap so no pixel math is needed.
- */
-const MobileRightCol = styled.div`
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 46px;
-  z-index: var(--z-panel-chrome);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 18px;
-  padding: 18px 6px 18px 4px;
-  background: linear-gradient(to left, rgba(10, 8, 5, 0.85), transparent 70%);
-  pointer-events: none;
-`;
-
-const MobileCounter = styled.span`
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--ink-2);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.04em;
-  flex-shrink: 0;
-  pointer-events: none;
-`;
-
-const TrayBtn = styled.button<{ $active?: boolean; $large?: boolean }>`
-  width: ${({ $large }) => ($large ? '36px' : '24px')};
-  height: ${({ $large }) => ($large ? '36px' : '24px')};
-  flex-shrink: 0;
-  border-radius: ${({ $large }) => ($large ? '6px' : '3px')};
-  border: 1px solid ${({ $active }) => ($active ? 'var(--amber-dim)' : 'var(--rule)')};
-  background: ${({ $active }) => ($active ? accentRgba('amber', 0.08) : 'rgba(15,13,10,0.90)')};
-  color: ${({ $active }) => ($active ? 'var(--amber)' : 'var(--ink-3)')};
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  padding: 0;
-  pointer-events: auto;
-  -webkit-tap-highlight-color: transparent;
-
-  ${({ $active }) =>
-    !$active &&
-    `&:hover {
-      border-color: var(--rule-2);
-      color: var(--ink);
-    }`}
-
-  @media (max-width: 767px) {
-    width: 36px;
-    height: 36px;
-    border-radius: 6px;
-  }
-`;
-
-const FullscreenOverlay = styled.div<{ $isActive: boolean }>`
-  position: fixed;
-  top: 56px;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: var(--z-fullscreen);
-  background: var(--surface-deep);
-  overflow: hidden;
-  cursor: ${({ $isActive }) => ($isActive ? 'crosshair' : 'default')};
-`;
+const MEASURE_LINE_STROKE_STYLE: React.CSSProperties = { stroke: 'var(--measure)' };
 
 // ── TrayButton ─────────────────────────────────────────────────────────────
 
-function TrayButton({
+const TrayButton = memo(function TrayButton({
   label,
   active,
   large,
@@ -317,11 +104,11 @@ function TrayButton({
       </TrayBtn>
     </Tooltip>
   );
-}
+});
 
 // ── Shared crosshair + measurement overlay ─────────────────────────────────
 
-function CrosshairAndDots({
+const CrosshairAndDots = memo(function CrosshairAndDots({
   cross,
   axes,
   adjustedDots,
@@ -356,7 +143,7 @@ function CrosshairAndDots({
             y1={`${adjustedDots[0].fy * 100}%`}
             x2={`${adjustedDots[1].fx * 100}%`}
             y2={`${adjustedDots[1].fy * 100}%`}
-            style={{ stroke: 'var(--measure)' }}
+            style={MEASURE_LINE_STROKE_STYLE}
             strokeWidth="1.5"
             strokeDasharray="5 4"
             opacity="0.75"
@@ -378,7 +165,7 @@ function CrosshairAndDots({
       ))}
     </>
   );
-}
+});
 
 // ── ExpandedSlicePanel ──────────────────────────────────────────────────────
 
@@ -545,6 +332,9 @@ function ExpandedSlicePanel({
 
 // ── SlicePanel ─────────────────────────────────────────────────────────────
 
+/** Sensitivity of touch-swipe slice navigation — pixels per full range traversal. */
+const TOUCH_SWIPE_FULL_RANGE_PX = 300;
+
 export function SlicePanel({ plane }: { plane: SlicePlane }) {
   const [expanded, setExpanded] = useState(false);
   const isMobile = useIsMobile();
@@ -618,7 +408,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
     const t = e.touches[0];
     const dy = touchRef.current.startY - t.clientY;
     // Sensitivity: traverse full range over 300 px of swipe.
-    const step = Math.round((dy / 300) * total);
+    const step = Math.round((dy / TOUCH_SWIPE_FULL_RANGE_PX) * total);
     if (step === 0) return;
     const newIdx = Math.max(1, Math.min(total, touchRef.current.startIdx + step));
     handleScrub(newIdx);
@@ -655,32 +445,30 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
 
       {/* ── Mobile: flex-column right rail (Scrubber → Download → Counter) ── */}
       {isMobile ? (
-        <>
-          <MobileRightCol>
-            {total > 0 && (
-              <SliceScrubber
-                axis={plane}
-                slice={idx}
-                total={total}
-                visible
-                inline
-                onChange={handleScrub}
-              />
-            )}
-            <TrayButton
-              label="Export slice as PNG"
-              onClick={() => downloadSlice(canvasRef.current, plane, idx)}
-            >
-              <Download size={11} />
-            </TrayButton>
-            {total > 0 && (
-              <MobileCounter>
-                {idx}
-                <SliceDim> / {total}</SliceDim>
-              </MobileCounter>
-            )}
-          </MobileRightCol>
-        </>
+        <MobileRightCol>
+          {total > 0 && (
+            <SliceScrubber
+              axis={plane}
+              slice={idx}
+              total={total}
+              visible
+              inline
+              onChange={handleScrub}
+            />
+          )}
+          <TrayButton
+            label="Export slice as PNG"
+            onClick={() => downloadSlice(canvasRef.current, plane, idx)}
+          >
+            <Download size={11} />
+          </TrayButton>
+          {total > 0 && (
+            <MobileCounter>
+              {idx}
+              <SliceDim> / {total}</SliceDim>
+            </MobileCounter>
+          )}
+        </MobileRightCol>
       ) : (
         /* ── Desktop: ButtonTray (top-right) + absolute Scrubber ── */
         <>

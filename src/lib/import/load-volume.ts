@@ -15,7 +15,9 @@ async function expandZips(source: ImportSource, onProgress: ProgressFn): Promise
       filter: (file) => !file.name.endsWith('/') && !file.name.startsWith('__MACOSX'),
     });
     for (const [path, bytes] of Object.entries(entries)) {
-      const name = path.split('/').pop()!.toLowerCase();
+      // `pop()` is safe: an entry path is never an empty string. Fall back to
+      // the full path for the (impossible) empty case rather than asserting.
+      const name = (path.split('/').pop() ?? path).toLowerCase();
       const file = new File([new Uint8Array(bytes)], name);
       expanded.push({ path, name, file });
     }

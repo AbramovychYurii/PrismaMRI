@@ -505,7 +505,9 @@ export class ThreePreview {
     const off = document.createElement('canvas');
     off.width = capW;
     off.height = capH;
-    off.getContext('2d')!.putImageData(new ImageData(flipped, capW, capH), 0, 0);
+    const captureCtx = off.getContext('2d');
+    if (!captureCtx) throw new Error('captureJpeg: failed to acquire 2D context');
+    captureCtx.putImageData(new ImageData(flipped, capW, capH), 0, 0);
     return off.toDataURL('image/jpeg', quality).replace(/^data:[^;]+;base64,/, '');
   }
 
@@ -518,7 +520,8 @@ export class ThreePreview {
     const off = document.createElement('canvas');
     off.width = src.width;
     off.height = src.height;
-    const ctx = off.getContext('2d')!;
+    const ctx = off.getContext('2d');
+    if (!ctx) throw new Error('exportPNG: failed to acquire 2D context');
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, off.width, off.height);
     ctx.drawImage(src, 0, 0);

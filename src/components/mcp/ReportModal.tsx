@@ -4,567 +4,72 @@
  * Left panel: scope (this finding / all findings) + format toggles + download.
  * Right panel: live document preview.
  *
- * PDF generation is not yet implemented — the Download button is a placeholder.
+ * All visual styling lives in `ReportModal.styles.ts`. This file owns the
+ * capture/encode logic, the PDF generation glue, and the preview JSX.
  */
 
 import { AuroraSparkles } from '@/components/ui/AuroraSparkles';
 import { SEVERITY_HEX, SEVERITY_LABEL } from '@/constants';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { waitForPaint } from '@/lib/mcp/canvas-utils';
 import { generateReport } from '@/lib/reportPdf';
 import { useVolumeStore } from '@/store/volumeStore';
 import type { AiAnnotation } from '@/types';
-import { Download, FileText, Loader, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Download, FileText, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import styled, { keyframes } from 'styled-components';
-
-// ── Animations ───────────────────────────────────────────────────────────────
-
-const fadeIn = keyframes`
-  from { opacity: 0; }
-  to   { opacity: 1; }
-`;
-
-const slideUp = keyframes`
-  from { transform: translateY(12px); opacity: 0; }
-  to   { transform: translateY(0);    opacity: 1; }
-`;
-
-// ── Shell ────────────────────────────────────────────────────────────────────
-
-const Backdrop = styled.div`
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-modal);
-  background: var(--surface-overlay);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  backdrop-filter: blur(4px);
-  animation: ${fadeIn} 150ms ease;
-  padding: 20px;
-
-  @media (max-width: 640px) {
-    padding: 0;
-    align-items: stretch;
-  }
-`;
-
-const Shell = styled.div`
-  display: flex;
-  width: min(900px, 100%);
-  height: min(620px, 90vh);
-  border-radius: 12px;
-  overflow: hidden;
-  border: 1px solid var(--rule-2);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.9);
-  animation: ${slideUp} 180ms cubic-bezier(0.22, 1, 0.36, 1);
-  font-family: var(--mono);
-
-  @media (max-width: 640px) {
-    flex-direction: column;
-    width: 100%;
-    height: 100%;
-    border-radius: 0;
-    border: none;
-    position: relative;
-    overflow-y: auto;
-  }
-`;
-
-// ── Left panel ───────────────────────────────────────────────────────────────
-
-const LeftPanel = styled.div`
-  width: 300px;
-  flex-shrink: 0;
-  background: rgba(18, 16, 12, 0.98);
-  border-right: 1px solid var(--rule-2);
-  display: flex;
-  flex-direction: column;
-  padding: 24px 20px 20px;
-  gap: 20px;
-
-  @media (max-width: 640px) {
-    width: 100%;
-    border-right: none;
-    border-bottom: 1px solid var(--rule-2);
-    flex-shrink: 0;
-    overflow-y: auto;
-    /* leave room for the floating close button */
-    padding: 16px 16px 16px;
-    padding-top: 52px;
-    gap: 14px;
-    max-height: none;
-    flex: 0 0 auto;
-  }
-`;
-
-const PanelLabel = styled.span`
-  font-size: 9px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-`;
-
-const PanelTitle = styled.h2`
-  margin: 4px 0 2px;
-  font-family: var(--serif);
-  font-size: 22px;
-  font-weight: 400;
-  color: var(--ink);
-`;
-
-const PanelSub = styled.p`
-  margin: 0;
-  font-size: 11.5px;
-  color: var(--ink-3);
-  line-height: 1.4;
-`;
-
-// Scope
-
-const SectionLabel = styled.span`
-  font-size: 9px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--ink-2);
-  display: block;
-  margin-bottom: 7px;
-`;
-
-const ScopeSection = styled.div``;
-
-const ScopeOption = styled.label<{ $active: boolean }>`
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid ${({ $active }) => ($active ? 'var(--amber)' : 'var(--rule-2)')};
-  background: ${({ $active }) => ($active ? 'rgba(196,153,70,0.08)' : 'transparent')};
-  cursor: pointer;
-  margin-bottom: 6px;
-  transition: border-color 120ms, background 120ms;
-  &:last-child { margin-bottom: 0; }
-`;
-
-/** Hides the native radio and renders a custom dot — inactive matches background. */
-const Radio = styled.input`
-  appearance: none;
-  -webkit-appearance: none;
-  flex-shrink: 0;
-  margin-top: 3px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 1.5px solid var(--rule-2);
-  background: transparent;
-  cursor: pointer;
-  position: relative;
-  transition: border-color 120ms, background 120ms;
-
-  &:checked {
-    border-color: var(--amber);
-    background: var(--amber);
-    box-shadow: inset 0 0 0 3px rgba(18, 16, 12, 0.98);
-  }
-`;
-
-const ScopeBody = styled.div`
-  flex: 1;
-`;
-
-const ScopeName = styled.div<{ $active: boolean }>`
-  font-size: 12.5px;
-  font-weight: 600;
-  color: ${({ $active }) => ($active ? 'var(--ink)' : 'var(--ink-2)')};
-  letter-spacing: 0.02em;
-`;
-
-const ScopeDesc = styled.div`
-  font-size: 10.5px;
-  color: var(--ink-3);
-  margin-top: 3px;
-  line-height: 1.4;
-`;
-
-// Format
-
-const FormatSection = styled.div``;
-
-const FormatRow = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-`;
-
-const FormatToggle = styled.button<{ $active: boolean }>`
-  font-family: var(--mono);
-  font-size: 10.5px;
-  letter-spacing: 0.06em;
-  padding: 5px 10px;
-  border-radius: 6px;
-  border: 1px solid ${({ $active }) => ($active ? 'var(--amber)' : 'var(--rule-2)')};
-  background: ${({ $active }) => ($active ? 'rgba(196,153,70,0.10)' : 'transparent')};
-  color: ${({ $active }) => ($active ? 'var(--amber)' : 'var(--ink-2)')};
-  cursor: pointer;
-  transition: border-color 100ms, background 100ms, color 100ms;
-  &:hover {
-    ${({ $active }) => !$active && 'border-color: var(--ink-4); color: var(--ink-2);'}
-  }
-`;
-
-// Download
-
-const DownloadArea = styled.div`
-  margin-top: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-`;
-
-const DownloadBtn = styled.button<{ $loading?: boolean }>`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  padding: 12px;
-  border-radius: 8px;
-  border: none;
-  background: var(--amber);
-  color: #0e0c09;
-  font-family: var(--mono);
-  font-size: 11.5px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  cursor: ${({ $loading }) => ($loading ? 'wait' : 'pointer')};
-  opacity: ${({ $loading }) => ($loading ? 0.7 : 1)};
-  transition: filter 120ms, opacity 120ms;
-  &:hover:not(:disabled) { filter: brightness(1.08); }
-`;
-
-const spin = keyframes`
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
-`;
-
-const SpinIcon = styled(Loader)`
-  animation: ${spin} 700ms linear infinite;
-`;
-
-// ── Right panel ──────────────────────────────────────────────────────────────
-
-const RightPanel = styled.div`
-  flex: 1;
-  min-height: 0;
-  background: rgba(12, 11, 8, 0.98);
-  display: flex;
-  flex-direction: column;
-
-  @media (max-width: 640px) {
-    flex: none;
-    min-height: 0;
-  }
-`;
-
-const PreviewHeader = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px 12px;
-  border-bottom: 1px solid var(--rule);
-`;
-
-const PreviewLabel = styled.span`
-  font-size: 9px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-`;
-
-const CloseBtn = styled.button`
-  background: none;
-  border: none;
-  padding: 2px;
-  cursor: pointer;
-  color: var(--ink-3);
-  line-height: 0;
-  &:hover { color: var(--ink); }
-
-  @media (max-width: 640px) {
-    display: none;
-  }
-`;
-
-const MobileCloseBtn = styled.button`
-  display: none;
-
-  @media (max-width: 640px) {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: absolute;
-    top: 12px;
-    right: 14px;
-    z-index: 10;
-    background: rgba(30, 27, 20, 0.9);
-    border: 1px solid var(--rule-2);
-    border-radius: 50%;
-    width: 32px;
-    height: 32px;
-    cursor: pointer;
-    color: var(--ink-3);
-    line-height: 0;
-    &:hover { color: var(--ink); }
-  }
-`;
-
-const PreviewScroll = styled.div`
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding: 20px;
-  /* block so Doc stretches to fit all content vertically */
-  display: block;
-
-  @media (max-width: 640px) {
-    flex: none;
-    overflow-y: visible;
-    padding-bottom: 32px;
-  }
-`;
-
-// Document
-
-const Doc = styled.div`
-  background: #fafaf8;
-  color: #1a1814;
-  width: 100%;
-  max-width: 520px;
-  margin: 0 auto;          /* centre without flex tricks */
-  border-radius: 4px;
-  padding: 28px 32px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
-  /* ensure bg covers all content including images */
-  overflow: hidden;
-  box-sizing: border-box;
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 11px;
-  line-height: 1.5;
-`;
-
-const DocHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 2px solid #1a1814;
-`;
-
-const DocLogo = styled.div`
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  font-family: inherit;
-  em { font-style: italic; font-weight: 400; }
-`;
-
-const DocReportLabel = styled.div`
-  text-align: right;
-  font-size: 9px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  line-height: 1.6;
-  color: #555;
-`;
-
-const DocMeta = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 10px 16px;
-  margin-bottom: 18px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid #ddd;
-`;
-
-const DocMetaItem = styled.div``;
-
-const DocMetaKey = styled.div`
-  font-size: 8px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: #888;
-  margin-bottom: 2px;
-`;
-
-const DocMetaVal = styled.div`
-  font-size: 10px;
-  color: #1a1814;
-  word-break: break-all;
-`;
-
-const DocSectionLabel = styled.div`
-  font-size: 8px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: #888;
-  margin-bottom: 10px;
-`;
-
-const FindingCard = styled.div<{ $color: string }>`
-  border-left: 3px solid ${({ $color }) => $color};
-  padding: 10px 12px;
-  background: #f4f3ef;
-  border-radius: 0 4px 4px 0;
-  margin-bottom: 10px;
-`;
-
-const FindingRow = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 4px;
-`;
-
-const FindingIndex = styled.span`
-  font-size: 11px;
-  color: #888;
-  margin-right: 6px;
-`;
-
-const FindingTitle = styled.span`
-  font-size: 12px;
-  font-weight: 700;
-  color: #1a1814;
-  flex: 1;
-`;
-
-const FindingSeverity = styled.span<{ $color: string }>`
-  font-size: 8.5px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: ${({ $color }) => $color};
-  border: 1px solid ${({ $color }) => $color}66;
-  padding: 2px 6px;
-  border-radius: 999px;
-`;
-
-const FindingLocation = styled.div`
-  font-size: 9px;
-  color: #888;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  margin-bottom: 6px;
-`;
-
-const FindingText = styled.div`
-  font-size: 10.5px;
-  color: #333;
-  line-height: 1.55;
-`;
-
-const CONFIDENCE_COLOR_PREVIEW = '#60a5fa';
-
-const FindingConfidenceRow = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: 7px;
-`;
-
-const FindingConfidenceLabel = styled.span`
-  font-size: 8px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #999;
-`;
-
-const FindingConfidenceValue = styled.span`
-  font-size: 9px;
-  font-weight: 700;
-  color: ${CONFIDENCE_COLOR_PREVIEW};
-  flex-shrink: 0;
-`;
-
-/** Placeholder shown when images are being captured for preview. */
-const FindingThumb = styled.img`
-  display: block;
-  width: 100%;
-  border-radius: 3px;
-  margin-top: 8px;
-  border: 1px solid #ddd;
-`;
-
-const FindingThumbPlaceholder = styled.div`
-  width: 100%;
-  height: 64px;
-  margin-top: 8px;
-  background: repeating-linear-gradient(
-    -45deg,
-    #f0efe9,
-    #f0efe9 4px,
-    #e8e7e1 4px,
-    #e8e7e1 8px
-  );
-  border-radius: 3px;
-  border: 1px solid #ddd;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #aaa;
-`;
-
-/** Visual page break separator inside the preview doc. */
-const PageBreakLine = styled.div`
-  margin: 20px -32px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: #bbb;
-  font-size: 8px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-
-  &::before,
-  &::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: #ddd;
-    border-style: dashed;
-    border-width: 0 0 1px;
-  }
-`;
-
-const DocNote = styled.div`
-  margin-top: 16px;
-  padding: 10px 12px;
-  background: #f0efe9;
-  border-radius: 4px;
-  border: 1px solid #ddd;
-`;
-
-const DocNoteLabel = styled.div`
-  font-size: 8px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: #888;
-  margin-bottom: 4px;
-`;
-
-const DocNoteText = styled.div`
-  font-size: 10px;
-  color: #555;
-  line-height: 1.5;
-`;
+import {
+  Backdrop,
+  Doc,
+  DocHeader,
+  DocLogo,
+  DocMeta,
+  DocMetaItem,
+  DocMetaKey,
+  DocMetaVal,
+  DocNote,
+  DocNoteLabel,
+  DocNoteText,
+  DocReportLabel,
+  DocSectionLabel,
+  DownloadArea,
+  DownloadBtn,
+  FindingCard,
+  FindingConfidenceLabel,
+  FindingConfidenceRow,
+  FindingConfidenceValue,
+  FindingIndex,
+  FindingLocation,
+  FindingRow,
+  FindingSeverity,
+  FindingText,
+  FindingThumb,
+  FindingThumbPlaceholder,
+  FindingTitle,
+  FormatRow,
+  FormatSection,
+  FormatToggle,
+  LeftPanel,
+  MobileCloseBtn,
+  PageBreakLine,
+  PanelLabel,
+  PanelSub,
+  PanelTitle,
+  CloseBtn as PreviewCloseBtn,
+  PreviewHeader,
+  PreviewLabel,
+  PreviewScroll,
+  Radio,
+  RightPanel,
+  ScopeBody,
+  ScopeDesc,
+  ScopeName,
+  ScopeOption,
+  ScopeSection,
+  SectionLabel,
+  Shell,
+  SpinIcon,
+} from './ReportModal.styles';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -578,32 +83,23 @@ function sliceNum(a: AiAnnotation) {
   return a.voxel.z + 1;
 }
 
-// ── Component ────────────────────────────────────────────────────────────────
+// ── Capture ──────────────────────────────────────────────────────────────────
 
-type Scope = 'finding' | 'all';
-type Format = 'images' | 'markers';
+type Capture = { data: string; ar: number };
 
-interface Props {
-  finding: AiAnnotation;
-  findingIndex: number;
-  allFindings: AiAnnotation[];
-  onClose: () => void;
-}
+/** JPEG quality for embedded scan thumbnails — preserves fine anatomy without exploding PDF size. */
+const PREVIEW_JPEG_QUALITY = 0.88;
 
 /**
  * Draw the same circular pin the app uses on 2-D panels — ring only, no crosshair.
  * Returns JPEG data URL + aspect ratio (height/width) of the source canvas.
  */
-function annotateCanvas(
-  src: HTMLCanvasElement,
-  fx: number,
-  fy: number,
-  hexColor: string,
-): { data: string; ar: number } {
+function annotateCanvas(src: HTMLCanvasElement, fx: number, fy: number, hexColor: string): Capture {
   const off = document.createElement('canvas');
   off.width = src.width;
   off.height = src.height;
-  const ctx = off.getContext('2d')!;
+  const ctx = off.getContext('2d');
+  if (!ctx) throw new Error('annotateCanvas: failed to acquire 2D context');
   ctx.drawImage(src, 0, 0);
 
   const px = fx * src.width;
@@ -616,14 +112,14 @@ function annotateCanvas(
   ctx.beginPath();
   ctx.arc(px, py, r + lw, 0, Math.PI * 2);
   ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-  ctx.lineWidth = lw; // fix 6: 2× thinner halo
+  ctx.lineWidth = lw;
   ctx.stroke();
 
   // Coloured glow (animated in the app; static here)
   ctx.shadowColor = `${hexColor}bb`;
   ctx.shadowBlur = r * 0.5;
 
-  // Main ring — fix 6: 2× thinner border
+  // Main ring
   ctx.beginPath();
   ctx.arc(px, py, r, 0, Math.PI * 2);
   ctx.strokeStyle = hexColor;
@@ -632,25 +128,40 @@ function annotateCanvas(
 
   ctx.shadowBlur = 0;
 
-  return { data: off.toDataURL('image/jpeg', 0.88), ar: src.height / src.width };
+  return { data: off.toDataURL('image/jpeg', PREVIEW_JPEG_QUALITY), ar: src.height / src.width };
 }
 
 /** Capture a canvas as-is (no annotation). Returns data + aspect ratio. */
-function captureRaw(src: HTMLCanvasElement): { data: string; ar: number } {
-  return { data: src.toDataURL('image/jpeg', 0.88), ar: src.height / src.width };
+function captureRaw(src: HTMLCanvasElement): Capture {
+  return {
+    data: src.toDataURL('image/jpeg', PREVIEW_JPEG_QUALITY),
+    ar: src.height / src.width,
+  };
 }
 
-function waitForPaint(): Promise<void> {
-  return new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+// ── Stable inline-style references ──────────────────────────────────────────
+
+/** Avoid allocating a fresh `style` object on every render of the disabled toggle. */
+const FORMAT_TOGGLE_DISABLED_STYLE: React.CSSProperties = { opacity: 0.4 };
+const FORMAT_TOGGLE_ENABLED_STYLE: React.CSSProperties = { opacity: 1 };
+
+// ── Component ────────────────────────────────────────────────────────────────
+
+type Scope = 'finding' | 'all';
+type Format = 'images' | 'markers';
+
+interface Props {
+  finding: AiAnnotation;
+  findingIndex: number;
+  allFindings: AiAnnotation[];
+  onClose: () => void;
 }
 
 export function ReportModal({ finding, findingIndex, allFindings, onClose }: Props) {
   const [scope, setScope] = useState<Scope>('finding');
-  const [formats, setFormats] = useState<Set<Format>>(new Set<Format>(['images', 'markers']));
+  const [formats, setFormats] = useState<Set<Format>>(() => new Set<Format>(['images', 'markers']));
   const [downloading, setDownloading] = useState(false);
-  const [previewThumbs, setPreviewThumbs] = useState<Map<string, { data: string; ar: number }>>(
-    new Map(),
-  );
+  const [previewThumbs, setPreviewThumbs] = useState<Map<string, Capture>>(() => new Map());
 
   const volume = useVolumeStore((s) => s.volume);
   const canvasRefs = useVolumeStore((s) => s.canvasRefs);
@@ -670,7 +181,8 @@ export function ReportModal({ finding, findingIndex, allFindings, onClose }: Pro
   const toggleFormat = (f: Format) =>
     setFormats((prev) => {
       const next = new Set(prev);
-      next.has(f) ? next.delete(f) : next.add(f);
+      if (next.has(f)) next.delete(f);
+      else next.add(f);
       return next;
     });
 
@@ -683,7 +195,7 @@ export function ReportModal({ finding, findingIndex, allFindings, onClose }: Pro
       setPreviewThumbs(new Map());
       return;
     }
-    const thumbs = new Map<string, { data: string; ar: number }>();
+    const thumbs = new Map<string, Capture>();
     for (const f of scopeFindings) {
       const canvas = canvasRefs[f.plane as keyof typeof canvasRefs];
       if (canvas) {
@@ -702,7 +214,7 @@ export function ReportModal({ finding, findingIndex, allFindings, onClose }: Pro
     setDownloading(true);
     try {
       // For PDF: navigate to each finding's exact slice to get accurate captures
-      const thumbnails = new Map<string, { data: string; ar: number }>();
+      const thumbnails = new Map<string, Capture>();
 
       if (showImages && cursor) {
         const savedCursor = { ...cursor };
@@ -756,13 +268,27 @@ export function ReportModal({ finding, findingIndex, allFindings, onClose }: Pro
     }
   };
 
+  // Trap Tab/Shift+Tab navigation inside the dialog so keyboard users can't
+  // tab into the page underneath while the modal is open.
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  useFocusTrap(dialogRef);
+
+  // Esc closes the modal — mirrors ConfirmModal / KeyboardShortcutsModal.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   return createPortal(
     <Backdrop
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <Shell>
+      <Shell ref={dialogRef}>
         <MobileCloseBtn type="button" aria-label="Close" onClick={onClose}>
           <X size={16} />
         </MobileCloseBtn>
@@ -792,7 +318,6 @@ export function ReportModal({ finding, findingIndex, allFindings, onClose }: Pro
                   {finding.label.length > 32 ? '…' : ''}
                 </ScopeDesc>
               </ScopeBody>
-              {/* pages label removed */}
             </ScopeOption>
 
             <ScopeOption $active={scope === 'all'}>
@@ -806,7 +331,6 @@ export function ReportModal({ finding, findingIndex, allFindings, onClose }: Pro
                 <ScopeName $active={scope === 'all'}>All findings</ScopeName>
                 <ScopeDesc>{allFindings.length} findings + consolidated impression</ScopeDesc>
               </ScopeBody>
-              {/* pages label removed */}
             </ScopeOption>
           </ScopeSection>
 
@@ -825,7 +349,9 @@ export function ReportModal({ finding, findingIndex, allFindings, onClose }: Pro
                 $active={formats.has('markers')}
                 type="button"
                 disabled={!formats.has('images')}
-                style={{ opacity: formats.has('images') ? 1 : 0.4 }}
+                style={
+                  formats.has('images') ? FORMAT_TOGGLE_ENABLED_STYLE : FORMAT_TOGGLE_DISABLED_STYLE
+                }
                 onClick={() => formats.has('images') && toggleFormat('markers')}
               >
                 Finding markers
@@ -854,9 +380,9 @@ export function ReportModal({ finding, findingIndex, allFindings, onClose }: Pro
               <FileText size={12} />
               Preview
             </PreviewLabel>
-            <CloseBtn type="button" aria-label="Close" onClick={onClose}>
+            <PreviewCloseBtn type="button" aria-label="Close" onClick={onClose}>
               <X size={16} />
-            </CloseBtn>
+            </PreviewCloseBtn>
           </PreviewHeader>
 
           <PreviewScroll>

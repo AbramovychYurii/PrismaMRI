@@ -2,7 +2,10 @@ import type { ImportFile, ImportSource } from '@/lib/import/types';
 
 function toImportFile(file: File, path: string): ImportFile {
   const clean = path.replace(/^\.?\//, '');
-  return { path: clean, name: clean.split('/').pop()!.toLowerCase(), file };
+  // After leading-slash strip `clean` is always non-empty for a real file,
+  // so `pop()` returns a string. Fall back to `clean` rather than assert.
+  const name = (clean.split('/').pop() ?? clean).toLowerCase();
+  return { path: clean, name, file };
 }
 
 /** Build a source from a flat FileList (from <input> with webkitdirectory or multiple). */

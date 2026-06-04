@@ -1,4 +1,6 @@
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { X } from 'lucide-react';
+import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
 
@@ -161,13 +163,36 @@ interface Props {
 }
 
 export function KeyboardShortcutsModal({ onClose }: Props) {
+  // Esc closes the modal — kept here rather than at the call site so the
+  // behaviour ships with every instance.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  // Trap Tab/Shift+Tab navigation inside the dialog. The Modal is styled as a
+  // `<dialog>` via `as`, so we grab its node with a callback ref rather than
+  // forwarding a refObject (which the polymorphic `as` prop doesn't accept).
+  const dialogRef = useRef<HTMLElement | null>(null);
+  useFocusTrap(dialogRef);
+
   return createPortal(
     <Backdrop
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <Modal as="dialog" open aria-label="Keyboard shortcuts">
+      <Modal
+        ref={(node: HTMLElement | null) => {
+          dialogRef.current = node;
+        }}
+        as="dialog"
+        open
+        aria-label="Keyboard shortcuts"
+      >
         <ModalHead>
           <ModalTitle>Keyboard shortcuts</ModalTitle>
           <CloseBtn type="button" aria-label="Close" onClick={onClose}>

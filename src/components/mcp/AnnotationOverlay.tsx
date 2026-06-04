@@ -13,6 +13,7 @@
 import { SEVERITY_HEX } from '@/constants';
 import { useVolumeStore } from '@/store/volumeStore';
 import type { AiAnnotation, SlicePlane, VolumeCursor } from '@/types';
+import { memo, useMemo } from 'react';
 import styled from 'styled-components';
 
 // ── Geometry ─────────────────────────────────────────────────────────────────
@@ -93,7 +94,7 @@ const PinLabel = styled.span<{
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-function PinItem({
+const PinItem = memo(function PinItem({
   annotation,
   active,
   opacity,
@@ -128,7 +129,7 @@ function PinItem({
       )}
     </Pin>
   );
-}
+});
 
 export function AnnotationOverlay({
   plane,
@@ -142,18 +143,21 @@ export function AnnotationOverlay({
   const activeId = useVolumeStore((s) => s.activeAnnotationId);
   const focusAnnotation = useVolumeStore((s) => s.focusAnnotation);
 
-  if (!cursor) return null;
-
   // Reveal markers on the exact slice ±1, widening with the active slab.
   const tol = Math.max(halfSlabs, 1);
-  const cur = cursorCoord(plane, cursor);
+  const cur = cursor ? cursorCoord(plane, cursor) : 0;
 
-  const visible = annotations
-    .filter((a) => a.plane === plane)
-    .map((a) => ({ a, dist: Math.abs(sliceCoord(plane, a.voxel) - cur) }))
-    .filter(({ dist }) => dist <= tol);
+  // Memoise the visibility list so that scroll across slices that don't pass
+  // through any finding doesn't re-create the array (avoids downstream churn).
+  const visible = useMemo(() => {
+    if (!cursor) return [];
+    return annotations
+      .filter((a) => a.plane === plane)
+      .map((a) => ({ a, dist: Math.abs(sliceCoord(plane, a.voxel) - cur) }))
+      .filter(({ dist }) => dist <= tol);
+  }, [annotations, plane, cur, tol, cursor]);
 
-  if (visible.length === 0) return null;
+  if (!cursor || visible.length === 0) return null;
 
   return (
     <Overlay>

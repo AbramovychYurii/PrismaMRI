@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
 
@@ -74,7 +74,7 @@ interface TooltipProps {
  * Wraps a single child in an inline-flex span and renders a fixed tooltip on
  * hover. The portal approach means it's never clipped by overflow:hidden.
  */
-export function Tooltip({ label, above = false, children }: TooltipProps) {
+export const Tooltip = memo(function Tooltip({ label, above = false, children }: TooltipProps) {
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
 
   function handleMouseEnter(e: React.MouseEvent<HTMLSpanElement>) {
@@ -84,7 +84,7 @@ export function Tooltip({ label, above = false, children }: TooltipProps) {
 
   return (
     <span
-      style={{ display: 'inline-flex' }}
+      style={INLINE_FLEX_STYLE}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={() => setPos(null)}
     >
@@ -98,4 +98,8 @@ export function Tooltip({ label, above = false, children }: TooltipProps) {
         )}
     </span>
   );
-}
+});
+
+// Stable identity for the span's style object so the wrapper span doesn't
+// receive a new prop reference on every render of the parent.
+const INLINE_FLEX_STYLE: React.CSSProperties = { display: 'inline-flex' };

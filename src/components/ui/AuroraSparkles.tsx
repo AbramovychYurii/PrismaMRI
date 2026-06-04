@@ -6,9 +6,9 @@
  * so url(#id) references always work — no cross-SVG issues.
  */
 
-let idCounter = 0;
+import { memo, useId } from 'react';
 
-export function AuroraSparkles({
+export const AuroraSparkles = memo(function AuroraSparkles({
   size = 12,
   strokeWidth = 1.5,
   style,
@@ -17,8 +17,10 @@ export function AuroraSparkles({
   strokeWidth?: number;
   style?: React.CSSProperties;
 }) {
-  // Unique id per instance so multiple renders don't conflict
-  const id = `aurora-sp-${++idCounter}`;
+  // Stable per-instance id (works with SSR + StrictMode double-mount, and
+  // doesn't change between renders → enables effective memoisation).
+  const reactId = useId();
+  const id = `aurora-sp-${reactId.replace(/[:]/g, '')}`;
 
   return (
     <svg
@@ -52,4 +54,4 @@ export function AuroraSparkles({
       <path stroke={`url(#${id})`} d="M5 18H3" />
     </svg>
   );
-}
+});

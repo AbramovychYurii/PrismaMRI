@@ -15,6 +15,7 @@
  * Esc and backdrop-click both trigger onCancel.
  */
 
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -200,6 +201,11 @@ export function ConfirmModal({
     return () => cancelAnimationFrame(raf);
   }, []);
 
+  // Trap Tab/Shift+Tab navigation inside the dialog so keyboard users can't
+  // accidentally tab back to the page underneath.
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  useFocusTrap(dialogRef);
+
   return createPortal(
     <Backdrop
       onClick={(e) => {
@@ -207,7 +213,7 @@ export function ConfirmModal({
       }}
     >
       {/* biome-ignore lint/a11y/useSemanticElements: <explanation> */}
-      <Dialog role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+      <Dialog ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
         <Head>
           <Title id="confirm-modal-title">{title}</Title>
           <CloseBtn type="button" aria-label="Cancel" onClick={onCancel}>

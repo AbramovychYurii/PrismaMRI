@@ -1,3 +1,4 @@
+export { useFocusTrap } from './useFocusTrap';
 export { useViewerApp } from './useViewerApp';
 export { useWindowLevel } from './useWindowLevel';
 export { useSliceImage } from './useSliceImage';

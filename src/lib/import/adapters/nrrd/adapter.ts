@@ -111,9 +111,12 @@ export const nrrdAdapter: ImportFormatAdapter = {
           Math.hypot(...vecs[2]) || 1,
         ];
       }
-    } else if (fields.get('spacings')) {
-      const sp = fields.get('spacings')!.split(/\s+/).map(Number);
-      if (sp.length >= 3) spacing = [sp[0] || 1, sp[1] || 1, sp[2] || 1];
+    } else {
+      const spacings = fields.get('spacings');
+      if (spacings) {
+        const sp = spacings.split(/\s+/).map(Number);
+        if (sp.length >= 3) spacing = [sp[0] || 1, sp[1] || 1, sp[2] || 1];
+      }
     }
 
     let scalarMin = Number.POSITIVE_INFINITY;
