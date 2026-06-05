@@ -118,7 +118,8 @@ export const Body = styled.div`
   gap: 9px;
 
   @media (max-width: 767px) {
-    /* Allow body to scroll when card height is capped. */
+    /* Allow vertical scroll when card height is capped. */
+    overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior: contain;
     -webkit-overflow-scrolling: touch;
