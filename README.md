@@ -136,6 +136,10 @@ Once findings appear in the viewer, click **REPORT** on any finding card to expo
 
 > The skill is for **personal exploration and learning**, not a medical device. It does not diagnose and does not replace a physician's consultation or an official radiology report.
 
+### Building your own integration
+
+The browser app talks to the bundled MCP server over a small JSON-over-WebSocket protocol on `127.0.0.1`. It is not specific to MCP — any local process can drive the viewer (a CLI, a Python notebook bridge, an alternative MCP server pointed at a different LLM, an integration test harness). The full specification, including all 20 commands and a minimal Node.js client, lives in [`docs/PROTOCOL.md`](docs/PROTOCOL.md).
+
 ## Privacy
 
 - Data is **never sent** to a server.
