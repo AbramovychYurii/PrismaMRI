@@ -1,7 +1,10 @@
 import {
   type RenderPreset,
   VolumeShader,
+  buildOccupancyGrid,
+  buildPreIntegratedTF,
   buildTransferFunction,
+  isLowPower,
 } from '@/lib/volume/three-preview/volume-shader';
 import type { PreparedVolumeFor3D } from '@/types';
 import * as THREE from 'three';
@@ -26,6 +29,8 @@ export function buildTexture(prepared: PreparedVolumeFor3D): THREE.Data3DTexture
 export function buildMaterial(
   texture: THREE.Data3DTexture,
   colormap: THREE.DataTexture,
+  colormapPre: THREE.DataTexture,
+  occupancy: THREE.Data3DTexture,
   prepared: PreparedVolumeFor3D,
   preset: RenderPreset = 'mip',
 ): THREE.ShaderMaterial {
@@ -34,7 +39,13 @@ export function buildMaterial(
   const uniforms: Record<string, THREE.IUniform> = {
     u_data: { value: texture },
     u_cmdata: { value: colormap },
+    u_cmdataPre: { value: colormapPre },
+    u_occupancy: { value: occupancy },
     u_size: { value: new THREE.Vector3(w, h, d) },
+    /** Physical voxel size (mm) — used to correct gradient for anisotropy.
+     *  Without this, surfaces in CTs with non-isotropic spacing (typical:
+     *  0.5 × 0.5 × 1.5 mm) get squashed shading along the thick axis. */
+    u_voxelSize: { value: new THREE.Vector3(...prepared.spacing) },
     u_clim: { value: new THREE.Vector2(0, 1) },
     u_steps: { value: 256 },
     u_mode: { value: preset === 'mip' ? 1 : 0 },
@@ -48,6 +59,11 @@ export function buildMaterial(
     u_planePos: { value: new THREE.Vector3() },
     /** 0 = no shading, 1 = Phong — on by default for DVR depth cues. */
     u_shading: { value: 1 },
+    /** 0 = AO disabled, 1 = enabled.  Starts OFF on low-power devices
+     *  (old phones / budget laptops) — the 4-tap AO disk is the most
+     *  expensive single feature in the cinematic stack and would drop
+     *  these devices to single-digit fps. */
+    u_aoEnabled: { value: isLowPower ? 0 : 1 },
     /** 0 = off, 1 = clip active plane (hide camera-side half). */
     u_clipMode: { value: 0 },
     /** +1 = clip the positive-axis side, -1 = clip the negative-axis side.
@@ -70,6 +86,10 @@ export interface VolumeObject {
   material: THREE.ShaderMaterial;
   texture: THREE.Data3DTexture;
   colormap: THREE.DataTexture;
+  /** 256×256 pre-integrated TF — used by the DVR shader path. */
+  colormapPre: THREE.DataTexture;
+  /** 32³ occupancy grid for empty-space skipping. */
+  occupancy: THREE.Data3DTexture;
   /** World-space bounding box edge lengths. */
   size: THREE.Vector3;
 }
@@ -82,7 +102,9 @@ export function buildVolumeMesh(
   const [sx, sy, sz] = prepared.spacing;
   const texture = buildTexture(prepared);
   const colormap = buildTransferFunction(preset);
-  const material = buildMaterial(texture, colormap, prepared, preset);
+  const colormapPre = buildPreIntegratedTF(preset);
+  const occupancy = buildOccupancyGrid(prepared);
+  const material = buildMaterial(texture, colormap, colormapPre, occupancy, prepared, preset);
 
   // The render box is 10 % larger than the voxel dims (5 % padding each side)
   // so cursor planes extend visibly past the volume boundary.  The centre
@@ -99,6 +121,8 @@ export function buildVolumeMesh(
     material,
     texture,
     colormap,
+    colormapPre,
+    occupancy,
     size: new THREE.Vector3(w * sx, h * sy, d * sz),
   };
 }
@@ -108,4 +132,6 @@ export function disposeVolumeObject(v: VolumeObject): void {
   v.material.dispose();
   v.texture.dispose();
   v.colormap.dispose();
+  v.colormapPre.dispose();
+  v.occupancy.dispose();
 }

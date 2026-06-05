@@ -7,7 +7,12 @@ import {
   buildVolumeMesh,
   disposeVolumeObject,
 } from '@/lib/volume/three-preview/volume-object';
-import { type RenderPreset, buildTransferFunction } from '@/lib/volume/three-preview/volume-shader';
+import {
+  type RenderPreset,
+  buildPreIntegratedTF,
+  buildTransferFunction,
+  isLowPower,
+} from '@/lib/volume/three-preview/volume-shader';
 import type {
   ActiveMeasurement,
   AiAnnotation,
@@ -19,8 +24,11 @@ import type {
 import * as THREE from 'three';
 import type { TrackballControls } from 'three/examples/jsm/controls/TrackballControls.js';
 
-/** Full-quality ray-march step count. */
-const RAY_STEPS = 256;
+/** Full-quality ray-march step count.  Bumped from 256 → 384 to pair with
+ *  empty-space skipping: the grid now skips ~30-60 % of empty-air steps for
+ *  free, so the extra ray budget goes into surface detail/anti-banding.
+ *  Low-power devices fall back to 256 to keep frame times reasonable. */
+const RAY_STEPS = isLowPower ? 256 : 384;
 
 export class ThreePreview {
   private readonly renderer: THREE.WebGLRenderer;
@@ -135,6 +143,11 @@ export class ThreePreview {
     this.controls.addEventListener('change', () => {
       if (!didMove) {
         // First real camera movement: drop to half DPR for responsiveness.
+        // We intentionally do NOT toggle AO here — toggling AO between orbit
+        // and rest causes a visible brightness flash on release (AO crushes
+        // creases darker), which is worse UX than the perf hit.  If mobile
+        // perf becomes a problem, gate AO on hardwareConcurrency at startup
+        // instead of toggling per-interaction.
         this.renderer.setPixelRatio(Math.max(0.75, this.nativeDpr * 0.5));
         this.resize();
         didMove = true;
@@ -161,12 +174,19 @@ export class ThreePreview {
     const m = this.volume?.material;
     if (!m) return;
 
-    // Swap the colormap texture
+    // Swap both colormap textures: 1D (point-sample, MIP + cut-face) and
+    // 2D pre-integrated (DVR segment compositing).  Both depend on the
+    // preset and must stay in lock-step.
     const oldColormap = this.volume!.colormap;
+    const oldColormapPre = this.volume!.colormapPre;
     const newColormap = buildTransferFunction(preset);
+    const newColormapPre = buildPreIntegratedTF(preset);
     m.uniforms.u_cmdata.value = newColormap;
+    m.uniforms.u_cmdataPre.value = newColormapPre;
     this.volume!.colormap = newColormap;
+    this.volume!.colormapPre = newColormapPre;
     oldColormap.dispose();
+    oldColormapPre.dispose();
 
     // Mode: MIP vs DVR
     m.uniforms.u_mode.value = preset === 'mip' ? 1 : 0;
