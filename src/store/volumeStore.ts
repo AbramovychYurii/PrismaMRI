@@ -19,6 +19,7 @@ import type {
   VolumeHistogram,
 } from '@/types';
 import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
 
 interface VolumeState {
   volume: LoadedVolume | null;
@@ -63,6 +64,15 @@ interface VolumeState {
 
 interface VolumeActions {
   setVolume: (v: LoadedVolume, p: PreparedVolumeFor3D, h: VolumeHistogram) => void;
+  /**
+   * Restore a volume from the per-tab IDB cache without resetting UI state.
+   * Used on page reload — the persisted UI state (cursor, W/L, toolbar, render
+   * preset, slab thickness, …) is rehydrated from sessionStorage independently,
+   * so we must NOT clobber it the way `setVolume` does for a fresh import.
+   * Cursor is clamped to the restored volume's dims in case the persisted
+   * cursor pointed past the new dims (defensive — same tab keeps same dims).
+   */
+  restoreVolume: (v: LoadedVolume, p: PreparedVolumeFor3D, h: VolumeHistogram) => void;
   setCursor: (c: VolumeCursor) => void;
   setActivePlane: (p: SlicePlane) => void;
   setLoading: (s: Partial<VolumeState['loading']>) => void;
@@ -140,191 +150,277 @@ const initialState: VolumeState = {
   previewInstance: null,
 };
 
-export const useVolumeStore = create<VolumeState & VolumeActions>((set) => ({
-  ...initialState,
+export const useVolumeStore = create<VolumeState & VolumeActions>()(
+  persist(
+    (set) => ({
+      ...initialState,
 
-  setVolume: (volume, prepared3D, histogram) => {
-    const activeVolumeId = deriveVolumeId(volume);
-    const aiAnnotations = annotationsStorage.load(activeVolumeId);
-    set({
-      volume,
-      prepared3D,
-      histogram,
-      cursor: {
-        x: Math.floor(volume.meta.dims[0] / 2),
-        y: Math.floor(volume.meta.dims[1] / 2),
-        z: Math.floor(volume.meta.dims[2] / 2),
+      setVolume: (volume, prepared3D, histogram) => {
+        const activeVolumeId = deriveVolumeId(volume);
+        const aiAnnotations = annotationsStorage.load(activeVolumeId);
+        set({
+          volume,
+          prepared3D,
+          histogram,
+          cursor: {
+            x: Math.floor(volume.meta.dims[0] / 2),
+            y: Math.floor(volume.meta.dims[1] / 2),
+            z: Math.floor(volume.meta.dims[2] / 2),
+          },
+          wl: volume.windowLevel,
+          wlDraft: volume.windowLevel,
+          measurement: null,
+          renderPreset: 'mip',
+          toolbar: initialState.toolbar,
+          activePlane: initialState.activePlane,
+          snapSeq: 0,
+          error: null,
+          activeVolumeId,
+          aiAnnotations,
+          activeAnnotationId: null,
+        });
       },
-      wl: volume.windowLevel,
-      wlDraft: volume.windowLevel,
-      measurement: null,
-      renderPreset: 'mip',
-      toolbar: initialState.toolbar,
-      activePlane: initialState.activePlane,
-      snapSeq: 0,
-      error: null,
-      activeVolumeId,
-      aiAnnotations,
-      activeAnnotationId: null,
-    });
-  },
 
-  setCursor: (cursor) =>
-    set((state) => {
-      const dims = state.volume?.meta.dims;
-      if (!dims) return { cursor };
-      const clampAxis = (v: number, max: number) => Math.max(0, Math.min(max - 1, v));
-      return {
-        cursor: {
-          x: clampAxis(cursor.x, dims[0]),
-          y: clampAxis(cursor.y, dims[1]),
-          z: clampAxis(cursor.z, dims[2]),
-        },
-      };
+      restoreVolume: (volume, prepared3D, histogram) => {
+        const activeVolumeId = deriveVolumeId(volume);
+        const aiAnnotations = annotationsStorage.load(activeVolumeId);
+        const dims = volume.meta.dims;
+        const clampAxis = (v: number, max: number) => Math.max(0, Math.min(max - 1, v));
+        set((state) => {
+          // Clamp the persisted cursor against this volume's dims.  Same tab keeps
+          // the same volume, so this is normally a no-op — but a stale persisted
+          // cursor from a different dataset (e.g. after a bug-triggered swap)
+          // would otherwise stick at out-of-bounds coordinates.
+          const cursor = state.cursor
+            ? {
+                x: clampAxis(state.cursor.x, dims[0]),
+                y: clampAxis(state.cursor.y, dims[1]),
+                z: clampAxis(state.cursor.z, dims[2]),
+              }
+            : {
+                x: Math.floor(dims[0] / 2),
+                y: Math.floor(dims[1] / 2),
+                z: Math.floor(dims[2] / 2),
+              };
+          // Drop activeAnnotationId if the finding no longer exists for this volume.
+          const activeAnnotationId =
+            state.activeAnnotationId && aiAnnotations.some((a) => a.id === state.activeAnnotationId)
+              ? state.activeAnnotationId
+              : null;
+          return {
+            volume,
+            prepared3D,
+            histogram,
+            activeVolumeId,
+            aiAnnotations,
+            cursor,
+            activeAnnotationId,
+            error: null,
+          };
+        });
+      },
+
+      setCursor: (cursor) =>
+        set((state) => {
+          const dims = state.volume?.meta.dims;
+          if (!dims) return { cursor };
+          const clampAxis = (v: number, max: number) => Math.max(0, Math.min(max - 1, v));
+          return {
+            cursor: {
+              x: clampAxis(cursor.x, dims[0]),
+              y: clampAxis(cursor.y, dims[1]),
+              z: clampAxis(cursor.z, dims[2]),
+            },
+          };
+        }),
+
+      setActivePlane: (activePlane) => set({ activePlane }),
+
+      setLoading: (s) => set((state) => ({ loading: { ...state.loading, ...s } })),
+
+      setError: (error) => set({ error }),
+
+      toggleToolbar: (key) =>
+        set((state) => {
+          const nextValue = !state.toolbar[key];
+          const patch: Partial<ToolbarState> = { [key]: nextValue };
+          // Enabling clip requires at least one visible plane — auto-activate if off.
+          if (key === 'clip' && nextValue && state.toolbar.planes === 'off')
+            patch.planes = 'active';
+          // Disabling clip removes the single-plane mode entirely.
+          if (key === 'clip' && !nextValue) patch.planes = 'off';
+          return { toolbar: { ...state.toolbar, ...patch } };
+        }),
+
+      cyclePlanesMode: () =>
+        set((state) => {
+          const cycle: Record<PlanesMode, PlanesMode> = {
+            off: 'active',
+            active: 'all',
+            all: 'off',
+          };
+          const nextPlanes = cycle[state.toolbar.planes];
+          const patch: Partial<ToolbarState> = { planes: nextPlanes };
+          // Turning planes off while clip is on → also disable clip.
+          if (nextPlanes === 'off' && state.toolbar.clip) patch.clip = false;
+          return { toolbar: { ...state.toolbar, ...patch } };
+        }),
+
+      setWL: (wl) => set((state) => ({ wl: { ...state.wl, ...wl } })),
+
+      setWLDraft: (wl) => set((state) => ({ wlDraft: { ...state.wlDraft, ...wl } })),
+
+      setScrubVisible: (axis, value) =>
+        set((state) => ({ scrubVisible: { ...state.scrubVisible, [axis]: value } })),
+
+      setMeasurementFrom: (p) => set({ measurement: { from: p, to: null, distanceMm: null } }),
+
+      setMeasurementTo: (p) =>
+        set((state) => {
+          if (!state.measurement) return {};
+          const spacing = state.volume?.meta.spacing ?? DEFAULT_SPACING;
+          const { from } = state.measurement;
+          const dx = (p.x - from.x) * spacing[0];
+          const dy = (p.y - from.y) * spacing[1];
+          const dz = (p.z - from.z) * spacing[2];
+          return {
+            measurement: {
+              from,
+              to: p,
+              distanceMm: Math.sqrt(dx * dx + dy * dy + dz * dz),
+            },
+          };
+        }),
+
+      clearMeasurement: () => set({ measurement: null }),
+
+      setRenderPreset: (renderPreset) =>
+        set((state) => {
+          const defaultWL = state.volume?.windowLevel ?? state.wl;
+          return { renderPreset, wl: defaultWL, wlDraft: defaultWL };
+        }),
+
+      setSlabMm: (slabMm) => set({ slabMm }),
+
+      requestSnapToView: (plane) =>
+        set((state) => ({
+          snapSeq: state.snapSeq + 1,
+          snapPlane: plane,
+          // Sync the active plane so clip / plane-indicator match the snapped view.
+          activePlane: plane,
+        })),
+
+      setMobileTab: (mobileTab) =>
+        set((state) => ({
+          mobileTab,
+          // Sync activePlane when switching to a slice tab.
+          activePlane: isSlicePlane(mobileTab) ? mobileTab : state.activePlane,
+        })),
+
+      addAiAnnotation: (a) =>
+        set((state) => {
+          if (!state.activeVolumeId) return {};
+          const tagged = { ...a, volumeId: state.activeVolumeId };
+          const next = [...state.aiAnnotations, tagged];
+          annotationsStorage.save(state.activeVolumeId, next);
+          return { aiAnnotations: next };
+        }),
+
+      setAiAnnotations: (list) =>
+        set((state) => {
+          if (!state.activeVolumeId) return {};
+          const volumeId = state.activeVolumeId;
+          const tagged = list.map((a) => ({ ...a, volumeId }));
+          annotationsStorage.save(volumeId, tagged);
+          return { aiAnnotations: tagged, activeAnnotationId: null };
+        }),
+
+      removeAiAnnotation: (id) =>
+        set((state) => {
+          const next = state.aiAnnotations.filter((a) => a.id !== id);
+          if (state.activeVolumeId) annotationsStorage.save(state.activeVolumeId, next);
+          return {
+            aiAnnotations: next,
+            activeAnnotationId: state.activeAnnotationId === id ? null : state.activeAnnotationId,
+          };
+        }),
+
+      clearAiAnnotations: () =>
+        set((state) => {
+          if (state.activeVolumeId) annotationsStorage.clear(state.activeVolumeId);
+          return { aiAnnotations: [], activeAnnotationId: null };
+        }),
+
+      setActiveAnnotation: (activeAnnotationId) => set({ activeAnnotationId }),
+
+      focusAnnotation: (id) =>
+        set((state) => {
+          const a = state.aiAnnotations.find((x) => x.id === id);
+          if (!a) return {};
+          const dims = state.volume?.meta.dims;
+          const clampAxis = (v: number, max: number) => Math.max(0, Math.min(max - 1, v));
+          const cursor = dims
+            ? {
+                x: clampAxis(a.voxel.x, dims[0]),
+                y: clampAxis(a.voxel.y, dims[1]),
+                z: clampAxis(a.voxel.z, dims[2]),
+              }
+            : a.voxel;
+          return { cursor, activePlane: a.plane, activeAnnotationId: id };
+        }),
+
+      setMcpConnected: (mcpConnected) => set({ mcpConnected }),
+      setLocalPort: (localPort) => set({ localPort }),
+
+      setAgentActivity: (active, action = null) =>
+        set({ agentActivity: { active, action: active ? (action ?? null) : null } }),
+
+      setAgentSessionActive: (agentSessionActive) => set({ agentSessionActive }),
+
+      setCanvasRef: (plane, canvas) =>
+        set((state) => ({ canvasRefs: { ...state.canvasRefs, [plane]: canvas } })),
+
+      setPreviewInstance: (previewInstance) => set({ previewInstance }),
+
+      reset: () => set(initialState),
     }),
-
-  setActivePlane: (activePlane) => set({ activePlane }),
-
-  setLoading: (s) => set((state) => ({ loading: { ...state.loading, ...s } })),
-
-  setError: (error) => set({ error }),
-
-  toggleToolbar: (key) =>
-    set((state) => {
-      const nextValue = !state.toolbar[key];
-      const patch: Partial<ToolbarState> = { [key]: nextValue };
-      // Enabling clip requires at least one visible plane — auto-activate if off.
-      if (key === 'clip' && nextValue && state.toolbar.planes === 'off') patch.planes = 'active';
-      // Disabling clip removes the single-plane mode entirely.
-      if (key === 'clip' && !nextValue) patch.planes = 'off';
-      return { toolbar: { ...state.toolbar, ...patch } };
-    }),
-
-  cyclePlanesMode: () =>
-    set((state) => {
-      const cycle: Record<PlanesMode, PlanesMode> = { off: 'active', active: 'all', all: 'off' };
-      const nextPlanes = cycle[state.toolbar.planes];
-      const patch: Partial<ToolbarState> = { planes: nextPlanes };
-      // Turning planes off while clip is on → also disable clip.
-      if (nextPlanes === 'off' && state.toolbar.clip) patch.clip = false;
-      return { toolbar: { ...state.toolbar, ...patch } };
-    }),
-
-  setWL: (wl) => set((state) => ({ wl: { ...state.wl, ...wl } })),
-
-  setWLDraft: (wl) => set((state) => ({ wlDraft: { ...state.wlDraft, ...wl } })),
-
-  setScrubVisible: (axis, value) =>
-    set((state) => ({ scrubVisible: { ...state.scrubVisible, [axis]: value } })),
-
-  setMeasurementFrom: (p) => set({ measurement: { from: p, to: null, distanceMm: null } }),
-
-  setMeasurementTo: (p) =>
-    set((state) => {
-      if (!state.measurement) return {};
-      const spacing = state.volume?.meta.spacing ?? DEFAULT_SPACING;
-      const { from } = state.measurement;
-      const dx = (p.x - from.x) * spacing[0];
-      const dy = (p.y - from.y) * spacing[1];
-      const dz = (p.z - from.z) * spacing[2];
-      return {
-        measurement: {
-          from,
-          to: p,
-          distanceMm: Math.sqrt(dx * dx + dy * dy + dz * dz),
-        },
-      };
-    }),
-
-  clearMeasurement: () => set({ measurement: null }),
-
-  setRenderPreset: (renderPreset) =>
-    set((state) => {
-      const defaultWL = state.volume?.windowLevel ?? state.wl;
-      return { renderPreset, wl: defaultWL, wlDraft: defaultWL };
-    }),
-
-  setSlabMm: (slabMm) => set({ slabMm }),
-
-  requestSnapToView: (plane) =>
-    set((state) => ({
-      snapSeq: state.snapSeq + 1,
-      snapPlane: plane,
-      // Sync the active plane so clip / plane-indicator match the snapped view.
-      activePlane: plane,
-    })),
-
-  setMobileTab: (mobileTab) =>
-    set((state) => ({
-      mobileTab,
-      // Sync activePlane when switching to a slice tab.
-      activePlane: isSlicePlane(mobileTab) ? mobileTab : state.activePlane,
-    })),
-
-  addAiAnnotation: (a) =>
-    set((state) => {
-      if (!state.activeVolumeId) return {};
-      const tagged = { ...a, volumeId: state.activeVolumeId };
-      const next = [...state.aiAnnotations, tagged];
-      annotationsStorage.save(state.activeVolumeId, next);
-      return { aiAnnotations: next };
-    }),
-
-  setAiAnnotations: (list) =>
-    set((state) => {
-      if (!state.activeVolumeId) return {};
-      const volumeId = state.activeVolumeId;
-      const tagged = list.map((a) => ({ ...a, volumeId }));
-      annotationsStorage.save(volumeId, tagged);
-      return { aiAnnotations: tagged, activeAnnotationId: null };
-    }),
-
-  removeAiAnnotation: (id) =>
-    set((state) => {
-      const next = state.aiAnnotations.filter((a) => a.id !== id);
-      if (state.activeVolumeId) annotationsStorage.save(state.activeVolumeId, next);
-      return {
-        aiAnnotations: next,
-        activeAnnotationId: state.activeAnnotationId === id ? null : state.activeAnnotationId,
-      };
-    }),
-
-  clearAiAnnotations: () =>
-    set((state) => {
-      if (state.activeVolumeId) annotationsStorage.clear(state.activeVolumeId);
-      return { aiAnnotations: [], activeAnnotationId: null };
-    }),
-
-  setActiveAnnotation: (activeAnnotationId) => set({ activeAnnotationId }),
-
-  focusAnnotation: (id) =>
-    set((state) => {
-      const a = state.aiAnnotations.find((x) => x.id === id);
-      if (!a) return {};
-      const dims = state.volume?.meta.dims;
-      const clampAxis = (v: number, max: number) => Math.max(0, Math.min(max - 1, v));
-      const cursor = dims
-        ? {
-            x: clampAxis(a.voxel.x, dims[0]),
-            y: clampAxis(a.voxel.y, dims[1]),
-            z: clampAxis(a.voxel.z, dims[2]),
-          }
-        : a.voxel;
-      return { cursor, activePlane: a.plane, activeAnnotationId: id };
-    }),
-
-  setMcpConnected: (mcpConnected) => set({ mcpConnected }),
-  setLocalPort: (localPort) => set({ localPort }),
-
-  setAgentActivity: (active, action = null) =>
-    set({ agentActivity: { active, action: active ? (action ?? null) : null } }),
-
-  setAgentSessionActive: (agentSessionActive) => set({ agentSessionActive }),
-
-  setCanvasRef: (plane, canvas) =>
-    set((state) => ({ canvasRefs: { ...state.canvasRefs, [plane]: canvas } })),
-
-  setPreviewInstance: (previewInstance) => set({ previewInstance }),
-
-  reset: () => set(initialState),
-}));
+    {
+      // ── Persistence ──────────────────────────────────────────────────────
+      // Stores a small subset of UI state in sessionStorage so a page reload
+      // doesn't reset the user's W/L, slice positions, render preset, etc.
+      //
+      // Why sessionStorage (not localStorage / IDB):
+      //   • Per-tab isolation — matches the per-tab IDB cache fix.  Two
+      //     tabs on different volumes keep their own UI state.
+      //   • Survives reload and "reopen closed tab" in Chrome.
+      //   • Clears naturally on tab close — no zombie state stuck on disk.
+      //
+      // What's persisted: only fields a user would notice resetting (W/L,
+      // cursor, active plane, toolbar toggles, render preset, slab, mobile
+      // tab, focused finding, current measurement).
+      //
+      // What's NOT persisted:
+      //   • volume / prepared3D / histogram — already cached in IndexedDB
+      //   • aiAnnotations — already persisted per-volume in localStorage
+      //   • DOM refs (canvasRefs, previewInstance) — non-serialisable
+      //   • Loading / error / agent runtime flags — transient
+      //   • snapSeq / snapPlane / activeVolumeId — derived or internal
+      name: 'prisma-mri-ui-state',
+      storage: createJSONStorage(() => sessionStorage),
+      version: 1,
+      partialize: (state) => ({
+        cursor: state.cursor,
+        activePlane: state.activePlane,
+        toolbar: state.toolbar,
+        wl: state.wl,
+        wlDraft: state.wlDraft,
+        scrubVisible: state.scrubVisible,
+        measurement: state.measurement,
+        renderPreset: state.renderPreset,
+        slabMm: state.slabMm,
+        mobileTab: state.mobileTab,
+        activeAnnotationId: state.activeAnnotationId,
+      }),
+    },
+  ),
+);

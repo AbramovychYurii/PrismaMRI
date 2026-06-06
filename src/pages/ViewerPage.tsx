@@ -25,7 +25,7 @@ const RestoreScreen = styled.div`
 export function ViewerPage() {
   const volumeLoaded = useVolumeStore((s) => s.volume !== null);
   const mcpConnected = useVolumeStore((s) => s.mcpConnected);
-  const setVolume = useVolumeStore((s) => s.setVolume);
+  const restoreVolume = useVolumeStore((s) => s.restoreVolume);
   const { showShortcuts, setShowShortcuts } = useViewerActions();
   const navigate = useNavigate();
 
@@ -41,7 +41,9 @@ export function ViewerPage() {
   }, [mcpConnected, volumeLoaded]);
 
   // On mount: if no volume is in memory, try IndexedDB restore.
-  // setVolume and navigate are stable refs; volumeLoaded triggers re-check after restore.
+  // Uses `restoreVolume` (not `setVolume`) so the persisted UI state — cursor,
+  // W/L, render preset, toolbar — survives the reload instead of getting
+  // reset to fresh-import defaults.
   useEffect(() => {
     if (volumeLoaded) {
       setRestoring(false);
@@ -56,7 +58,7 @@ export function ViewerPage() {
       .then((result) => {
         if (!alive) return;
         if (result) {
-          setVolume(result.volume, result.prepared3D, result.histogram);
+          restoreVolume(result.volume, result.prepared3D, result.histogram);
           setRestoring(false);
         } else {
           navigate('/', { replace: true });
@@ -69,7 +71,7 @@ export function ViewerPage() {
     return () => {
       alive = false;
     };
-  }, [volumeLoaded, setVolume, navigate]);
+  }, [volumeLoaded, restoreVolume, navigate]);
 
   if (restoring) return <RestoreScreen>Restoring volume…</RestoreScreen>;
 
