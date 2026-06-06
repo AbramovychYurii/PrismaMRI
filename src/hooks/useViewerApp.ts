@@ -7,6 +7,7 @@ import { loadVolumeInWorker } from '@/lib/import/volume-client';
 import * as volumeDb from '@/lib/volumeDb';
 import { useVolumeStore } from '@/store';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 
 interface DirPickerWindow {
@@ -58,9 +59,18 @@ export function useViewerApp() {
           },
           controller.signal,
         );
-        setVolume(volume, prepared3D, histogram);
-        setLoading({ active: false, percent: 100, stage: 'done', message: 'Ready' });
-        navigate('/viewer');
+        // Commit setVolume + the route change synchronously so ImportOverlay
+        // starts unmounting before any further work. We deliberately do NOT
+        // clear loading.active here: the route swap doesn't guarantee the
+        // example cards have actually left the DOM (the heavy AppGrid mount
+        // can hold the previous frame on screen), so flipping it to false
+        // mid-transition would briefly un-dim the cards. ViewerPage clears
+        // it from a mount effect — guaranteed to fire only after the viewer
+        // has taken over.
+        flushSync(() => {
+          setVolume(volume, prepared3D, histogram);
+          navigate('/viewer');
+        });
         // Save to IndexedDB in the background — don't block the UI.
         volumeDb.saveVolume(volume, prepared3D, histogram).catch(() => {
           // Non-critical: storage might be full or unavailable.

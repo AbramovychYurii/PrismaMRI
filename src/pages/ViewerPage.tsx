@@ -26,8 +26,21 @@ export function ViewerPage() {
   const volumeLoaded = useVolumeStore((s) => s.volume !== null);
   const mcpConnected = useVolumeStore((s) => s.mcpConnected);
   const restoreVolume = useVolumeStore((s) => s.restoreVolume);
+  const loadingActive = useVolumeStore((s) => s.loading.active);
+  const setLoading = useVolumeStore((s) => s.setLoading);
   const { showShortcuts, setShowShortcuts } = useViewerActions();
   const navigate = useNavigate();
+
+  // Clear the loading flag once the viewer takes over. loadFromSource
+  // deliberately leaves it true through the route swap so the example
+  // cards stay dimmed until ImportOverlay is fully gone — otherwise the
+  // cards visibly un-dim while the heavy AppGrid mount holds the previous
+  // frame on screen.
+  useEffect(() => {
+    if (volumeLoaded && loadingActive) {
+      setLoading({ active: false, percent: 100, stage: 'done', message: 'Ready' });
+    }
+  }, [volumeLoaded, loadingActive, setLoading]);
 
   const confirmedOnce = useRef(false);
   const [showConfirm, setShowConfirm] = useState(false);
