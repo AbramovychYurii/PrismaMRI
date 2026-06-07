@@ -62,7 +62,7 @@ function screenToVoxel(
   dims: readonly [number, number, number],
   cursor: VolumeCursor,
   canvas: HTMLCanvasElement,
-  e: React.MouseEvent,
+  e: { clientX: number; clientY: number },
   drawFracs?: DrawFracs | null,
 ): MeasurementPoint {
   const rect = canvas.getBoundingClientRect();
@@ -134,6 +134,42 @@ export function useMeasurementInteraction(
     if (menu) setMeasurementTo(menu.voxel);
   }, [menu, setMeasurementTo]);
 
+  /**
+   * Start a drag-measurement at the pointer position — used by Shift+drag in
+   * the fullscreen panel.  Seeds both `from` and `to` to the same voxel so the
+   * line is well-defined from frame 0 (distance reads 0 mm until the user
+   * actually moves the cursor).
+   */
+  const beginDrag = useCallback(
+    (
+      e: { clientX: number; clientY: number },
+      canvas: HTMLCanvasElement,
+      drawFracs?: DrawFracs | null,
+    ) => {
+      if (!dims || !cursor) return;
+      const voxel = screenToVoxel(plane, dims, cursor, canvas, e, drawFracs);
+      // Seed `from` only.  `to` stays null until the first real movement —
+      // that way a bare click never creates a degenerate from-equals-to
+      // measurement (which would render two dots at the same coordinate).
+      setMeasurementFrom(voxel);
+    },
+    [plane, dims, cursor, setMeasurementFrom],
+  );
+
+  /** Continuously update the `to` point while the user drags. */
+  const updateDrag = useCallback(
+    (
+      e: { clientX: number; clientY: number },
+      canvas: HTMLCanvasElement,
+      drawFracs?: DrawFracs | null,
+    ) => {
+      if (!dims || !cursor) return;
+      const voxel = screenToVoxel(plane, dims, cursor, canvas, e, drawFracs);
+      setMeasurementTo(voxel);
+    },
+    [plane, dims, cursor, setMeasurementTo],
+  );
+
   return {
     measurement,
     measureDots,
@@ -143,5 +179,7 @@ export function useMeasurementInteraction(
     onMeasureFrom,
     onMeasureTo,
     onClear: clearMeasurement,
+    beginDrag,
+    updateDrag,
   };
 }

@@ -194,6 +194,25 @@ export const MeasureDot = styled.div`
   z-index: var(--z-panel-top);
 `;
 
+/** Live distance chip rendered next to the measurement line. */
+export const MeasureLabel = styled.div`
+  position: absolute;
+  transform: translate(10px, -50%);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--measure);
+  background: rgba(8, 7, 5, 0.82);
+  border: 1px solid var(--measure-glow);
+  border-radius: 3px;
+  padding: 2px 6px;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: var(--z-panel-top);
+  box-shadow: 0 0 6px var(--measure-glow);
+  font-variant-numeric: tabular-nums;
+`;
+
 // ── Button tray (top-right) ──────────────────────────────────────────────────
 
 export const ButtonTray = styled.div`

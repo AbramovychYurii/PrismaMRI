@@ -170,6 +170,8 @@ export interface SlicePanelCore {
   onMeasureFrom: ReturnType<typeof useMeasurementInteraction>['onMeasureFrom'];
   onMeasureTo: ReturnType<typeof useMeasurementInteraction>['onMeasureTo'];
   onClear: ReturnType<typeof useMeasurementInteraction>['onClear'];
+  beginDragMeasurement: ReturnType<typeof useMeasurementInteraction>['beginDrag'];
+  updateDragMeasurement: ReturnType<typeof useMeasurementInteraction>['updateDrag'];
 }
 
 /**
@@ -342,5 +344,7 @@ export function useSlicePanelCore(plane: SlicePlane, halfSlabs = 0): SlicePanelC
     onMeasureFrom: measureInteraction.onMeasureFrom,
     onMeasureTo: measureInteraction.onMeasureTo,
     onClear: measureInteraction.onClear,
+    beginDragMeasurement: measureInteraction.beginDrag,
+    updateDragMeasurement: measureInteraction.updateDrag,
   };
 }

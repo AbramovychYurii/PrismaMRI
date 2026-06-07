@@ -36,6 +36,7 @@ import {
   MEASURE_DOT_PX,
   MEASURE_DOT_SHADOW,
   MeasureDot,
+  MeasureLabel,
   MeasureLine,
   MobileCounter,
   MobileRightCol,
@@ -112,11 +113,14 @@ const CrosshairAndDots = memo(function CrosshairAndDots({
   cross,
   axes,
   adjustedDots,
+  distanceMm,
 }: {
   cross: { fx: number; fy: number } | null;
   axes: { v: 'x' | 'y' | 'z'; h: 'x' | 'y' | 'z' };
   adjustedDots: Array<{ fx: number; fy: number }>;
+  distanceMm?: number | null;
 }) {
+  const hasLine = adjustedDots.length === 2;
   return (
     <>
       {cross && (
@@ -136,7 +140,7 @@ const CrosshairAndDots = memo(function CrosshairAndDots({
           </CrossCenter>
         </CrosshairOverlay>
       )}
-      {adjustedDots.length === 2 && (
+      {hasLine && (
         <MeasureLine aria-hidden="true">
           <line
             x1={`${adjustedDots[0].fx * 100}%`}
@@ -151,9 +155,14 @@ const CrosshairAndDots = memo(function CrosshairAndDots({
           />
         </MeasureLine>
       )}
-      {adjustedDots.map((dot) => (
+      {adjustedDots.map((dot, i) => (
+        // Stable index key — we render at most 2 dots and they're identified
+        // by position in the array (0 = from, 1 = to).  Using fx/fy in the key
+        // breaks reconciliation when both points coincide (Shift+click without
+        // drag), leaking dead nodes into the DOM as the user clicks around.
         <MeasureDot
-          key={`${dot.fx}${dot.fy}`}
+          // biome-ignore lint/suspicious/noArrayIndexKey: stable role-based key
+          key={i}
           style={{
             left: `${dot.fx * 100}%`,
             top: `${dot.fy * 100}%`,
@@ -163,6 +172,16 @@ const CrosshairAndDots = memo(function CrosshairAndDots({
           }}
         />
       ))}
+      {hasLine && distanceMm !== null && distanceMm !== undefined && (
+        <MeasureLabel
+          style={{
+            left: `${((adjustedDots[0].fx + adjustedDots[1].fx) / 2) * 100}%`,
+            top: `${((adjustedDots[0].fy + adjustedDots[1].fy) / 2) * 100}%`,
+          }}
+        >
+          {distanceMm.toFixed(1)} mm
+        </MeasureLabel>
+      )}
     </>
   );
 });
@@ -208,7 +227,26 @@ function ExpandedSlicePanel({
     onMeasureTo,
     onClear,
     closeMenu,
+    beginDragMeasurement,
+    updateDragMeasurement,
   } = useSlicePanelCore(plane, halfSlabs);
+
+  /**
+   * Tracks an in-flight Shift-drag.  We deliberately don't write any
+   * measurement to the store on `pointerdown` — only on the first pointermove
+   * that exceeds `DRAG_THRESHOLD_PX`.  This avoids two problems:
+   *  • A bare Shift-click (no drag) would otherwise create a degenerate
+   *    `from === to` measurement and leave an orange dot behind.
+   *  • Two dots at the same coordinate produced duplicate React keys, which
+   *    broke reconciliation and leaked nodes as the user clicked around.
+   */
+  const DRAG_THRESHOLD_PX = 3;
+  const dragRef = useRef<{
+    pointerId: number | null;
+    startX: number;
+    startY: number;
+    started: boolean;
+  }>({ pointerId: null, startX: 0, startY: 0, started: false });
 
   const footer = PLANE_FOOTER[plane];
 
@@ -228,6 +266,8 @@ function ExpandedSlicePanel({
 
   function handleClick(e: React.MouseEvent) {
     e.stopPropagation();
+    // Shift+click is reserved for measurement — don't also move the crosshair.
+    if (e.shiftKey) return;
     // First click on an inactive panel just focuses it — cursor only moves on
     // subsequent clicks. Rotating the 3-D model is opt-in via the context-menu
     // "View from this side" item.
@@ -239,6 +279,63 @@ function ExpandedSlicePanel({
     setCursor(cursorFromClick(e, canvasRef.current, plane, dims, cursor, drawFracs));
   }
 
+  function handlePointerDown(e: React.PointerEvent) {
+    e.stopPropagation();
+    // Shift+drag = measurement.  Left-button pointers only.
+    if (!e.shiftKey || e.button !== 0) return;
+    if (!canvasRef.current || !dims || !cursor) return;
+    e.preventDefault();
+    if (!isActive) setActivePlane(plane);
+    // Arm a drag — measurement won't be created until the cursor actually
+    // moves past DRAG_THRESHOLD_PX.  A bare click writes nothing.
+    dragRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      started: false,
+    };
+    // Capture so we keep getting moves/up even if the cursor leaves the panel.
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  function handlePointerMove(e: React.PointerEvent) {
+    const d = dragRef.current;
+    if (d.pointerId === null || d.pointerId !== e.pointerId) return;
+    if (!canvasRef.current) return;
+    if (!d.started) {
+      const dx = e.clientX - d.startX;
+      const dy = e.clientY - d.startY;
+      if (dx * dx + dy * dy < DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) return;
+      // First real movement — commit the start point now (using the original
+      // pointerdown coordinates, not the slightly-displaced current ones) so
+      // the line begins exactly where the user pressed.
+      beginDragMeasurement(
+        { clientX: d.startX, clientY: d.startY },
+        canvasRef.current,
+        drawFracs,
+      );
+      d.started = true;
+    }
+    updateDragMeasurement(e, canvasRef.current, drawFracs);
+  }
+
+  function handlePointerUp(e: React.PointerEvent) {
+    e.stopPropagation();
+    const d = dragRef.current;
+    if (d.pointerId === e.pointerId) {
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch {
+        /* already released */
+      }
+      // If the user pressed Shift+clicked without dragging, nothing was ever
+      // written to the store — nothing to clean up.  The previously-displayed
+      // measurement is intentionally preserved so a stray click doesn't wipe
+      // an existing line.
+      dragRef.current = { pointerId: null, startX: 0, startY: 0, started: false };
+    }
+  }
+
   return createPortal(
     <FullscreenOverlay
       $isActive={isActive}
@@ -248,12 +345,18 @@ function ExpandedSlicePanel({
         e.stopPropagation();
         onWheel(e);
       }}
-      onPointerDown={(e) => e.stopPropagation()}
-      onPointerUp={(e) => e.stopPropagation()}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
     >
       <StyledCanvas ref={canvasRef as React.Ref<HTMLCanvasElement>} />
 
-      <CrosshairAndDots cross={cross} axes={axes} adjustedDots={adjustedDots} />
+      <CrosshairAndDots
+        cross={cross}
+        axes={axes}
+        adjustedDots={adjustedDots}
+        distanceMm={measurement?.distanceMm ?? null}
+      />
 
       <AnnotationOverlay plane={plane} halfSlabs={halfSlabs} />
 
@@ -301,7 +404,7 @@ function ExpandedSlicePanel({
 
       <PanelFooter $scrubVisible={scrubVisible}>
         <span>
-          {footer.hint} · {footer.code}
+          {footer.hint} · {footer.code} · SHIFT+DRAG · MEASURE
         </span>
         {total > 0 && (
           <SliceCounter>
@@ -433,7 +536,12 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
     >
       <StyledCanvas ref={canvasRef as React.Ref<HTMLCanvasElement>} />
 
-      <CrosshairAndDots cross={cross} axes={axes} adjustedDots={adjustedDots} />
+      <CrosshairAndDots
+        cross={cross}
+        axes={axes}
+        adjustedDots={adjustedDots}
+        distanceMm={measurement?.distanceMm ?? null}
+      />
 
       <PanelHeader>
         <PlaneGlyph $color={accentColor}>{PLANE_GLYPH[plane]}</PlaneGlyph>
