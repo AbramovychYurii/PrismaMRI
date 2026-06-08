@@ -1,7 +1,7 @@
+import { gunzipBytes, readBlobBytes } from '@/lib/import/read-file';
 import type { ImportFormatAdapter, ImportSource, ProgressFn } from '@/lib/import/types';
 import { resolveWindowLevel } from '@/lib/volume/math';
 import type { LoadedVolume, Vec3 } from '@/types';
-import { gunzipSync } from 'fflate';
 
 function isMhaName(name: string): boolean {
   return name.endsWith('.mha') || name.endsWith('.mhd');
@@ -30,9 +30,12 @@ export const mhaAdapter: ImportFormatAdapter = {
   async parse(source: ImportSource, onProgress: ProgressFn): Promise<LoadedVolume> {
     const file = source.files.find((f) => isMhaName(f.name));
     if (!file) throw new Error('No MHA/MHD file found.');
-    onProgress({ stage: 'reading-files', current: 0, total: 1 });
-
-    const bytes = new Uint8Array(await file.file.arrayBuffer());
+    // Reading-files budget split — see nrrd/adapter.ts for rationale.
+    const fsize = file.file.size;
+    onProgress({ stage: 'reading-files', current: 0, total: fsize * 2 });
+    const bytes = await readBlobBytes(file.file, (loaded, total) => {
+      onProgress({ stage: 'reading-files', current: loaded, total: total * 2 });
+    });
 
     // Read ASCII header until ElementDataFile line.
     const fields = new Map<string, string>();
@@ -77,21 +80,31 @@ export const mhaAdapter: ImportFormatAdapter = {
       const rawName = elementDataFile.toLowerCase();
       const rawFile = source.files.find((f) => f.name.endsWith(rawName));
       if (!rawFile) throw new Error(`MHD references missing data file "${elementDataFile}".`);
-      payload = new Uint8Array(await rawFile.file.arrayBuffer());
+      payload = await readBlobBytes(rawFile.file);
     }
-    if (compressed) payload = gunzipSync(payload);
+    if (compressed) {
+      payload = gunzipBytes(payload, (loaded, total) => {
+        onProgress({ stage: 'reading-files', current: fsize + loaded, total: fsize + total });
+      });
+    }
 
     const count = nx * ny * nz;
     const dv = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
     const out = new Float32Array(count);
-    onProgress({ stage: 'assembling', current: 0, total: 1 });
+    // Chunked assembling — see nrrd/adapter.ts for rationale.
+    const CHUNK = 1 << 19;
+    onProgress({ stage: 'assembling', current: 0, total: count });
     let scalarMin = Number.POSITIVE_INFINITY;
     let scalarMax = Number.NEGATIVE_INFINITY;
-    for (let i = 0; i < count; i++) {
-      const v = desc.read(dv, i * desc.bytes, le);
-      out[i] = v;
-      if (v < scalarMin) scalarMin = v;
-      if (v > scalarMax) scalarMax = v;
+    for (let off = 0; off < count; off += CHUNK) {
+      const end = Math.min(off + CHUNK, count);
+      for (let i = off; i < end; i++) {
+        const v = desc.read(dv, i * desc.bytes, le);
+        out[i] = v;
+        if (v < scalarMin) scalarMin = v;
+        if (v > scalarMax) scalarMax = v;
+      }
+      onProgress({ stage: 'assembling', current: end, total: count });
     }
 
     const es = (fields.get('ElementSpacing') ?? fields.get('ElementSize') ?? '1 1 1')

@@ -2,6 +2,7 @@ import { MAX_3D_TEXTURE_EDGE } from '@/constants';
 import type { LoadedVolume, PreparedVolumeFor3D, Vec3 } from '@/types';
 import {
   type ScalarHistogram,
+  type SubProgressFn,
   buildScalarHistogram,
   resolveIsoThreshold,
   resolveScalarRange,
@@ -19,6 +20,7 @@ function downsampleStride(dims: Vec3): number {
 export function prepareVolumeFor3D(
   volume: LoadedVolume,
   prebuiltHist?: ScalarHistogram,
+  onProgress?: SubProgressFn,
 ): PreparedVolumeFor3D {
   const [sx, sy, sz] = volume.meta.dims;
   const stride = downsampleStride(volume.meta.dims);
@@ -32,6 +34,9 @@ export function prepareVolumeFor3D(
   const span = hi - lo || 1;
   const threshold = resolveIsoThreshold(hist, [lo, hi]);
 
+  // Quantization is the dominant cost here — emit progress every slice along z.
+  // dz is at most MAX_3D_TEXTURE_EDGE (≈256) so this is ≤256 ticks; the actual
+  // worker further reduces by mapping the ratio onto a 0..1 sub-range.
   const out = new Uint8Array(dx * dy * dz);
   const src = volume.voxels;
   let o = 0;
@@ -45,6 +50,7 @@ export function prepareVolumeFor3D(
         out[o++] = t <= 0 ? 0 : t >= 1 ? 255 : (t * 255) | 0;
       }
     }
+    onProgress?.((z + 1) / dz);
   }
 
   const spacing: Vec3 = [

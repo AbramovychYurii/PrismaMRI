@@ -7,20 +7,36 @@ export interface ScalarHistogram {
   count: number;
 }
 
+/**
+ * Optional sub-stage progress hook.  Called with a 0..1 ratio between chunks
+ * so the caller can map it onto a slice of an outer progress range (e.g. the
+ * `preparing-3d` import stage).  Kept off the hot path: the histogram loop
+ * only invokes it at chunk boundaries, never per voxel.
+ */
+export type SubProgressFn = (ratio: number) => void;
+
+// ~512K samples per progress tick — same heuristic the import adapters use.
+const HIST_CHUNK = 1 << 19;
+
 export function buildScalarHistogram(
   data: VoxelArray,
   binCount = 1024,
   ignore?: number,
+  onProgress?: SubProgressFn,
 ): ScalarHistogram {
   // Int16 fast-path: fixed [-32768, 32767] range → single pass, no min/max pre-scan.
   if (data instanceof Int16Array) {
     const raw = new Uint32Array(65536);
     let count = 0;
-    for (let i = 0; i < data.length; i++) {
-      const v = data[i];
-      if (ignore !== undefined && v === ignore) continue;
-      raw[v + 32768]++;
-      count++;
+    for (let off = 0; off < data.length; off += HIST_CHUNK) {
+      const end = Math.min(off + HIST_CHUNK, data.length);
+      for (let i = off; i < end; i++) {
+        const v = data[i];
+        if (ignore !== undefined && v === ignore) continue;
+        raw[v + 32768]++;
+        count++;
+      }
+      onProgress?.(end / data.length);
     }
     if (count === 0) return { bins: new Uint32Array(1), min: 0, max: 1, count: 0 };
 
@@ -48,14 +64,20 @@ export function buildScalarHistogram(
     return { bins, min, max, count };
   }
 
-  // Generic two-pass path for Float32 and other types.
+  // Generic two-pass path for Float32 and other types.  The two passes are
+  // weighted 50/50 against the caller's progress range — pass 1 = min/max scan,
+  // pass 2 = bin accumulation.
   let min = Number.POSITIVE_INFINITY;
   let max = Number.NEGATIVE_INFINITY;
-  for (let i = 0; i < data.length; i++) {
-    const v = data[i];
-    if (ignore !== undefined && v === ignore) continue;
-    if (v < min) min = v;
-    if (v > max) max = v;
+  for (let off = 0; off < data.length; off += HIST_CHUNK) {
+    const end = Math.min(off + HIST_CHUNK, data.length);
+    for (let i = off; i < end; i++) {
+      const v = data[i];
+      if (ignore !== undefined && v === ignore) continue;
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+    onProgress?.((end / data.length) * 0.5);
   }
   if (!Number.isFinite(min) || !Number.isFinite(max) || min === max) {
     return { bins: new Uint32Array(1), min: min || 0, max: max || 1, count: 0 };
@@ -63,11 +85,15 @@ export function buildScalarHistogram(
   const bins = new Uint32Array(binCount);
   const scale = (binCount - 1) / (max - min);
   let count = 0;
-  for (let i = 0; i < data.length; i++) {
-    const v = data[i];
-    if (ignore !== undefined && v === ignore) continue;
-    bins[Math.round((v - min) * scale)]++;
-    count++;
+  for (let off = 0; off < data.length; off += HIST_CHUNK) {
+    const end = Math.min(off + HIST_CHUNK, data.length);
+    for (let i = off; i < end; i++) {
+      const v = data[i];
+      if (ignore !== undefined && v === ignore) continue;
+      bins[Math.round((v - min) * scale)]++;
+      count++;
+    }
+    onProgress?.(0.5 + (end / data.length) * 0.5);
   }
   return { bins, min, max, count };
 }

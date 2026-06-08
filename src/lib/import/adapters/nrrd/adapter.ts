@@ -1,7 +1,7 @@
+import { gunzipBytes, readBlobBytes } from '@/lib/import/read-file';
 import type { ImportFormatAdapter, ImportSource, ProgressFn } from '@/lib/import/types';
 import { resolveWindowLevel } from '@/lib/volume/math';
 import type { LoadedVolume, Vec3 } from '@/types';
-import { gunzipSync } from 'fflate';
 
 function isNrrdName(name: string): boolean {
   return name.endsWith('.nrrd') || name.endsWith('.nhdr');
@@ -38,9 +38,15 @@ export const nrrdAdapter: ImportFormatAdapter = {
   async parse(source: ImportSource, onProgress: ProgressFn): Promise<LoadedVolume> {
     const file = source.files.find((f) => isNrrdName(f.name));
     if (!file) throw new Error('No NRRD file found.');
-    onProgress({ stage: 'reading-files', current: 0, total: 1 });
-
-    const bytes = new Uint8Array(await file.file.arrayBuffer());
+    // First half of the reading-files budget = disk read; second half (if
+    // applicable) = gunzip.  We don't know yet whether the payload is gzipped
+    // — assume it is to reserve headroom; uncompressed files just jump from
+    // 50% → 100% of the stage when assembling starts.
+    const fsize = file.file.size;
+    onProgress({ stage: 'reading-files', current: 0, total: fsize * 2 });
+    const bytes = await readBlobBytes(file.file, (loaded, total) => {
+      onProgress({ stage: 'reading-files', current: loaded, total: total * 2 });
+    });
 
     // Header is ASCII, terminated by a blank line (\n\n).
     let headerEnd = -1;
@@ -82,7 +88,12 @@ export const nrrdAdapter: ImportFormatAdapter = {
 
     let payload: Uint8Array = bytes.subarray(headerEnd);
     if (encoding === 'gzip' || encoding === 'gz') {
-      payload = new Uint8Array(gunzipSync(payload));
+      payload = gunzipBytes(payload, (loaded, total) => {
+        // Second half of reading-files budget — `loaded` is bytes of
+        // compressed input consumed (monotonic, doesn't depend on the
+        // compression ratio).  Shift by fsize so we land in the upper half.
+        onProgress({ stage: 'reading-files', current: fsize + loaded, total: fsize + total });
+      });
     } else if (encoding !== 'raw') {
       throw new Error(`Unsupported NRRD encoding "${encoding}".`);
     }
@@ -96,8 +107,24 @@ export const nrrdAdapter: ImportFormatAdapter = {
     const out: Float32Array | Int16Array = fitsI16
       ? new Int16Array(count)
       : new Float32Array(count);
-    onProgress({ stage: 'assembling', current: 0, total: 1 });
-    for (let i = 0; i < count; i++) out[i] = desc.read(dv, i * desc.bytes, le);
+    // Chunked assembling — emit progress every CHUNK voxels and compute
+    // scalarMin/Max inline so we don't need a second pass over `out`.
+    // 1<<19 = 512K → ~64 emits on a 32M-voxel volume; each emit is a cheap
+    // postMessage from the worker.
+    const CHUNK = 1 << 19;
+    onProgress({ stage: 'assembling', current: 0, total: count });
+    let scalarMin = Number.POSITIVE_INFINITY;
+    let scalarMax = Number.NEGATIVE_INFINITY;
+    for (let off = 0; off < count; off += CHUNK) {
+      const end = Math.min(off + CHUNK, count);
+      for (let i = off; i < end; i++) {
+        const v = desc.read(dv, i * desc.bytes, le);
+        out[i] = v;
+        if (v < scalarMin) scalarMin = v;
+        if (v > scalarMax) scalarMax = v;
+      }
+      onProgress({ stage: 'assembling', current: end, total: count });
+    }
 
     // spacing from "space directions" or "spacings"
     let spacing: Vec3 = [1, 1, 1];
@@ -117,14 +144,6 @@ export const nrrdAdapter: ImportFormatAdapter = {
         const sp = spacings.split(/\s+/).map(Number);
         if (sp.length >= 3) spacing = [sp[0] || 1, sp[1] || 1, sp[2] || 1];
       }
-    }
-
-    let scalarMin = Number.POSITIVE_INFINITY;
-    let scalarMax = Number.NEGATIVE_INFINITY;
-    for (let i = 0; i < count; i++) {
-      const v = out[i];
-      if (v < scalarMin) scalarMin = v;
-      if (v > scalarMax) scalarMax = v;
     }
 
     return {

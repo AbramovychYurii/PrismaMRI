@@ -29,12 +29,30 @@ ctx.onmessage = async (e: MessageEvent<WorkerRequest>) => {
   try {
     const volume = await loadVolumeFromSource(req.source, emit);
 
-    emit({ stage: 'preparing-3d', current: 0, total: 1, message: 'Building 3D texture…' });
-    // Build histogram once — reused for smart W/L and 3D texture quantisation.
-    const hist = buildScalarHistogram(volume.voxels, 1024);
+    // Preparing-3D budget split: histogram ≈ 40%, Uint8 quantisation ≈ 60%.
+    // Each sub-step emits chunked progress so the stage drains smoothly from
+    // 88→99% instead of sitting at 88% for the whole pass.
+    emit({ stage: 'preparing-3d', current: 0, total: 100, message: 'Building 3D texture…' });
+    const HIST_WEIGHT = 40;
+    const PREP_WEIGHT = 60;
+    const hist = buildScalarHistogram(volume.voxels, 1024, undefined, (r) => {
+      emit({
+        stage: 'preparing-3d',
+        current: Math.round(r * HIST_WEIGHT),
+        total: 100,
+        message: 'Building 3D texture…',
+      });
+    });
     const windowLevel = resolveHistogramWindowLevel(hist);
-    const prepared = prepareVolumeFor3D(volume, hist);
-    emit({ stage: 'preparing-3d', current: 1, total: 1, message: 'Building 3D texture…' });
+    const prepared = prepareVolumeFor3D(volume, hist, (r) => {
+      emit({
+        stage: 'preparing-3d',
+        current: HIST_WEIGHT + Math.round(r * PREP_WEIGHT),
+        total: 100,
+        message: 'Building 3D texture…',
+      });
+    });
+    emit({ stage: 'preparing-3d', current: 100, total: 100, message: 'Building 3D texture…' });
 
     const voxelsBuf = volume.voxels.buffer;
     const preparedBuf = prepared.data.buffer;

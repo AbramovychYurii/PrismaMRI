@@ -57,14 +57,32 @@ const STAGE_LABEL: Record<string, string> = {
   'preparing-3d': 'Building 3D',
 };
 
+/**
+ * Stages whose `current / total` is a voxel count, an arbitrary 0..100 ratio,
+ * or a stale value inherited from the previous stage — the raw number is
+ * meaningless to the user, so we show only the stage label (the percent is
+ * rendered separately under the title).  DICOM `reading-files` / `parsing-
+ * headers` keep their "(45 / 200)" counter because there it's a real slice
+ * count.
+ */
+const HIDE_COUNTER_STAGES = new Set([
+  'scanning',
+  'reading-files',
+  'assembling',
+  'preparing-3d',
+]);
+
 function formatLoadingTitle(loading: {
   stage: string;
   current: number;
   total: number;
   message: string;
 }): string {
+  const label = STAGE_LABEL[loading.stage] ?? 'Loading';
+  if (HIDE_COUNTER_STAGES.has(loading.stage)) {
+    return label;
+  }
   if (loading.total > 1 && loading.current > 0) {
-    const label = STAGE_LABEL[loading.stage] ?? 'Loading';
     return `${label} (${loading.current} / ${loading.total})`;
   }
   return loading.message || 'Loading…';
