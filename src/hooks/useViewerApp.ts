@@ -176,7 +176,10 @@ export function useViewerApp() {
 
   const [showShortcuts, setShowShortcuts] = useState(false);
 
-  // Global shortcuts: Esc → import / close shortcuts, ⌘/Ctrl+O → open folder, ? → shortcuts
+  // Global shortcuts: Esc → close shortcuts modal only, ⌘/Ctrl+O → open
+  // folder, ? → toggle shortcuts.  Esc no longer navigates back to the import
+  // screen — that's now strictly a click on the "Back to import" button so a
+  // stray Esc can't dump the user out of a long-loaded volume.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
@@ -184,11 +187,7 @@ export function useViewerApp() {
       if (e.key === '?') {
         setShowShortcuts((v) => !v);
       } else if (e.key === 'Escape') {
-        setShowShortcuts((v) => {
-          if (v) return false;
-          navigate('/');
-          return false;
-        });
+        setShowShortcuts((v) => (v ? false : v));
       } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'o') {
         e.preventDefault();
         void openFolder();
@@ -196,7 +195,7 @@ export function useViewerApp() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [navigate, openFolder]);
+  }, [openFolder]);
 
   return {
     loadFromSource,

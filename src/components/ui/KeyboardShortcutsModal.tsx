@@ -16,10 +16,7 @@ interface ShortcutRow {
 const SECTIONS: Array<{ label: string; rows: ShortcutRow[] }> = [
   {
     label: 'File',
-    rows: [
-      { keys: ['⌘ / Ctrl', 'O'], action: 'Open folder' },
-      { keys: ['Esc'], action: 'Return to import screen' },
-    ],
+    rows: [{ keys: ['⌘ / Ctrl', 'O'], action: 'Open folder' }],
   },
   {
     label: 'Slices',

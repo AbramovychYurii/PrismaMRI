@@ -256,6 +256,7 @@ function ExpandedSlicePanel({
     setActivePlane(plane);
   }, [plane, setActivePlane]);
 
+  // Esc collapses the fullscreen panel back to the rail view.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();

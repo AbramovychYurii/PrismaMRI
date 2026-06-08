@@ -77,7 +77,10 @@ export function Stage() {
       {!hasVolume && <NoVolumePlaceholder>No volume loaded</NoVolumePlaceholder>}
       <ToolbarPill previewRef={previewRef} />
       <AnnotationHud />
-      <SessionPanel />
+      {/* Hide the AI Agent FAB in focus mode — it's part of the chrome the
+          user explicitly asked to mute.  Unmounting also collapses any
+          expanded panel state cleanly on re-entry. */}
+      {!focus && <SessionPanel />}
     </StageSection>
   );
 }
