@@ -152,9 +152,11 @@ test.describe('Dock panel', () => {
 
   // ── Back-to-import action ───────────────────────────────────────────────
 
-  test('pressing Escape from viewer returns to import screen', async ({ page }) => {
-    // The useViewerApp hook maps Escape to returning to import.
-    await page.keyboard.press('Escape');
+  test('"Back to import" button returns to import screen', async ({ page }) => {
+    // The button is rendered inside SessionCell in the dock (see
+    // src/components/dock/SessionCell.tsx).  The dock is open by default in
+    // the test fixture, so the button is reachable.
+    await page.getByRole('button', { name: /back to import/i }).click();
 
     // Import screen should reappear with the Examples heading.
     await expect(page.getByRole('heading', { name: /examples/i })).toBeVisible({ timeout: 5_000 });

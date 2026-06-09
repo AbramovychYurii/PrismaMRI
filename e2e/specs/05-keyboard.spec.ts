@@ -112,16 +112,24 @@ test.describe('Keyboard shortcuts', () => {
     });
   });
 
-  // ── Escape returns to import screen ────────────────────────────────────
+  // ── Escape does NOT return to import screen ────────────────────────────
+  //
+  // Esc used to be a hidden hotkey for "back to import" but the only escape
+  // from a loaded volume is now an explicit click on the SessionCell button.
+  // This guards against a regression where a stray Esc would dump the user
+  // out of a long-loaded study.
 
-  test('Escape from viewer (no modal open) returns to import screen', async ({ page }) => {
+  test('Escape from viewer (no modal open) keeps the user on the viewer', async ({ page }) => {
     await page.goto('/');
     await loadVolume(page);
 
     await page.keyboard.press('Escape');
 
-    // Import screen should now be visible.
-    await expect(page.getByRole('heading', { name: /examples/i })).toBeVisible({ timeout: 5_000 });
+    // Give any (incorrect) navigation a brief window to happen; viewer should
+    // still be mounted and the Examples heading should NOT appear.
+    await page.waitForTimeout(500);
+    await expect(page.getByTestId('stage-canvas')).toBeVisible();
+    await expect(page.getByRole('heading', { name: /examples/i })).toHaveCount(0);
   });
 
   // ── Ctrl+O ─────────────────────────────────────────────────────────────
