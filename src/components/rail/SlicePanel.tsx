@@ -310,11 +310,7 @@ function ExpandedSlicePanel({
       // First real movement — commit the start point now (using the original
       // pointerdown coordinates, not the slightly-displaced current ones) so
       // the line begins exactly where the user pressed.
-      beginDragMeasurement(
-        { clientX: d.startX, clientY: d.startY },
-        canvasRef.current,
-        drawFracs,
-      );
+      beginDragMeasurement({ clientX: d.startX, clientY: d.startY }, canvasRef.current, drawFracs);
       d.started = true;
     }
     updateDragMeasurement(e, canvasRef.current, drawFracs);

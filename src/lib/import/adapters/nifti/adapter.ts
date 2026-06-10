@@ -7,11 +7,7 @@ function isNiftiName(name: string): boolean {
   return name.endsWith('.nii') || name.endsWith('.nii.gz') || name.endsWith('.hdr');
 }
 
-function maybeGunzip(
-  buf: Uint8Array,
-  onProgress: ProgressFn,
-  fsize: number,
-): Uint8Array {
+function maybeGunzip(buf: Uint8Array, onProgress: ProgressFn, fsize: number): Uint8Array {
   if (buf.length > 2 && buf[0] === 0x1f && buf[1] === 0x8b) {
     return gunzipBytes(buf, (loaded, total) => {
       onProgress({ stage: 'reading-files', current: fsize + loaded, total: fsize + total });

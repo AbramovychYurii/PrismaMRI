@@ -65,12 +65,7 @@ const STAGE_LABEL: Record<string, string> = {
  * headers` keep their "(45 / 200)" counter because there it's a real slice
  * count.
  */
-const HIDE_COUNTER_STAGES = new Set([
-  'scanning',
-  'reading-files',
-  'assembling',
-  'preparing-3d',
-]);
+const HIDE_COUNTER_STAGES = new Set(['scanning', 'reading-files', 'assembling', 'preparing-3d']);
 
 function formatLoadingTitle(loading: {
   stage: string;

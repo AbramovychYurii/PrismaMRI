@@ -356,6 +356,8 @@ export const VolumeShader = {
     u_shading: { value: 0 },
     /** 0 = AO disabled (during interaction for perf), 1 = enabled (still frames). */
     u_aoEnabled: { value: 1 },
+    /** 0 = key-light shadows disabled, 1 = enabled. */
+    u_shadowEnabled: { value: 1 },
     /** Camera position in voxel space — updated every frame. */
     u_camVoxel: { value: new THREE.Vector3() },
     /** Camera forward direction in voxel space (normalised) — updated every frame.
@@ -396,6 +398,7 @@ export const VolumeShader = {
     uniform int       u_mode;
     uniform int       u_shading;
     uniform int       u_aoEnabled;
+    uniform int       u_shadowEnabled;
     uniform vec3      u_camVoxel;
     uniform vec3      u_rayDirVox;
     uniform int       u_planeMode;
@@ -450,6 +453,26 @@ export const VolumeShader = {
     // and reads as a subtle outline glow on overhanging features.
     // Cost: 1 dot + 1 add per shaded sample.
     const float RIM_GAIN       = 0.30;
+    // Directional volumetric shadows — secondary ray march from each shaded
+    // sample toward the key light, accumulating TF opacity.  Geometrically
+    // growing stride (×GROWTH per tap): near-field taps are dense so contact
+    // shadows stay crisp, far-field taps are sparse so distant occluders
+    // cast progressively softer shadows — the volumetric analogue of an
+    // area light, at SHADOW_TAPS fetches per shaded sample (~2× the AO disk;
+    // the priciest feature in the stack, hence the low-power gate set from
+    // volume-object.ts).
+    //
+    // Deliberately SHORT reach (~19 voxels): these are contact shadows for
+    // crevices, tooth gaps and overhangs — not global sun shadows.  A long
+    // march would let the whole body occlude the fixed key light and crush
+    // every camera-facing surface of the (semi-opaque) Tissue preset to its
+    // ambient floor; capping the reach keeps overall brightness while still
+    // grounding nearby geometry.
+    const int   SHADOW_TAPS     = 8;
+    const float SHADOW_OFFSET   = 3.0;  // voxels — skip the sample's own shell
+    const float SHADOW_GROWTH   = 1.30; // 8 taps ≈ 19-voxel reach
+    const float SHADOW_DENSITY  = 0.45; // per-tap opacity weight
+    const float SHADOW_STRENGTH = 0.55; // 0 = no shadows, 1 = full transmittance
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -517,6 +540,33 @@ export const VolumeShader = {
       float u = clamp((iBack  - u_clim.x) / span, 0.0, 1.0);
       float v = clamp((iFront - u_clim.x) / span, 0.0, 1.0);
       return texture(u_cmdataPre, vec2(u, v));
+    }
+
+    // Key-light transmittance at vox: 1.0 = fully lit, → 0.0 = occluded.
+    // Attenuates diffuse + specular only — ambient, rim and fresnel are
+    // environment terms and stay unshadowed, so occluded regions dim toward
+    // the "studio fill" level instead of crushing to black.
+    float shadowTransmittance(vec3 vox, vec3 L) {
+      float trans = 1.0;
+      float dist  = SHADOW_OFFSET;
+      for (int s = 0; s < SHADOW_TAPS; s++) {
+        vec3 p = vox + L * dist;
+        if (any(lessThan(p, vec3(0.0))) || any(greaterThan(p, u_size))) break;
+        // Clipped-away tissue must not cast shadows onto the cut face.
+        // An axis-aligned half-space is crossed at most once per straight
+        // ray, so once we enter the hidden half there are no occluders left.
+        if (u_clipMode == 1) {
+          float pA  = u_activePlane == 0 ? p.y : u_activePlane == 1 ? p.x : p.z;
+          float plA = u_activePlane == 0 ? u_planePos.y : u_activePlane == 1 ? u_planePos.x : u_planePos.z;
+          if (u_clipDir > 0.0 && pA > plA) break;
+          if (u_clipDir < 0.0 && pA < plA) break;
+        }
+        float a = sampleTF(sampleVol(p)).a;
+        trans *= 1.0 - a * SHADOW_DENSITY;
+        if (trans < 0.05) break;
+        dist *= SHADOW_GROWTH;
+      }
+      return mix(1.0, trans, SHADOW_STRENGTH);
     }
 
     // Clip-mode cut face: faint plane tint so the extent is always visible, then
@@ -730,12 +780,19 @@ export const VolumeShader = {
             // without leaving the far side in shadow.
             vec3 L = normalize(KEY + V * HEADLIGHT_BIAS);
 
+            // Directional volumetric shadow: occluders between this sample
+            // and the key light dim its diffuse + specular contribution.
+            // Start 2 voxels along N (out of the surface) so a grazing light
+            // angle doesn't immediately re-enter the sample's own surface
+            // shell and read as full self-shadow.
+            float shadow = u_shadowEnabled == 1 ? shadowTransmittance(vox + N * 2.0, L) : 1.0;
+
             // Wrap-around diffuse: smooth falloff across the terminator,
             // approximates the subsurface look real tissue has under light.
             float NdotL = dot(N, L);
-            float diff  = (max(NdotL, -WRAP) + WRAP) / (1.0 + WRAP);
+            float diff  = (max(NdotL, -WRAP) + WRAP) / (1.0 + WRAP) * shadow;
             vec3  R     = reflect(-L, N);
-            float spec  = pow(max(0.0, dot(R, V)), SHINE);
+            float spec  = pow(max(0.0, dot(R, V)), SHINE) * shadow;
 
             // ── Ambient occlusion (4-tap perpendicular disk) ─────────────────
             // Skip during interaction (u_aoEnabled = 0) to keep orbit smooth.

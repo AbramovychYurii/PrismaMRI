@@ -60,10 +60,13 @@ export function buildMaterial(
     /** 0 = no shading, 1 = Phong — on by default for DVR depth cues. */
     u_shading: { value: 1 },
     /** 0 = AO disabled, 1 = enabled.  Starts OFF on low-power devices
-     *  (old phones / budget laptops) — the 4-tap AO disk is the most
-     *  expensive single feature in the cinematic stack and would drop
-     *  these devices to single-digit fps. */
+     *  (old phones / budget laptops) — the 4-tap AO disk is one of the most
+     *  expensive features in the cinematic stack and would drop these
+     *  devices to single-digit fps. */
     u_aoEnabled: { value: isLowPower ? 0 : 1 },
+    /** 0 = key-light shadows disabled, 1 = enabled.  Same low-power gate as
+     *  AO: the 8-tap shadow march costs ~2× the AO disk per shaded sample. */
+    u_shadowEnabled: { value: isLowPower ? 0 : 1 },
     /** 0 = off, 1 = clip active plane (hide camera-side half). */
     u_clipMode: { value: 0 },
     /** +1 = clip the positive-axis side, -1 = clip the negative-axis side.
