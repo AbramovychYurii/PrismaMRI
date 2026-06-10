@@ -1,7 +1,8 @@
 import { useHover } from '@/hooks/useHover';
-import type { ThreePreview } from '@/lib/volume/three-preview';
+import { ThreePreview } from '@/lib/volume/three-preview';
+import { Loader } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
-import styled from 'styled-components';
+import styled, { keyframes } from 'styled-components';
 
 // ── Styled components ──────────────────────────────────────────────────────
 
@@ -43,6 +44,14 @@ const Dropdown = styled.div`
   min-width: 200px;
   z-index: var(--z-dock-ui);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.65);
+`;
+
+const spin = keyframes`
+  to { transform: rotate(360deg); }
+`;
+
+const SpinIcon = styled(Loader)`
+  animation: ${spin} 700ms linear infinite;
 `;
 
 const ItemBtn = styled.button<{ $hover: boolean }>`
@@ -98,6 +107,25 @@ function IconDownload() {
   );
 }
 
+function IconVideo() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width={14}
+      height={14}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="m22 8-6 4 6 4V8Z" />
+      <rect x={2} y={6} width={14} height={12} rx={2} ry={2} />
+    </svg>
+  );
+}
+
 // ── MenuItem ───────────────────────────────────────────────────────────────
 
 function MenuItem({
@@ -130,8 +158,13 @@ interface Props {
   previewRef: React.MutableRefObject<ThreePreview | null>;
 }
 
+/** Captured once: whether this browser can record the canvas to video at all. */
+const CAN_RECORD_VIDEO = ThreePreview.canRecordVideo();
+
 export function StageMenu({ previewRef }: Props) {
   const [open, setOpen] = useState(false);
+  // Recording progress 0..1 while a turntable video renders, else null.
+  const [recordPct, setRecordPct] = useState<number | null>(null);
   const { hover, onMouseEnter, onMouseLeave } = useHover();
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -157,34 +190,58 @@ export function StageMenu({ previewRef }: Props) {
     return () => document.removeEventListener('keydown', onKey);
   }, [open]);
 
+  function triggerDownload(blob: Blob, filename: string) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   function handleExport3D() {
     setOpen(false);
     previewRef.current
       ?.exportPNG()
-      .then((blob) => {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'prismamri-3d.png';
-        a.click();
-        URL.revokeObjectURL(url);
-      })
+      .then((blob) => triggerDownload(blob, 'prismamri-3d.png'))
       .catch(console.error);
   }
+
+  async function handleExportVideo() {
+    setOpen(false);
+    const preview = previewRef.current;
+    if (!preview || recordPct !== null) return;
+    setRecordPct(0);
+    try {
+      const { blob, ext } = await preview.exportRotationVideo({
+        onProgress: (t) => setRecordPct(t),
+      });
+      triggerDownload(blob, `prismamri-3d-spin.${ext}`);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setRecordPct(null);
+    }
+  }
+
+  const recording = recordPct !== null;
 
   return (
     <Wrap ref={wrapRef}>
       <TriggerBtn
         type="button"
-        aria-label="Stage options"
+        aria-label={
+          recording ? `Recording 3D spin — ${Math.round((recordPct ?? 0) * 100)}%` : 'Stage options'
+        }
         aria-expanded={open}
-        $on={open}
-        $hover={hover && !open}
+        disabled={recording}
+        $on={open || recording}
+        $hover={hover && !open && !recording}
         onClick={() => setOpen((v) => !v)}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
       >
-        <IconMoreHorizontal />
+        {recording ? <SpinIcon size={20} /> : <IconMoreHorizontal />}
       </TriggerBtn>
 
       {open && (
@@ -194,6 +251,13 @@ export function StageMenu({ previewRef }: Props) {
             label="Export 3D view as PNG"
             onClick={handleExport3D}
           />
+          {CAN_RECORD_VIDEO && (
+            <MenuItem
+              icon={<IconVideo />}
+              label="Export 3D spin as video"
+              onClick={handleExportVideo}
+            />
+          )}
         </Dropdown>
       )}
     </Wrap>

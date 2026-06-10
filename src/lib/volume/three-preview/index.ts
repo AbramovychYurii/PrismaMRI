@@ -30,6 +30,17 @@ import type { TrackballControls } from 'three/examples/jsm/controls/TrackballCon
  *  Low-power devices fall back to 256 to keep frame times reasonable. */
 const RAY_STEPS = isLowPower ? 256 : 384;
 
+/**
+ * Pick the best supported container/codec for MediaRecorder canvas capture.
+ * VP9 → VP8 → generic WebM cover Chrome/Firefox; MP4 (H.264) is the Safari
+ * fallback. Returns null when the browser can't record video at all.
+ */
+function pickVideoMime(): string | null {
+  if (typeof MediaRecorder === 'undefined') return null;
+  const candidates = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
+  return candidates.find((c) => MediaRecorder.isTypeSupported(c)) ?? null;
+}
+
 export class ThreePreview {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
@@ -48,6 +59,9 @@ export class ThreePreview {
   private raf = 0;
   private disposed = false;
   private dirty = true;
+  /** True while a turntable video is being recorded — the main render loop
+   *  yields so it can't overwrite the camera the recording is animating. */
+  private _recording = false;
   /** Timestamp of the last renderer.render() call — used to keep the GPU warm. */
   private lastRenderAt = 0;
   /** Interval between keepalive renders when the scene is otherwise idle (ms). */
@@ -387,6 +401,12 @@ export class ThreePreview {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.loop);
 
+    // While recording a turntable video, exportRotationVideo drives the
+    // camera + render itself. Skip the loop's own controls.update()/render so
+    // it can't fight the animation (controls.update() rewrites camera.position
+    // from its internal _eye every frame).
+    if (this._recording) return;
+
     // ── Snap animation ───────────────────────────────────────────────────────
     if (this._snapActive) {
       // Latch start timestamp on the first frame of this animation.
@@ -552,6 +572,104 @@ export class ThreePreview {
         'image/png',
       );
     });
+  }
+
+  /** True if this browser can record the canvas to a video file at all. */
+  static canRecordVideo(): boolean {
+    return (
+      typeof MediaRecorder !== 'undefined' &&
+      typeof HTMLCanvasElement.prototype.captureStream === 'function' &&
+      pickVideoMime() !== null
+    );
+  }
+
+  /**
+   * Record a smooth 360° turntable of the current 3-D view to a video Blob.
+   *
+   * Captures the live canvas via MediaRecorder while the camera orbits the
+   * volume around the world-vertical (Z) axis through the orbit target. The
+   * camera's current zoom, tilt and distance are preserved — only the azimuth
+   * sweeps a full turn — so the export matches whatever framing the user set
+   * up. The render happens on the visible canvas, so the user sees the spin as
+   * it records (which doubles as a progress indicator).
+   *
+   * MediaRecorder samples the canvas at `fps`; we render on every animation
+   * frame, so playback is as smooth as the device can render. Returns the
+   * encoded Blob (WebM where supported, MP4 on Safari) plus its file extension.
+   */
+  async exportRotationVideo(
+    opts: { durationMs?: number; fps?: number; onProgress?: (t: number) => void } = {},
+  ): Promise<{ blob: Blob; ext: string }> {
+    if (this._recording) throw new Error('A recording is already in progress');
+    if (!this.volume || !this.controls) throw new Error('No volume loaded');
+    const mime = pickVideoMime();
+    if (typeof MediaRecorder === 'undefined' || mime === null) {
+      throw new Error('This browser cannot record video (MediaRecorder unsupported)');
+    }
+
+    const { durationMs = 5000, fps = 30, onProgress } = opts;
+
+    // Save camera + control state so the view is exactly restored afterwards.
+    const savedPos = this.camera.position.clone();
+    const savedUp = this.camera.up.clone();
+    const controlsWasEnabled = this.controls.enabled;
+    this.controls.enabled = false;
+    this._recording = true;
+
+    // Turntable axis = world vertical (Z, the anatomical head–foot axis in this
+    // scene), passing through the orbit target. Orbit the saved camera offset
+    // around it so zoom/tilt/distance are all preserved.
+    const target = this.controls.target.clone();
+    const offset0 = savedPos.clone().sub(target);
+    const axis = new THREE.Vector3(0, 0, 1);
+    const rotated = new THREE.Vector3();
+
+    const stream = this.canvas.captureStream(fps);
+    const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8_000_000 });
+    const chunks: Blob[] = [];
+    recorder.ondataavailable = (e) => {
+      if (e.data.size > 0) chunks.push(e.data);
+    };
+    const finished = new Promise<Blob>((resolve) => {
+      recorder.onstop = () => resolve(new Blob(chunks, { type: mime }));
+    });
+
+    recorder.start();
+    try {
+      const start = performance.now();
+      await new Promise<void>((resolve) => {
+        const step = (now: number): void => {
+          if (this.disposed) {
+            resolve();
+            return;
+          }
+          const t = Math.min(1, (now - start) / durationMs);
+          rotated.copy(offset0).applyAxisAngle(axis, t * Math.PI * 2);
+          this.camera.position.copy(target).add(rotated);
+          this.camera.up.set(0, 0, 1);
+          this.camera.lookAt(target);
+          this.updateCameraUniform();
+          this.renderer.render(this.scene, this.camera);
+          onProgress?.(t);
+          if (t < 1) requestAnimationFrame(step);
+          else resolve();
+        };
+        requestAnimationFrame(step);
+      });
+    } finally {
+      recorder.stop();
+      // Restore the camera and hand control back to the trackball.
+      this.camera.position.copy(savedPos);
+      this.camera.up.copy(savedUp);
+      this.camera.lookAt(target);
+      this.controls.enabled = controlsWasEnabled;
+      this.controls.update();
+      this._recording = false;
+      this.dirty = true;
+    }
+
+    const blob = await finished;
+    return { blob, ext: mime.includes('mp4') ? 'mp4' : 'webm' };
   }
 
   dispose(): void {
