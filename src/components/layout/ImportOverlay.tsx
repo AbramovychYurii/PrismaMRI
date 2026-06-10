@@ -13,7 +13,7 @@ import { useViewerActions } from '@/hooks';
 import { type FsEntry, collectFilesFromEntry } from '@/lib/import/scan-folder';
 import { useVolumeStore } from '@/store';
 import { FolderOpen } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ButtonsRow,
   ContentWrap,
@@ -97,6 +97,19 @@ export function ImportOverlay() {
   const error = useVolumeStore((s) => s.error);
   const loading = useVolumeStore((s) => s.loading);
   const { openFiles, openFolder, openFile, cancelLoad } = useViewerActions();
+
+  // Esc cancels an in-progress load — mirrors the Cancel button.  Scoped to
+  // while a load is active so it can't fire otherwise; the global Esc handler
+  // (useViewerApp) deliberately never cancels an already-loaded volume, so
+  // there's no conflict with this in-flight-only cancellation.
+  useEffect(() => {
+    if (!loading.active) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') cancelLoad();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [loading.active, cancelLoad]);
 
   async function handleDrop(e: React.DragEvent) {
     e.preventDefault();
