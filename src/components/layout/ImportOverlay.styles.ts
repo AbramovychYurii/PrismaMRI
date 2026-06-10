@@ -45,8 +45,6 @@ export const TwoColGrid = styled.div`
 `;
 
 export const LeftCol = styled.div`
-  padding-left: 40px;
-
   @media (max-width: 767px) {
     border-left: none;
     padding-left: 0;
