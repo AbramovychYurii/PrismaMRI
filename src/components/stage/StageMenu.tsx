@@ -1,6 +1,6 @@
 import { useHover } from '@/hooks/useHover';
 import { ThreePreview } from '@/lib/volume/three-preview';
-import { Loader } from 'lucide-react';
+import { Loader, Share2 } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 
@@ -52,6 +52,12 @@ const spin = keyframes`
 
 const SpinIcon = styled(Loader)`
   animation: ${spin} 700ms linear infinite;
+`;
+
+const Divider = styled.div`
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--rule);
 `;
 
 const ItemBtn = styled.button<{ $hover: boolean }>`
@@ -161,6 +167,26 @@ interface Props {
 /** Captured once: whether this browser can record the canvas to video at all. */
 const CAN_RECORD_VIDEO = ThreePreview.canRecordVideo();
 
+/** Real video extension on this browser ('webm', or 'mp4' on Safari) — shown
+ *  in the export/share labels so the format matches what the user receives. */
+const VIDEO_EXT = ThreePreview.videoFileExt() ?? 'webm';
+
+/**
+ * Captured once: whether the Web Share API can share files here. True mostly on
+ * mobile (iOS/Android) and a few desktop browsers; false on most desktops, so
+ * the share items stay hidden there instead of dead-ending. Probed with a tiny
+ * real file because `canShare({ files })` is content-aware.
+ */
+const CAN_SHARE_FILES = (() => {
+  try {
+    if (typeof navigator === 'undefined' || typeof navigator.canShare !== 'function') return false;
+    const probe = new File([new Uint8Array([0])], 'probe.png', { type: 'image/png' });
+    return navigator.canShare({ files: [probe] });
+  } catch {
+    return false;
+  }
+})();
+
 export function StageMenu({ previewRef }: Props) {
   const [open, setOpen] = useState(false);
   // Recording progress 0..1 while a turntable video renders, else null.
@@ -224,6 +250,52 @@ export function StageMenu({ previewRef }: Props) {
     }
   }
 
+  /**
+   * Share a file via the Web Share API, falling back to a plain download.
+   * The fallback also covers the case where the OS share sheet rejects after a
+   * long async encode (the page's transient activation can expire) — the user
+   * still gets the file rather than nothing. A user-cancelled share (AbortError)
+   * is silent and does NOT fall back.
+   */
+  async function shareOrDownload(blob: Blob, filename: string, title: string) {
+    const file = new File([blob], filename, { type: blob.type });
+    if (navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title });
+        return;
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') return;
+        // Activation lost / share unavailable — fall through to download.
+      }
+    }
+    triggerDownload(blob, filename);
+  }
+
+  function handleShare3D() {
+    setOpen(false);
+    previewRef.current
+      ?.exportPNG()
+      .then((blob) => shareOrDownload(blob, 'prismamri-3d.png', 'PrismaMRI — 3D view'))
+      .catch(console.error);
+  }
+
+  async function handleShareVideo() {
+    setOpen(false);
+    const preview = previewRef.current;
+    if (!preview || recordPct !== null) return;
+    setRecordPct(0);
+    try {
+      const { blob, ext } = await preview.exportRotationVideo({
+        onProgress: (t) => setRecordPct(t),
+      });
+      await shareOrDownload(blob, `prismamri-3d-spin.${ext}`, 'PrismaMRI — 3D spin');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setRecordPct(null);
+    }
+  }
+
   const recording = recordPct !== null;
 
   return (
@@ -248,15 +320,32 @@ export function StageMenu({ previewRef }: Props) {
         <Dropdown>
           <MenuItem
             icon={<IconDownload />}
-            label="Export 3D view as PNG"
+            label="Export 3D view (.png)"
             onClick={handleExport3D}
           />
           {CAN_RECORD_VIDEO && (
             <MenuItem
               icon={<IconVideo />}
-              label="Export 3D spin as video"
+              label={`Export 3D spin (.${VIDEO_EXT})`}
               onClick={handleExportVideo}
             />
+          )}
+          {CAN_SHARE_FILES && (
+            <>
+              <Divider aria-hidden />
+              <MenuItem
+                icon={<Share2 size={14} />}
+                label="Share 3D view (.png)"
+                onClick={handleShare3D}
+              />
+              {CAN_RECORD_VIDEO && (
+                <MenuItem
+                  icon={<Share2 size={14} />}
+                  label={`Share 3D spin (.${VIDEO_EXT})`}
+                  onClick={handleShareVideo}
+                />
+              )}
+            </>
           )}
         </Dropdown>
       )}

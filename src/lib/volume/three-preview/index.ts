@@ -583,6 +583,15 @@ export class ThreePreview {
     );
   }
 
+  /** Extension of the recorded video on this browser: 'webm', 'mp4' (Safari),
+   *  or null if recording is unsupported. Used to label export/share actions
+   *  with the real format the user will get. */
+  static videoFileExt(): string | null {
+    const mime = pickVideoMime();
+    if (mime === null) return null;
+    return mime.includes('mp4') ? 'mp4' : 'webm';
+  }
+
   /**
    * Record a smooth 360° turntable of the current 3-D view to a video Blob.
    *
