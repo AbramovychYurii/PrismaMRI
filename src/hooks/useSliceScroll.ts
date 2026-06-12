@@ -76,6 +76,38 @@ export function useSliceScroll(plane: SlicePlane) {
   );
 }
 
+/** Number keys → which plane they focus.  Order matches the panel stack
+ *  (coronal / sagittal / axial, top to bottom). */
+const PLANE_FOCUS_KEYS: Record<string, SlicePlane> = {
+  '1': 'coronal',
+  '2': 'sagittal',
+  '3': 'axial',
+};
+
+/**
+ * Global 1 / 2 / 3 keys: focus the coronal / sagittal / axial plane.
+ * Focusing a plane is what arrow stepping and the crosshair act on, so this is
+ * a fast keyboard alternative to clicking a panel.  Modifier combos (⌘1 etc.,
+ * which switch browser tabs) and typing in inputs are ignored.
+ */
+export function usePlaneFocusKeys(): void {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      const plane = PLANE_FOCUS_KEYS[e.key];
+      if (!plane) return;
+      const { volume, setActivePlane } = useVolumeStore.getState();
+      if (!volume) return;
+      e.preventDefault();
+      setActivePlane(plane);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+}
+
 /** Global ↑/↓ stepping of the active plane by ±1 slice. */
 export function useActivePlaneKeys(): void {
   const activePlane = useVolumeStore((s) => s.activePlane);

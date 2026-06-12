@@ -95,6 +95,9 @@ export function NavigationCell() {
         <TipRow>
           <TipKey>↑ ↓</TipKey> step the active plane by 1 slice.
         </TipRow>
+        <TipRow>
+          <TipKey>1 2 3</TipKey> focus coronal · sagittal · axial.
+        </TipRow>
       </TipsSection>
     </>
   );

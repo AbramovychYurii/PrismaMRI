@@ -1,4 +1,4 @@
-import { useActivePlaneKeys } from '@/hooks/useSliceScroll';
+import { useActivePlaneKeys, usePlaneFocusKeys } from '@/hooks/useSliceScroll';
 import { useWindowLevel } from '@/hooks/useWindowLevel';
 import { fetchBlobWithProgress } from '@/lib/fetch-with-progress';
 import { fromDirectoryHandle, fromFileList } from '@/lib/import/scan-folder';
@@ -27,6 +27,7 @@ export function useViewerApp() {
 
   useWindowLevel();
   useActivePlaneKeys();
+  usePlaneFocusKeys();
 
   const abortRef = useRef<AbortController | null>(null);
 

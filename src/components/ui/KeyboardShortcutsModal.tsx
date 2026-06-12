@@ -31,6 +31,7 @@ const SECTIONS: Array<{ label: string; rows: ShortcutRow[] }> = [
     label: '2D Panels',
     rows: [
       { keys: ['Click'], action: 'Activate plane / move crosshair' },
+      { keys: ['1 / 2 / 3'], action: 'Focus coronal / sagittal / axial' },
       { keys: ['Shift', 'Drag'], action: 'Measure distance (fullscreen)' },
       { keys: ['Right-click'], altKeys: ['Long press'], action: 'Open measure menu' },
     ],
