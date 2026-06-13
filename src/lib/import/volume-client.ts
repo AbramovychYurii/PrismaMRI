@@ -1,4 +1,4 @@
-import type { ImportSource } from '@/lib/import/types';
+import type { ImportSource, SeriesChoice } from '@/lib/import/types';
 import type { ImportProgress, LoadedVolume, PreparedVolumeFor3D, VolumeHistogram } from '@/types';
 import type { WorkerResponse } from '@/workers/volume/types';
 
@@ -9,15 +9,27 @@ export interface LoadResult {
 }
 
 /**
+ * Either the loaded volume, or a list of series the source contains — in which
+ * case the caller picks one and re-runs the load with its `seriesKey`.
+ */
+export type LoadWorkerResult =
+  | { kind: 'volume'; result: LoadResult }
+  | { kind: 'series-choice'; series: SeriesChoice[] };
+
+/**
  * Run a folder/file selection through the volume worker. Heavy parsing and
  * Uint8 quantization happen off the main thread; buffers come back as
  * Transferables (zero-copy).
+ *
+ * A multi-series source resolves to `{ kind: 'series-choice' }` instead of a
+ * volume; re-call with `seriesKey` set to the chosen series to assemble it.
  */
 export function loadVolumeInWorker(
   source: ImportSource,
   onProgress: (p: ImportProgress, percent: number) => void,
   signal?: AbortSignal,
-): Promise<LoadResult> {
+  seriesKey?: string,
+): Promise<LoadWorkerResult> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
       reject(new DOMException('Load cancelled.', 'AbortError'));
@@ -48,6 +60,12 @@ export function loadVolumeInWorker(
         reject(new Error(msg.message));
         return;
       }
+      if (msg.type === 'series') {
+        cleanup();
+        worker.terminate();
+        resolve({ kind: 'series-choice', series: msg.series });
+        return;
+      }
       // done
       const volume: LoadedVolume = {
         voxels: msg.voxelKind === 'i16' ? new Int16Array(msg.voxels) : new Float32Array(msg.voxels),
@@ -74,7 +92,7 @@ export function loadVolumeInWorker(
       };
       cleanup();
       worker.terminate();
-      resolve({ volume, prepared3D, histogram });
+      resolve({ kind: 'volume', result: { volume, prepared3D, histogram } });
     };
 
     worker.onerror = (e) => {
@@ -83,9 +101,10 @@ export function loadVolumeInWorker(
       reject(new Error(e.message || 'Volume worker crashed.'));
     };
 
-    worker.postMessage({ type: 'load', source } satisfies {
+    worker.postMessage({ type: 'load', source, seriesKey } satisfies {
       type: 'load';
       source: ImportSource;
+      seriesKey?: string;
     });
   });
 }

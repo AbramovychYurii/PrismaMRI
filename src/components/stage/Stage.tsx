@@ -1,5 +1,6 @@
 import { AnnotationHud } from '@/components/mcp/AnnotationHud';
 import { SessionPanel } from '@/components/mcp/SessionPanel';
+import { StageSeriesSelect } from '@/components/stage/StageSeriesSelect';
 import { ToolbarPill } from '@/components/stage/ToolbarPill';
 import { useThreePreview } from '@/hooks';
 import { useVolumeStore } from '@/store';
@@ -75,6 +76,7 @@ export function Stage() {
     <StageSection $focus={focus} data-testid="stage-section">
       <StageCanvas ref={canvasRef} data-testid="stage-canvas" />
       {!hasVolume && <NoVolumePlaceholder>No volume loaded</NoVolumePlaceholder>}
+      <StageSeriesSelect />
       <ToolbarPill previewRef={previewRef} />
       <AnnotationHud />
       {/* Hide the AI Agent FAB in focus mode — it's part of the chrome the

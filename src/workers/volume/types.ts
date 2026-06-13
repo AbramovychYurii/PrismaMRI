@@ -1,4 +1,4 @@
-import type { ImportSource } from '@/lib/import/types';
+import type { ImportSource, SeriesChoice } from '@/lib/import/types';
 import type {
   ImportProgress,
   LoadedVolume,
@@ -10,6 +10,8 @@ import type {
 export interface WorkerLoadRequest {
   type: 'load';
   source: ImportSource;
+  /** When set, assemble only this series (from a prior series-choice). */
+  seriesKey?: string;
 }
 
 export type WorkerRequest = WorkerLoadRequest;
@@ -52,4 +54,10 @@ export interface WorkerErrorMsg {
   message: string;
 }
 
-export type WorkerResponse = WorkerProgressMsg | WorkerDoneMsg | WorkerErrorMsg;
+/** Source holds multiple series; the UI must pick one and re-issue `load`. */
+export interface WorkerSeriesMsg {
+  type: 'series';
+  series: SeriesChoice[];
+}
+
+export type WorkerResponse = WorkerProgressMsg | WorkerDoneMsg | WorkerErrorMsg | WorkerSeriesMsg;

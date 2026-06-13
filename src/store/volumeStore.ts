@@ -1,5 +1,6 @@
 import { isSlicePlane } from '@/constants';
 import * as annotationsStorage from '@/lib/annotationsStorage';
+import type { ImportSource, SeriesChoice } from '@/lib/import/types';
 import type { ThreePreview } from '@/lib/volume/three-preview';
 import { deriveVolumeId } from '@/lib/volumeId';
 import type {
@@ -60,6 +61,15 @@ interface VolumeState {
   canvasRefs: Record<SlicePlane, HTMLCanvasElement | null>;
   /** Live 3-D preview instance, registered by useThreePreview (for capture + markers). */
   previewInstance: ThreePreview | null;
+  /**
+   * Multi-series import context — retained so the stage series-switcher can
+   * re-assemble a different series without re-importing. Session-only (holds
+   * File objects; never persisted). Null unless the active volume came from a
+   * multi-series source in this session.
+   */
+  seriesSource: ImportSource | null;
+  seriesList: SeriesChoice[] | null;
+  activeSeriesKey: string | null;
 }
 
 interface VolumeActions {
@@ -103,6 +113,10 @@ interface VolumeActions {
   setAgentSessionActive: (v: boolean) => void;
   setCanvasRef: (plane: SlicePlane, canvas: HTMLCanvasElement | null) => void;
   setPreviewInstance: (p: ThreePreview | null) => void;
+  /** Retain the source + series list so the stage can switch series in place. */
+  setSeriesContext: (source: ImportSource, list: SeriesChoice[], activeKey: string | null) => void;
+  /** Drop the series context (single-series / non-DICOM load). */
+  clearSeriesContext: () => void;
   reset: () => void;
 }
 
@@ -148,6 +162,9 @@ const initialState: VolumeState = {
   agentSessionActive: false,
   canvasRefs: { coronal: null, sagittal: null, axial: null },
   previewInstance: null,
+  seriesSource: null,
+  seriesList: null,
+  activeSeriesKey: null,
 };
 
 export const useVolumeStore = create<VolumeState & VolumeActions>()(
@@ -381,6 +398,11 @@ export const useVolumeStore = create<VolumeState & VolumeActions>()(
         set((state) => ({ canvasRefs: { ...state.canvasRefs, [plane]: canvas } })),
 
       setPreviewInstance: (previewInstance) => set({ previewInstance }),
+
+      setSeriesContext: (seriesSource, seriesList, activeSeriesKey) =>
+        set({ seriesSource, seriesList, activeSeriesKey }),
+      clearSeriesContext: () =>
+        set({ seriesSource: null, seriesList: null, activeSeriesKey: null }),
 
       reset: () => set(initialState),
     }),

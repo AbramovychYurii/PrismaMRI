@@ -2,7 +2,7 @@ import { useActivePlaneKeys, usePlaneFocusKeys } from '@/hooks/useSliceScroll';
 import { useWindowLevel } from '@/hooks/useWindowLevel';
 import { fetchBlobWithProgress } from '@/lib/fetch-with-progress';
 import { fromDirectoryHandle, fromFileList } from '@/lib/import/scan-folder';
-import type { ImportSource } from '@/lib/import/types';
+import type { ImportSource, SeriesChoice } from '@/lib/import/types';
 import { loadVolumeInWorker } from '@/lib/import/volume-client';
 import * as volumeDb from '@/lib/volumeDb';
 import { useVolumeStore } from '@/store';
@@ -23,6 +23,8 @@ export function useViewerApp() {
   const setLoading = useVolumeStore((s) => s.setLoading);
   const setError = useVolumeStore((s) => s.setError);
   const setVolume = useVolumeStore((s) => s.setVolume);
+  const setSeriesContext = useVolumeStore((s) => s.setSeriesContext);
+  const clearSeriesContext = useVolumeStore((s) => s.clearSeriesContext);
   const navigate = useNavigate();
 
   useWindowLevel();
@@ -31,8 +33,19 @@ export function useViewerApp() {
 
   const abortRef = useRef<AbortController | null>(null);
 
+  // Pending multi-series picker: the list shown to the user, plus the resolver
+  // that the picker UI calls with the chosen series key (or null to cancel).
+  const [pendingSeries, setPendingSeries] = useState<SeriesChoice[] | null>(null);
+  const seriesResolveRef = useRef<((key: string | null) => void) | null>(null);
+
   const loadFromSource = useCallback(
-    async (source: ImportSource) => {
+    async (
+      source: ImportSource,
+      seriesKey?: string,
+      // Threaded through the picker round-trip so the stage switcher can offer
+      // the other series after the chosen one loads.
+      seriesList?: SeriesChoice[],
+    ): Promise<void> => {
       // Cancel any in-progress load before starting a new one.
       abortRef.current?.abort();
       const controller = new AbortController();
@@ -46,7 +59,7 @@ export function useViewerApp() {
         message: 'Reading…',
       });
       try {
-        const { volume, prepared3D, histogram } = await loadVolumeInWorker(
+        const out = await loadVolumeInWorker(
           source,
           (p, percent) => {
             setLoading({
@@ -59,7 +72,26 @@ export function useViewerApp() {
             });
           },
           controller.signal,
+          seriesKey,
         );
+
+        // Multi-series source: pause and let the user choose, then re-load the
+        // same source restricted to the chosen series.
+        if (out.kind === 'series-choice') {
+          abortRef.current = null;
+          setLoading({ active: false, percent: 0, stage: 'idle', message: '' });
+          const chosen = await new Promise<string | null>((resolve) => {
+            seriesResolveRef.current = resolve;
+            setPendingSeries(out.series);
+          });
+          seriesResolveRef.current = null;
+          setPendingSeries(null);
+          if (chosen === null) return; // cancelled
+          await loadFromSource(source, chosen, out.series);
+          return;
+        }
+
+        const { volume, prepared3D, histogram } = out.result;
         // Commit setVolume + the route change synchronously so ImportOverlay
         // starts unmounting before any further work. We deliberately do NOT
         // clear loading.active here: the route swap doesn't guarantee the
@@ -72,6 +104,13 @@ export function useViewerApp() {
           setVolume(volume, prepared3D, histogram);
           navigate('/viewer');
         });
+        // Retain the series context so the stage switcher can re-assemble a
+        // different series in place; drop it for single-series / non-DICOM.
+        if (seriesList && seriesList.length > 1) {
+          setSeriesContext(source, seriesList, seriesKey ?? null);
+        } else {
+          clearSeriesContext();
+        }
         // Save to IndexedDB in the background — don't block the UI.
         volumeDb.saveVolume(volume, prepared3D, histogram).catch(() => {
           // Non-critical: storage might be full or unavailable.
@@ -85,13 +124,36 @@ export function useViewerApp() {
         setError(message);
         setLoading({ active: false, percent: 0, stage: 'error', message });
       } finally {
-        abortRef.current = null;
+        if (abortRef.current === controller) abortRef.current = null;
       }
     },
-    [setError, setLoading, setVolume, navigate],
+    [setError, setLoading, setVolume, setSeriesContext, clearSeriesContext, navigate],
+  );
+
+  /** Resolve the open series picker with a chosen key, or null to cancel. */
+  const resolveSeriesChoice = useCallback((key: string | null) => {
+    seriesResolveRef.current?.(key);
+  }, []);
+
+  /**
+   * Switch the displayed series in place (stage series-switcher). Re-assembles
+   * the chosen series from the retained source; no-op if it's already active.
+   */
+  const switchSeries = useCallback(
+    (key: string) => {
+      const { seriesSource, seriesList, activeSeriesKey } = useVolumeStore.getState();
+      if (!seriesSource || !seriesList || key === activeSeriesKey) return;
+      void loadFromSource(seriesSource, key, seriesList);
+    },
+    [loadFromSource],
   );
 
   const cancelLoad = useCallback(() => {
+    // If the series picker is open, cancel that; otherwise abort the worker.
+    if (seriesResolveRef.current) {
+      seriesResolveRef.current(null);
+      return;
+    }
     abortRef.current?.abort();
     abortRef.current = null;
   }, []);
@@ -205,6 +267,9 @@ export function useViewerApp() {
     openFile,
     loadFromUrl,
     cancelLoad,
+    pendingSeries,
+    resolveSeriesChoice,
+    switchSeries,
     showShortcuts,
     setShowShortcuts,
   };

@@ -27,7 +27,12 @@ ctx.onmessage = async (e: MessageEvent<WorkerRequest>) => {
   };
 
   try {
-    const volume = await loadVolumeFromSource(req.source, emit);
+    const outcome = await loadVolumeFromSource(req.source, emit, req.seriesKey);
+    if (outcome.kind === 'series-choice') {
+      post({ type: 'series', series: outcome.series });
+      return;
+    }
+    const volume = outcome.volume;
 
     // Preparing-3D budget split: histogram ≈ 40%, Uint8 quantisation ≈ 60%.
     // Each sub-step emits chunked progress so the stage drains smoothly from

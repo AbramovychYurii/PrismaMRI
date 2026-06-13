@@ -1,7 +1,16 @@
 import { importFormatAdapters } from '@/lib/import/adapters';
-import type { ImportFile, ImportSource, ProgressFn } from '@/lib/import/types';
+import type { ImportFile, ImportSource, ProgressFn, SeriesChoice } from '@/lib/import/types';
 import type { LoadedVolume } from '@/types';
 import { unzipSync } from 'fflate';
+
+/**
+ * Result of {@link loadVolumeFromSource}: either the parsed volume, or — when
+ * the source holds several series and the caller has not picked one — the list
+ * of choices to present, after which the caller re-runs with a `seriesKey`.
+ */
+export type LoadOutcome =
+  | { kind: 'volume'; volume: LoadedVolume }
+  | { kind: 'series-choice'; series: SeriesChoice[] };
 
 async function expandZips(source: ImportSource, onProgress: ProgressFn): Promise<ImportSource> {
   const zips = source.files.filter((f) => f.name.endsWith('.zip'));
@@ -28,7 +37,8 @@ async function expandZips(source: ImportSource, onProgress: ProgressFn): Promise
 export async function loadVolumeFromSource(
   rawSource: ImportSource,
   onProgress: ProgressFn,
-): Promise<LoadedVolume> {
+  seriesKey?: string,
+): Promise<LoadOutcome> {
   onProgress({ stage: 'scanning', current: 0, total: 0, message: 'Detecting format…' });
   const source = await expandZips(rawSource, onProgress);
 
@@ -46,8 +56,19 @@ export async function loadVolumeFromSource(
       'Unrecognized format. Supported: DICOM series, NIfTI (.nii/.nii.gz), NRRD, MHA/MHD.',
     );
   }
+
+  // Multi-series sources (DICOM): if the caller hasn't picked one yet, enumerate
+  // from headers and hand the choices back. Single-series falls straight
+  // through, so the common case keeps its single pass.
+  if (!seriesKey && adapter.listSeries) {
+    const series = await adapter.listSeries(source);
+    if (series.length > 1) {
+      return { kind: 'series-choice', series };
+    }
+  }
+
   onProgress({ stage: 'parsing-headers', message: `Reading ${adapter.label}…` });
-  const volume = await adapter.parse(source, onProgress);
+  const volume = await adapter.parse(source, onProgress, seriesKey);
   onProgress({ stage: 'done', message: 'Volume ready', current: 1, total: 1 });
-  return volume;
+  return { kind: 'volume', volume };
 }

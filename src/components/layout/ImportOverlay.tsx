@@ -7,6 +7,7 @@
  * All visual styling lives in `ImportOverlay.styles.ts`.
  */
 
+import { SeriesPickerModal } from '@/components/import/SeriesPickerModal';
 import { ExamplesSection } from '@/components/layout/ExamplesSection';
 import { APP_NAME } from '@/constants';
 import { useViewerActions } from '@/hooks';
@@ -96,7 +97,8 @@ export function ImportOverlay() {
   const [hover, setHover] = useState(false);
   const error = useVolumeStore((s) => s.error);
   const loading = useVolumeStore((s) => s.loading);
-  const { openFiles, openFolder, openFile, cancelLoad } = useViewerActions();
+  const { openFiles, openFolder, openFile, cancelLoad, pendingSeries, resolveSeriesChoice } =
+    useViewerActions();
 
   // Esc cancels an in-progress load — mirrors the Cancel button.  Scoped to
   // while a load is active so it can't fire otherwise; the global Esc handler
@@ -239,6 +241,14 @@ export function ImportOverlay() {
 
         <ExamplesSection />
       </ContentWrap>
+
+      {pendingSeries && (
+        <SeriesPickerModal
+          series={pendingSeries}
+          onSelect={(key) => resolveSeriesChoice(key)}
+          onCancel={() => resolveSeriesChoice(null)}
+        />
+      )}
     </ImportMain>
   );
 }
