@@ -334,8 +334,255 @@ export function buildPreIntegratedTF(preset: RenderPreset): THREE.DataTexture {
 }
 
 // ── GLSL ───────────────────────────────────────────────────────────────────
+//
+// The fragment shader is the densest, most regression-prone code in the
+// project — DVR front-to-back compositing, the pre-integrated 2-D TF,
+// empty-space skipping, and the cinematic lighting/AO/shadow stack, all in one
+// pass.  Rather than a single ~480-line string it is assembled from the named
+// GLSL fragments below, interpolated into `fragmentShader` in declaration
+// order (GLSL requires definitions before use):
+//
+//   FRAG_CONSTANTS → FRAG_HELPERS → FRAG_SHADE → (main, inline)
+//
+// GLSL ignores whitespace between fragments, so the assembled source is
+// behaviourally identical to the previous monolithic literal — splitting it is
+// purely for readability and isolated review.
+
+/**
+ * Cinematic-light shading tunables.  Each constant trades a specific bit of
+ * the "studio VRT" look against fill-rate; see the inline notes for why each
+ * value was chosen.  Shared by `shadeCinematic` and the shadow march.
+ */
+const FRAG_CONSTANTS = /* glsl */ `
+  // KEY: fixed "studio key light" direction in voxel space (up + right + front).
+  // Per-fragment we mix in a headlight bias toward the view vector so the far
+  // side of the volume is never pitch-black — a softer "studio" look than the
+  // harsh single-sun feel of a fixed Lambertian light.
+  const vec3  KEY            = vec3(0.2673, 0.5345, 0.8018);
+  const float HEADLIGHT_BIAS = 0.45;
+  // Wrap-around lighting: instead of clipping at N·L < 0, falloff is smooth
+  // across the terminator — approximates subsurface scattering for tissue.
+  const float WRAP           = 0.40;
+  const float KA             = 0.22;
+  const float KD             = 0.78;
+  const float KS             = 0.22;
+  const float SHINE          = 32.0;
+  // Pre-tonemap exposure boost — globally brightens colour before ACES
+  // compresses it; compensates for pre-integrated TF + AO darkening.
+  const float EXPOSURE       = 1.65;
+  // Ambient occlusion: 4-tap perpendicular-disk sample around the surface
+  // normal — ~80 % of a full hemisphere's effect at a fixed 4-fetch overhead.
+  const float AO_RADIUS      = 2.8;   // voxels
+  const float AO_STRENGTH    = 0.22;  // 0 = no AO, 1 = full crush-to-black
+  // Fresnel rim — bright silhouette edges where the normal turns perpendicular
+  // to view; classic cinematic VRT depth cue.
+  const float FRESNEL_POWER  = 2.5;
+  const float FRESNEL_GAIN   = 0.28;
+  // Rim/back fill — weak Lambert from the opposite hemisphere so the un-lit
+  // side keeps a subtle outline glow instead of going black.
+  const float RIM_GAIN       = 0.30;
+  // Directional volumetric shadows — secondary march toward the key light with
+  // a geometrically growing stride: near taps dense (crisp contact shadows),
+  // far taps sparse (soft distant shadows).  Deliberately SHORT reach (~19
+  // voxels): contact shadows for crevices/tooth gaps, not global sun shadows —
+  // a long march would let the whole body occlude the key light and crush the
+  // semi-opaque Tissue preset to its ambient floor.
+  const int   SHADOW_TAPS     = 8;
+  const float SHADOW_OFFSET   = 3.0;  // voxels — skip the sample's own shell
+  const float SHADOW_GROWTH   = 1.30; // 8 taps ≈ 19-voxel reach
+  const float SHADOW_DENSITY  = 0.45; // per-tap opacity weight
+  const float SHADOW_STRENGTH = 0.55; // 0 = no shadows, 1 = full transmittance
+`;
+
+/**
+ * Stateless sampling / intersection helpers plus the directional-shadow march.
+ * All read uniforms (u_data, u_size, u_clim, the TFs) but hold no per-ray
+ * state, so they're safe to call from both the MIP and DVR paths in main().
+ */
+const FRAG_HELPERS = /* glsl */ `
+  float sampleVol(vec3 vox) {
+    return texture(u_data, vox / u_size).r;
+  }
+
+  // Pseudo-random hash on screen coords — drives ray-origin jitter so adjacent
+  // rays start at different depths, eliminating concentric-ring banding.
+  float rand(vec2 co) {
+    return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
+  }
+
+  // Central-difference gradient (voxel units).  D=2.5 widens the stencil so AO
+  // doesn't amplify jitter into grain; the trade is softened ≤2-voxel detail,
+  // which reads fine for cinematic form.
+  vec3 gradient(vec3 vox) {
+    const float D = 2.5;
+    float dx = sampleVol(vox + vec3(D, 0.0, 0.0)) - sampleVol(vox - vec3(D, 0.0, 0.0));
+    float dy = sampleVol(vox + vec3(0.0, D, 0.0)) - sampleVol(vox - vec3(0.0, D, 0.0));
+    float dz = sampleVol(vox + vec3(0.0, 0.0, D)) - sampleVol(vox - vec3(0.0, 0.0, D));
+    return vec3(dx, dy, dz);
+  }
+
+  // Slab intersection.  The render box extends 5 % beyond u_size each side so
+  // cursor planes are visible past the volume boundary.
+  vec2 hitBox(vec3 ro, vec3 rd) {
+    const float P = 0.05;
+    vec3 lo   = -P * u_size;
+    vec3 hi   = (1.0 + P) * u_size;
+    vec3 inv  = 1.0 / rd;
+    vec3 t0   = (lo - ro) * inv;
+    vec3 t1   = (hi - ro) * inv;
+    vec3 tmin = min(t0, t1);
+    vec3 tmax = max(t0, t1);
+    return vec2(
+      max(max(tmin.x, tmin.y), tmin.z),
+      min(min(tmax.x, tmax.y), tmax.z)
+    );
+  }
+
+  // Raw intensity → window/level → 1D TF, single-point sample.  Used by MIP and
+  // cut-face overlays where there is no "previous" intensity to integrate from.
+  vec4 sampleTF(float intensity) {
+    float mapped = clamp(
+      (intensity - u_clim.x) / max(u_clim.y - u_clim.x, 0.0001),
+      0.0, 1.0
+    );
+    return texture(u_cmdata, vec2(mapped, 0.5));
+  }
+
+  // Pre-integrated TF lookup: composited RGBA of a segment whose intensity
+  // ramps from iFront to iBack.  2D LUT rows = front, cols = back → (u,v) =
+  // (back, front).  Removes "shell" banding at sharp TF transitions.
+  vec4 sampleTFSegment(float iFront, float iBack) {
+    float span = max(u_clim.y - u_clim.x, 0.0001);
+    float u = clamp((iBack  - u_clim.x) / span, 0.0, 1.0);
+    float v = clamp((iFront - u_clim.x) / span, 0.0, 1.0);
+    return texture(u_cmdataPre, vec2(u, v));
+  }
+
+  // Key-light transmittance at vox: 1.0 = fully lit, → 0.0 = occluded.
+  // Attenuates diffuse + specular only — ambient/rim/fresnel are environment
+  // terms and stay unshadowed, so occluded regions dim toward the studio-fill
+  // level instead of crushing to black.
+  float shadowTransmittance(vec3 vox, vec3 L) {
+    float trans = 1.0;
+    float dist  = SHADOW_OFFSET;
+    for (int s = 0; s < SHADOW_TAPS; s++) {
+      vec3 p = vox + L * dist;
+      if (any(lessThan(p, vec3(0.0))) || any(greaterThan(p, u_size))) break;
+      // Clipped-away tissue must not cast shadows onto the cut face.  An
+      // axis-aligned half-space is crossed at most once per straight ray, so
+      // once we enter the hidden half there are no occluders left.
+      if (u_clipMode == 1) {
+        float pA  = u_activePlane == 0 ? p.y : u_activePlane == 1 ? p.x : p.z;
+        float plA = u_activePlane == 0 ? u_planePos.y : u_activePlane == 1 ? u_planePos.x : u_planePos.z;
+        if (u_clipDir > 0.0 && pA > plA) break;
+        if (u_clipDir < 0.0 && pA < plA) break;
+      }
+      float a = sampleTF(sampleVol(p)).a;
+      trans *= 1.0 - a * SHADOW_DENSITY;
+      if (trans < 0.05) break;
+      dist *= SHADOW_GROWTH;
+    }
+    return mix(1.0, trans, SHADOW_STRENGTH);
+  }
+
+  // Clip-mode cut face: faint plane tint so the extent is always visible, then
+  // real tissue colour on top where the volume has data.
+  void blendCutFace(vec3 cutVox, vec3 planeColor, inout vec4 acc) {
+    const float TINT = 0.10;
+    float ta = (1.0 - acc.a) * TINT;
+    acc.rgb += ta * planeColor; acc.a += ta;
+    if (any(lessThan(cutVox, vec3(0.0))) || any(greaterThan(cutVox, u_size))) return;
+    vec4 ptf = sampleTF(sampleVol(cutVox));
+    if (ptf.a < 0.004) return;
+    float contrib = (1.0 - acc.a) * ptf.a;
+    acc.rgb += contrib * ptf.rgb;
+    acc.a   += contrib;
+  }
+`;
+
+/**
+ * Per-sample cinematic surface shading, factored out of main()'s DVR loop.
+ * Builds a gradient normal, then layers wrap-diffuse, specular, directional
+ * shadow, 4-tap AO, rim fill and fresnel.  Returns the lit colour; if the local
+ * gradient is too flat to define a surface normal the base colour is returned
+ * unchanged (matching the previous inline early-out).
+ */
+const FRAG_SHADE = /* glsl */ `
+  vec3 shadeCinematic(vec3 vox, vec3 color, vec3 V) {
+    // Anisotropy correction: gradient is ∂intensity/∂voxel; dividing by spacing
+    // (mm/vox) gives a normal in physical space so oblique-lit flat surfaces
+    // aren't skewed along the thick axis (typical CT: z spacing ≫ x/y).
+    vec3 grad = gradient(vox);
+    grad /= u_voxelSize;
+    float gLen = length(grad);
+    if (gLen <= 0.003) return color;
+
+    vec3 N = normalize(grad);
+    if (dot(N, V) < 0.0) N = -N;
+
+    // Headlight bias: light follows the camera partially — pure headlight is
+    // flat, pure fixed key is harsh; the mix gives form without a black far side.
+    vec3 L = normalize(KEY + V * HEADLIGHT_BIAS);
+
+    // Directional volumetric shadow.  Start 2 voxels along N (out of the
+    // surface) so a grazing light angle doesn't immediately re-enter the
+    // sample's own shell and read as full self-shadow.
+    float shadow = u_shadowEnabled == 1 ? shadowTransmittance(vox + N * 2.0, L) : 1.0;
+
+    // Wrap-around diffuse: smooth falloff across the terminator.
+    float NdotL = dot(N, L);
+    float diff  = (max(NdotL, -WRAP) + WRAP) / (1.0 + WRAP) * shadow;
+    vec3  R     = reflect(-L, N);
+    float spec  = pow(max(0.0, dot(R, V)), SHINE) * shadow;
+
+    // 4-tap perpendicular-disk AO, tilted inward (-0.3 N) to read the volume
+    // behind the surface — what gets dark in real crevices.  Skipped during
+    // interaction (u_aoEnabled = 0) to keep orbit smooth.
+    float aoFactor = 1.0;
+    if (u_aoEnabled == 1) {
+      vec3 T = abs(N.x) < 0.9 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
+      vec3 B = normalize(cross(N, T));
+      T = cross(B, N);
+      float occ = 0.0;
+      vec3 d0 = ( T - N * 0.3) * AO_RADIUS;
+      vec3 d1 = ( B - N * 0.3) * AO_RADIUS;
+      vec3 d2 = (-T - N * 0.3) * AO_RADIUS;
+      vec3 d3 = (-B - N * 0.3) * AO_RADIUS;
+      occ += sampleVol(clamp(vox + d0, vec3(0.0), u_size));
+      occ += sampleVol(clamp(vox + d1, vec3(0.0), u_size));
+      occ += sampleVol(clamp(vox + d2, vec3(0.0), u_size));
+      occ += sampleVol(clamp(vox + d3, vec3(0.0), u_size));
+      aoFactor = 1.0 - clamp(occ * 0.25, 0.0, 1.0) * AO_STRENGTH;
+    }
+
+    // Rim/back fill: weak Lambert from -L so faces away from the key keep a
+    // subtle glow.  AO modulates ambient + diffuse but NOT specular (direct
+    // reflections should still pop in shadowed regions).
+    float NdotR = max(0.0, dot(N, -L));
+    diff       += NdotR * RIM_GAIN;
+    color = color * aoFactor * (KA + KD * diff) + vec3(KS * spec);
+
+    // Fresnel rim — added AFTER AO so silhouette edges stay bright even in
+    // occluded regions (rim light comes from the environment, not the key).
+    float fresnel = pow(1.0 - max(0.0, dot(N, V)), FRESNEL_POWER);
+    color += vec3(fresnel * FRESNEL_GAIN);
+    return color;
+  }
+`;
 
 export const VolumeShader = {
+  // Uniform invariants — assumptions every ray-march path relies on:
+  //   • All positions (u_camVoxel, u_planePos, u_size) live in the SAME voxel
+  //     space; u_voxelSize (mm/voxel) is applied only to convert the gradient
+  //     into a physical-space normal for shading.
+  //   • u_rayDirVox is normalised and points camera→scene; the renderer
+  //     refreshes u_camVoxel/u_rayDirVox every frame (parallel/orthographic).
+  //   • int "mode" uniforms are flags, not enums to lerp: u_mode 0=DVR/1=MIP,
+  //     u_planeMode 0/1/2, u_activePlane 0=cor/1=sag/2=axi.
+  //   • u_clim is normalised [0,1] in the texture's quantisation space, x≤y.
+  //   • u_clipMode / u_clipDir are declared in the fragment source but set by
+  //     buildMaterial() in volume-object.ts, not listed here — keep both sites
+  //     in sync when adding clip-related uniforms.
   uniforms: {
     u_data: { value: null as THREE.Data3DTexture | null },
     u_cmdata: { value: null as THREE.DataTexture | null },
@@ -416,174 +663,11 @@ export const VolumeShader = {
     // empty-space skipping (most rays now skip 30-60 % of their steps).
     #define MAX_STEPS 384
 
-    // ── Cinematic-light shading constants ────────────────────────────────────
-    // KEY: fixed "studio key light" direction in voxel space (up + right + front).
-    // Per-fragment we mix in a headlight bias toward the view vector so the
-    // far side of the volume is never pitch-black — gives a softer, "studio"
-    // look closer to what cinematic VRT does (vs the harsh single-sun feel
-    // of a fixed Lambertian light).
-    const vec3  KEY            = vec3(0.2673, 0.5345, 0.8018);
-    const float HEADLIGHT_BIAS = 0.45;
-    // Wrap-around lighting: instead of clipping at N·L < 0, falloff is smooth
-    // across the terminator — approximates subsurface scattering for tissue,
-    // which is a key part of the cinematic look.
-    const float WRAP           = 0.40;
-    const float KA             = 0.22;
-    const float KD             = 0.78;
-    const float KS             = 0.22;
-    const float SHINE          = 32.0;
-    // Pre-tonemap exposure boost — globally brightens the rendered colour
-    // before ACES compresses it. 1.65 is the "punchy and bright" setting
-    // that compensates for pre-integrated TF + AO darkening relative to
-    // the original under-integrated 1D baseline.
-    const float EXPOSURE       = 1.65;
-    // Ambient occlusion: 4-tap perpendicular-disk sample around the surface
-    // normal. A full hemisphere costs 5-6 extra fetches per shaded sample —
-    // too much for mobile. The 4-tap disk captures ~80 % of the visual effect
-    // (crevices/cavities go dark) at a fixed 4-fetch overhead.
-    const float AO_RADIUS      = 2.8;   // voxels
-    const float AO_STRENGTH    = 0.22;  // 0 = no AO, 1 = full crush-to-black
-    // Fresnel rim — bright edges at silhouette where surface normal turns
-    // perpendicular to view direction.  Adds depth to 3-D form, classic
-    // cinematic VRT trick.  Cost: 1 pow + 1 add per shaded sample.
-    const float FRESNEL_POWER  = 2.5;
-    const float FRESNEL_GAIN   = 0.28;
-    // Rim/back fill light — weak Lambert from the opposite hemisphere
-    // (behind the volume).  Stops the un-lit side from going pitch-black
-    // and reads as a subtle outline glow on overhanging features.
-    // Cost: 1 dot + 1 add per shaded sample.
-    const float RIM_GAIN       = 0.30;
-    // Directional volumetric shadows — secondary ray march from each shaded
-    // sample toward the key light, accumulating TF opacity.  Geometrically
-    // growing stride (×GROWTH per tap): near-field taps are dense so contact
-    // shadows stay crisp, far-field taps are sparse so distant occluders
-    // cast progressively softer shadows — the volumetric analogue of an
-    // area light, at SHADOW_TAPS fetches per shaded sample (~2× the AO disk;
-    // the priciest feature in the stack, hence the low-power gate set from
-    // volume-object.ts).
-    //
-    // Deliberately SHORT reach (~19 voxels): these are contact shadows for
-    // crevices, tooth gaps and overhangs — not global sun shadows.  A long
-    // march would let the whole body occlude the fixed key light and crush
-    // every camera-facing surface of the (semi-opaque) Tissue preset to its
-    // ambient floor; capping the reach keeps overall brightness while still
-    // grounding nearby geometry.
-    const int   SHADOW_TAPS     = 8;
-    const float SHADOW_OFFSET   = 3.0;  // voxels — skip the sample's own shell
-    const float SHADOW_GROWTH   = 1.30; // 8 taps ≈ 19-voxel reach
-    const float SHADOW_DENSITY  = 0.45; // per-tap opacity weight
-    const float SHADOW_STRENGTH = 0.55; // 0 = no shadows, 1 = full transmittance
-
-    // ── Helpers ──────────────────────────────────────────────────────────────
-
-    float sampleVol(vec3 vox) {
-      return texture(u_data, vox / u_size).r;
-    }
-
-    // Pseudo-random hash on screen coords — drives ray-origin jitter.
-    // Each fragment gets a unique sub-step offset in [0, dt) so adjacent
-    // rays start at different depths, eliminating concentric-ring banding.
-    float rand(vec2 co) {
-      return fract(sin(dot(co, vec2(12.9898, 78.233))) * 43758.5453);
-    }
-
-    // Central-difference gradient (voxel units).
-    // D=2.5 widens the sampling footprint to smooth normals across the
-    // per-pixel ray-start randomisation that jitter introduces — without
-    // this, AO amplifies jitter into visible grain on otherwise-smooth
-    // surfaces.  Trade-off: very fine surface detail (≤ 2 voxel ridges)
-    // gets softened, which is the right side of the trade for cinematic
-    // shading where overall form reads better than micro-detail.
-    vec3 gradient(vec3 vox) {
-      const float D = 2.5;
-      float dx = sampleVol(vox + vec3(D, 0.0, 0.0)) - sampleVol(vox - vec3(D, 0.0, 0.0));
-      float dy = sampleVol(vox + vec3(0.0, D, 0.0)) - sampleVol(vox - vec3(0.0, D, 0.0));
-      float dz = sampleVol(vox + vec3(0.0, 0.0, D)) - sampleVol(vox - vec3(0.0, 0.0, D));
-      return vec3(dx, dy, dz);
-    }
-
-    // Slab intersection.  The render box extends 5 % beyond u_size on every
-    // side (10 % total) so cursor planes are visible past the volume boundary.
-    vec2 hitBox(vec3 ro, vec3 rd) {
-      const float P = 0.05;          // 5 % padding each side
-      vec3 lo   = -P * u_size;
-      vec3 hi   = (1.0 + P) * u_size;
-      vec3 inv  = 1.0 / rd;
-      vec3 t0   = (lo - ro) * inv;
-      vec3 t1   = (hi - ro) * inv;
-      vec3 tmin = min(t0, t1);
-      vec3 tmax = max(t0, t1);
-      return vec2(
-        max(max(tmin.x, tmin.y), tmin.z),
-        min(min(tmax.x, tmax.y), tmax.z)
-      );
-    }
-
-    // Map raw intensity through window/level then 1D TF — single-point sample.
-    // Used by MIP (max-intensity then colour) and by cut-face overlays where
-    // there is no "previous" intensity to integrate from.
-    vec4 sampleTF(float intensity) {
-      float mapped = clamp(
-        (intensity - u_clim.x) / max(u_clim.y - u_clim.x, 0.0001),
-        0.0, 1.0
-      );
-      return texture(u_cmdata, vec2(mapped, 0.5));
-    }
-
-    // Pre-integrated TF lookup: returns the composited RGBA contribution of
-    // a ray segment whose intensity ramps from iFront to iBack.
-    // The 2D LUT is rows = front, cols = back — texture coords (u, v) =
-    // (back, front).  This removes "shell" banding at sharp TF transitions
-    // without needing dense ray-stepping.
-    vec4 sampleTFSegment(float iFront, float iBack) {
-      float span = max(u_clim.y - u_clim.x, 0.0001);
-      float u = clamp((iBack  - u_clim.x) / span, 0.0, 1.0);
-      float v = clamp((iFront - u_clim.x) / span, 0.0, 1.0);
-      return texture(u_cmdataPre, vec2(u, v));
-    }
-
-    // Key-light transmittance at vox: 1.0 = fully lit, → 0.0 = occluded.
-    // Attenuates diffuse + specular only — ambient, rim and fresnel are
-    // environment terms and stay unshadowed, so occluded regions dim toward
-    // the "studio fill" level instead of crushing to black.
-    float shadowTransmittance(vec3 vox, vec3 L) {
-      float trans = 1.0;
-      float dist  = SHADOW_OFFSET;
-      for (int s = 0; s < SHADOW_TAPS; s++) {
-        vec3 p = vox + L * dist;
-        if (any(lessThan(p, vec3(0.0))) || any(greaterThan(p, u_size))) break;
-        // Clipped-away tissue must not cast shadows onto the cut face.
-        // An axis-aligned half-space is crossed at most once per straight
-        // ray, so once we enter the hidden half there are no occluders left.
-        if (u_clipMode == 1) {
-          float pA  = u_activePlane == 0 ? p.y : u_activePlane == 1 ? p.x : p.z;
-          float plA = u_activePlane == 0 ? u_planePos.y : u_activePlane == 1 ? u_planePos.x : u_planePos.z;
-          if (u_clipDir > 0.0 && pA > plA) break;
-          if (u_clipDir < 0.0 && pA < plA) break;
-        }
-        float a = sampleTF(sampleVol(p)).a;
-        trans *= 1.0 - a * SHADOW_DENSITY;
-        if (trans < 0.05) break;
-        dist *= SHADOW_GROWTH;
-      }
-      return mix(1.0, trans, SHADOW_STRENGTH);
-    }
-
-    // Clip-mode cut face: faint plane tint so the extent is always visible, then
-    // real tissue colour on top where the volume has data.
-    void blendCutFace(vec3 cutVox, vec3 planeColor, inout vec4 acc) {
-      // Always paint a subtle tint — keeps the panel visible even in empty/air regions.
-      const float TINT = 0.10;
-      float ta = (1.0 - acc.a) * TINT;
-      acc.rgb += ta * planeColor; acc.a += ta;
-      // Overlay actual tissue on top (only inside volume bounds).
-      if (any(lessThan(cutVox, vec3(0.0))) || any(greaterThan(cutVox, u_size))) return;
-      vec4 ptf = sampleTF(sampleVol(cutVox));
-      if (ptf.a < 0.004) return;
-      float contrib = (1.0 - acc.a) * ptf.a;
-      acc.rgb += contrib * ptf.rgb;
-      acc.a   += contrib;
-    }
+    // Shading tunables + stateless helpers + per-sample shading, assembled from
+    // the named fragments above (see the "── GLSL" note for the rationale).
+    ${FRAG_CONSTANTS}
+    ${FRAG_HELPERS}
+    ${FRAG_SHADE}
 
     void main() {
       // ── Orthographic ray setup ────────────────────────────────────────────
@@ -762,81 +846,10 @@ export const VolumeShader = {
         vec3  color = tf.rgb;
         float alpha = tf.a;
 
-        // Cinematic-light shading — skip 6-fetch gradient for nearly-transparent voxels
+        // Cinematic-light shading — skip the ~6-fetch gradient + AO/shadow taps
+        // for near-transparent voxels (they barely contribute to the composite).
         if (u_shading == 1 && alpha > 0.08) {
-          vec3  grad = gradient(vox);
-          // Anisotropy correction: gradient is ∂intensity/∂voxel, but a real
-          // surface normal lives in physical space. Divide by spacing (mm/vox)
-          // so a flat surface lit at an oblique angle isn't visually skewed
-          // along the thick axis (typical CT: z spacing ≫ x/y spacing).
-          grad /= u_voxelSize;
-          float gLen = length(grad);
-          if (gLen > 0.003) {
-            vec3 N = normalize(grad);
-            if (dot(N, V) < 0.0) N = -N;
-
-            // Headlight bias: light direction follows the camera partially.
-            // Pure headlight = flat, pure fixed key = harsh; the mix gives form
-            // without leaving the far side in shadow.
-            vec3 L = normalize(KEY + V * HEADLIGHT_BIAS);
-
-            // Directional volumetric shadow: occluders between this sample
-            // and the key light dim its diffuse + specular contribution.
-            // Start 2 voxels along N (out of the surface) so a grazing light
-            // angle doesn't immediately re-enter the sample's own surface
-            // shell and read as full self-shadow.
-            float shadow = u_shadowEnabled == 1 ? shadowTransmittance(vox + N * 2.0, L) : 1.0;
-
-            // Wrap-around diffuse: smooth falloff across the terminator,
-            // approximates the subsurface look real tissue has under light.
-            float NdotL = dot(N, L);
-            float diff  = (max(NdotL, -WRAP) + WRAP) / (1.0 + WRAP) * shadow;
-            vec3  R     = reflect(-L, N);
-            float spec  = pow(max(0.0, dot(R, V)), SHINE) * shadow;
-
-            // ── Ambient occlusion (4-tap perpendicular disk) ─────────────────
-            // Skip during interaction (u_aoEnabled = 0) to keep orbit smooth.
-            // Build a tangent basis around N, sample density at 4 points on
-            // a disk perpendicular to N, slightly tilted inward (-0.3 * N) so
-            // we read the volume *behind* the surface — that's what gets dark
-            // in real crevices.
-            float aoFactor = 1.0;
-            if (u_aoEnabled == 1) {
-              vec3 T = abs(N.x) < 0.9 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
-              vec3 B = normalize(cross(N, T));
-              T = cross(B, N);
-              float occ = 0.0;
-              // 4 directions on the disk: 0°, 90°, 180°, 270°
-              vec3 d0 = ( T          - N * 0.3) * AO_RADIUS;
-              vec3 d1 = ( B          - N * 0.3) * AO_RADIUS;
-              vec3 d2 = (-T          - N * 0.3) * AO_RADIUS;
-              vec3 d3 = (-B          - N * 0.3) * AO_RADIUS;
-              occ += sampleVol(clamp(vox + d0, vec3(0.0), u_size));
-              occ += sampleVol(clamp(vox + d1, vec3(0.0), u_size));
-              occ += sampleVol(clamp(vox + d2, vec3(0.0), u_size));
-              occ += sampleVol(clamp(vox + d3, vec3(0.0), u_size));
-              aoFactor = 1.0 - clamp(occ * 0.25, 0.0, 1.0) * AO_STRENGTH;
-            }
-
-            // Rim/back fill light: weak Lambert from -KEY direction.
-            // Without this, parts of the volume facing away from the key
-            // light go pitch-black; with it, they keep a subtle glow that
-            // reads as silhouette detail.
-            float NdotR = max(0.0, dot(N, -L));
-            diff       += NdotR * RIM_GAIN;
-
-            // AO modulates ambient + diffuse but NOT specular — specular
-            // highlights are direct reflections off the surface and physically
-            // should still pop even in shadowed regions.
-            color = color * aoFactor * (KA + KD * diff) + vec3(KS * spec);
-
-            // Fresnel rim — silhouette accent.  Added AFTER AO modulation
-            // so it stays bright at edges even in occluded regions (rim
-            // light comes from the environment, not the key, so AO of
-            // surface crevices doesn't extinguish it).
-            float fresnel = pow(1.0 - max(0.0, dot(N, V)), FRESNEL_POWER);
-            color += vec3(fresnel * FRESNEL_GAIN);
-          }
+          color = shadeCinematic(vox, color, V);
         }
 
         // Front-to-back blend
