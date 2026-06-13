@@ -51,8 +51,16 @@ function readPixels(buffer: ArrayBuffer, t: DicomTags): Float32Array {
 export const dicomAdapter: ImportFormatAdapter = {
   id: 'dicom',
   label: 'DICOM series',
-  matches(source) {
-    return source.files.some((f) => isDicomName(f.name));
+  async matches(source) {
+    // Fast path: a recognised extension (.dcm/.dicom/.ima).
+    if (source.files.some((f) => isDicomName(f.name))) return true;
+    // Many PACS exports are extensionless (e.g. PA…/ST…/SE…/IM000000), so fall
+    // back to sniffing the "DICM" magic / first-tag group. Stop at the first
+    // hit so a real series is detected without reading every file.
+    for (const f of source.files) {
+      if (await looksLikeDicom(f.file)) return true;
+    }
+    return false;
   },
   async parse(source: ImportSource, onProgress: ProgressFn): Promise<LoadedVolume> {
     let candidates = source.files.filter((f) => isDicomName(f.name));

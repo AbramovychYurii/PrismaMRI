@@ -32,7 +32,15 @@ export async function loadVolumeFromSource(
   onProgress({ stage: 'scanning', current: 0, total: 0, message: 'Detecting format…' });
   const source = await expandZips(rawSource, onProgress);
 
-  const adapter = importFormatAdapters.find((a) => a.matches(source));
+  // `matches` may be async (content-sniffing adapters), so resolve them in
+  // priority order rather than with a synchronous `Array.find`.
+  let adapter: (typeof importFormatAdapters)[number] | undefined;
+  for (const a of importFormatAdapters) {
+    if (await a.matches(source)) {
+      adapter = a;
+      break;
+    }
+  }
   if (!adapter) {
     throw new Error(
       'Unrecognized format. Supported: DICOM series, NIfTI (.nii/.nii.gz), NRRD, MHA/MHD.',
