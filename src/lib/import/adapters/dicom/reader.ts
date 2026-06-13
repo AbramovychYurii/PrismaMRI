@@ -26,6 +26,7 @@ export interface DicomTags {
   imageOrientationPatient?: number[];
   instanceNumber?: number;
   sliceLocation?: number;
+  seriesInstanceUid?: string;
   studyId?: string;
   studyDate?: string;
   studyTime?: string;
@@ -46,6 +47,7 @@ const T = {
   StudyTime: 0x00080030,
   SeriesDescription: 0x0008103e,
   StudyID: 0x00200010,
+  SeriesInstanceUID: 0x0020000e,
   InstanceNumber: 0x00200013,
   ImagePosition: 0x00200032,
   ImageOrientation: 0x00200037,
@@ -168,6 +170,9 @@ export function parseImplicitLittleEndianDicom(
         break;
       case T.StudyID:
         tags.studyId = decodeString(view, r.valueOffset, r.length);
+        break;
+      case T.SeriesInstanceUID:
+        tags.seriesInstanceUid = decodeString(view, r.valueOffset, r.length);
         break;
       case T.InstanceNumber:
         tags.instanceNumber = Number.parseInt(decodeString(view, r.valueOffset, r.length), 10);
@@ -299,6 +304,7 @@ function finalize(t: Partial<DicomTags>): DicomTags | null {
     imageOrientationPatient: t.imageOrientationPatient,
     instanceNumber: t.instanceNumber,
     sliceLocation: t.sliceLocation,
+    seriesInstanceUid: t.seriesInstanceUid,
     studyId: t.studyId,
     studyDate: t.studyDate,
     studyTime: t.studyTime,

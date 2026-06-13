@@ -29,6 +29,37 @@ async function looksLikeDicom(file: File): Promise<boolean> {
   return g === 0x0008 || g === 0x0002;
 }
 
+type Slice = { buffer: ArrayBuffer; tags: DicomTags };
+
+/** Group key for one series: prefer SeriesInstanceUID, else geometry. */
+function seriesKey(t: DicomTags): string {
+  if (t.seriesInstanceUid) return t.seriesInstanceUid;
+  const iop = t.imageOrientationPatient?.map((x) => Math.round(x)).join(',') ?? '';
+  return `${t.columns}x${t.rows}|${iop}`;
+}
+
+/**
+ * Split slices by series and return the largest coherent one (most slices;
+ * ties broken by the finer in-plane matrix). A single series is returned
+ * unchanged, so single-series imports are unaffected.
+ */
+function pickLargestSeries(slices: Slice[]): Slice[] {
+  const groups = new Map<string, Slice[]>();
+  for (const s of slices) {
+    const k = seriesKey(s.tags);
+    const g = groups.get(k);
+    if (g) g.push(s);
+    else groups.set(k, [s]);
+  }
+  if (groups.size <= 1) return slices;
+  return [...groups.values()].reduce((best, g) => {
+    if (g.length !== best.length) return g.length > best.length ? g : best;
+    const a = g[0].tags;
+    const b = best[0].tags;
+    return a.columns * a.rows > b.columns * b.rows ? g : best;
+  });
+}
+
 function readPixels(buffer: ArrayBuffer, t: DicomTags): Float32Array {
   const count = t.rows * t.columns * t.numberOfFrames;
   const out = new Float32Array(count);
@@ -83,7 +114,11 @@ export const dicomAdapter: ImportFormatAdapter = {
     }
     if (slices.length === 0) throw new Error('DICOM files contained no readable pixel data.');
 
-    const sorted = sortDicomSlices(slices);
+    // A folder or zip frequently bundles several series (different orientation,
+    // contrast, matrix size — even multiple studies). Concatenating them into a
+    // single grid yields an incoherent "accordion" volume, so keep only the
+    // largest single series and assemble that.
+    const sorted = sortDicomSlices(pickLargestSeries(slices));
     const first = sorted[0].tags;
     const width = first.columns;
     const height = first.rows;
