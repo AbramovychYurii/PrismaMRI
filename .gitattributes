@@ -1,1 +1,2 @@
 examples/*.nrrd filter=lfs diff=lfs merge=lfs -text
+examples/*.zip filter=lfs diff=lfs merge=lfs -text

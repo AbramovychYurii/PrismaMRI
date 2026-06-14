@@ -11,6 +11,20 @@ git lfs pull
 
 Load any file from the app import screen (drag-and-drop or **Open file**).
 
+## `Yurii_Abramovych_Head_Neck_DICOM.zip`
+
+My own head/neck MRI study (~11 MB zip, 171 DICOM files across several series).
+
+| | |
+|---|---|
+| **Author** | Yurii Abramovych (own scan) |
+| **Source** | Personal imaging |
+
+> **Note:** this study was acquired with a fairly large slice spacing, and many of
+> the series were scanned in isolation (separate stacks rather than one contiguous,
+> evenly-sampled volume). As a result the 3-D reconstruction quality is mediocre —
+> it's best reviewed through the 2-D planes.
+
 ## `maxillofacial_CBCT.nrrd`
 
 Maxillofacial CBCT volume (~32 MB).
