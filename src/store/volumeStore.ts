@@ -1,6 +1,7 @@
 import { isSlicePlane } from '@/constants';
 import * as annotationsStorage from '@/lib/annotationsStorage';
 import type { ImportSource, SeriesChoice } from '@/lib/import/types';
+import { createThrottledStorage } from '@/lib/throttledStorage';
 import type { ThreePreview } from '@/lib/volume/three-preview';
 import { deriveVolumeId } from '@/lib/volumeId';
 import type {
@@ -428,7 +429,12 @@ export const useVolumeStore = create<VolumeState & VolumeActions>()(
       //   • Loading / error / agent runtime flags — transient
       //   • snapSeq / snapPlane / activeVolumeId — derived or internal
       name: 'prisma-mri-ui-state',
-      storage: createJSONStorage(() => sessionStorage),
+      // Throttled so the ~60 Hz interaction updates (W/L drag, measurement
+      // drag, wheel-scrub) don't each pay a synchronous JSON.stringify +
+      // sessionStorage write on the main thread. Coalesced writes flush on a
+      // short trailing timer and synchronously on pagehide / tab-hide, so a
+      // reload still restores the latest UI state.
+      storage: createJSONStorage(() => createThrottledStorage(sessionStorage)),
       version: 1,
       partialize: (state) => ({
         cursor: state.cursor,

@@ -261,8 +261,11 @@ export function useSlicePanelCore(plane: SlicePlane, halfSlabs = 0): SlicePanelC
 
     if (!offscreen.current) offscreen.current = document.createElement('canvas');
     const off = offscreen.current;
-    off.width = image.width;
-    off.height = image.height;
+    // Setting width/height reallocates and clears the canvas — only do it when
+    // the slice dimensions actually change (they're constant while scrubbing a
+    // given plane), so a scroll-through repaints without a per-frame realloc.
+    if (off.width !== image.width) off.width = image.width;
+    if (off.height !== image.height) off.height = image.height;
     const octx = off.getContext('2d');
     if (!octx) return;
     octx.putImageData(
