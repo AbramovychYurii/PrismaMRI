@@ -37,10 +37,10 @@ test.describe('Import screen', () => {
     await expect(page.getByRole('heading', { name: /examples/i })).toBeVisible();
   });
 
-  test('three example cards are rendered', async ({ page }) => {
+  test('four example cards are rendered', async ({ page }) => {
     // Each card is a <button> with an aria-label starting with "Load …".
     const cards = page.getByRole('button', { name: /^Load /i });
-    await expect(cards).toHaveCount(3);
+    await expect(cards).toHaveCount(4);
   });
 
   test('example card shows modality badge CT', async ({ page }) => {
