@@ -2,6 +2,8 @@ import { AuroraSparkles } from '@/components/ui/AuroraSparkles';
 import { useViewerActions } from '@/hooks';
 import { useHover } from '@/hooks/useHover';
 import { useVolumeStore } from '@/store';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -58,6 +60,18 @@ const EXAMPLES: ExampleMeta[] = [
     thumbnail: `${BASE}examples/thumbnails/dog_frontal_thorax_injured_paw.jpg`,
   },
   {
+    id: 'head_neck_mri',
+    file: 'Yurii_Abramovych_Head_Neck_DICOM.zip',
+    title: 'Head & neck',
+    subtitle: 'my own MRI',
+    dims: '256–512 px',
+    spacing: '11 series',
+    size: '11 MB',
+    description: 'Personal head/neck MRI — brain, C-spine and neck series; coarse spacing.',
+    tag: 'MRI',
+    thumbnail: `${BASE}examples/thumbnails/head_neck_mri.png`,
+  },
+  {
     id: 'full_body',
     file: 'full_body.nrrd',
     title: 'Full body',
@@ -107,27 +121,77 @@ const SectionLabel = styled.span`
   text-transform: uppercase;
 `;
 
+// Slider viewport — holds the scroll track plus the overlaid nav arrows.
+const SliderViewport = styled.div`
+  position: relative;
+`;
+
 const CardList = styled.ul`
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
+  align-items: stretch;
   gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  &::-webkit-scrollbar { display: none; }
+
+  /* Three cards visible at a time on desktop; the rest scroll into view.
+     The li is itself a flex box so the inner card stretches to the tallest
+     row height — every card lines up regardless of description length. */
+  & > li {
+    flex: 0 0 calc((100% - 24px) / 3);
+    scroll-snap-align: start;
+    display: flex;
+  }
 
   @media (max-width: 767px) {
-    grid-template-columns: repeat(3, 72vw);
-    overflow-x: auto;
     padding-bottom: 8px;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    &::-webkit-scrollbar { display: none; }
+    & > li { flex-basis: 72vw; }
+  }
+`;
+
+// Circular prev/next controls, vertically centred over the card row.
+const NavArrow = styled.button<{ $side: 'left' | 'right' }>`
+  position: absolute;
+  top: 50%;
+  ${({ $side }) => ($side === 'left' ? 'left: -16px;' : 'right: -16px;')}
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--panel-2);
+  border: 1px solid var(--rule-2);
+  color: var(--ink);
+  cursor: pointer;
+  z-index: var(--z-overlay-local);
+  opacity: 1;
+  transition: opacity 150ms, border-color 150ms, background 150ms;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+
+  &:hover { border-color: var(--amber); background: var(--panel); }
+  &:disabled {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* Touch devices swipe — hide the arrows there. */
+  @media (max-width: 767px) {
+    display: none;
   }
 `;
 
 const CardButton = styled.button<{ $disabled: boolean; $hover: boolean }>`
   position: relative;
   width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   background: ${({ $hover }) => ($hover ? 'var(--panel-2)' : 'var(--panel)')};
@@ -369,11 +433,44 @@ export function ExamplesSection() {
   const { loadFromUrl } = useViewerActions();
   const examplesDisabled = useVolumeStore((s) => s.loading.active);
 
+  const trackRef = useRef<HTMLUListElement>(null);
+  const [canPrev, setCanPrev] = useState(false);
+  const [canNext, setCanNext] = useState(false);
+
+  // Recompute arrow availability from the track's scroll position.
+  const syncArrows = useCallback(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    const maxScroll = el.scrollWidth - el.clientWidth;
+    setCanPrev(el.scrollLeft > 1);
+    setCanNext(el.scrollLeft < maxScroll - 1);
+  }, []);
+
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    syncArrows();
+    el.addEventListener('scroll', syncArrows, { passive: true });
+    const ro = new ResizeObserver(syncArrows);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener('scroll', syncArrows);
+      ro.disconnect();
+    };
+  }, [syncArrows]);
+
+  // Scroll by roughly one card (track width / 3) in the given direction.
+  const scrollByCard = (dir: -1 | 1) => {
+    const el = trackRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * (el.clientWidth / 3 + 12), behavior: 'smooth' });
+  };
+
   const handleLoad = (ex: ExampleMeta) => () =>
     loadFromUrl(`${NRRD_BASE}/examples/${ex.file}`, ex.file);
 
   return (
-    <ExamplesSectionWrap aria-label="Example CT datasets">
+    <ExamplesSectionWrap aria-label="Example datasets">
       {/* Section header */}
       <SectionHeader>
         <SectionTitle>Examples</SectionTitle>
@@ -382,14 +479,36 @@ export function ExamplesSection() {
         </SectionLabel>
       </SectionHeader>
 
-      {/* Cards */}
-      <CardList>
-        {EXAMPLES.map((ex) => (
-          <li key={ex.id}>
-            <ExampleCard example={ex} disabled={examplesDisabled} onLoad={handleLoad(ex)} />
-          </li>
-        ))}
-      </CardList>
+      {/* Slider */}
+      <SliderViewport>
+        <NavArrow
+          type="button"
+          $side="left"
+          onClick={() => scrollByCard(-1)}
+          disabled={!canPrev}
+          aria-label="Previous examples"
+        >
+          <ChevronLeft size={18} strokeWidth={1.75} />
+        </NavArrow>
+
+        <CardList ref={trackRef}>
+          {EXAMPLES.map((ex) => (
+            <li key={ex.id}>
+              <ExampleCard example={ex} disabled={examplesDisabled} onLoad={handleLoad(ex)} />
+            </li>
+          ))}
+        </CardList>
+
+        <NavArrow
+          type="button"
+          $side="right"
+          onClick={() => scrollByCard(1)}
+          disabled={!canNext}
+          aria-label="More examples"
+        >
+          <ChevronRight size={18} strokeWidth={1.75} />
+        </NavArrow>
+      </SliderViewport>
     </ExamplesSectionWrap>
   );
 }

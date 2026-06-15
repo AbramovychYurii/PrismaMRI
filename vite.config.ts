@@ -50,8 +50,8 @@ function serveExamplesPlugin() {
       if (!examplesDir) return;
       server.middlewares.use("/examples", (req, res, next) => {
         const filename = (req.url ?? "").replace(/^\//, "").split("?")[0];
-        if (!filename || filename.includes("..") || !filename.endsWith(".nrrd"))
-          return next();
+        const served = filename.endsWith(".nrrd") || filename.endsWith(".zip");
+        if (!filename || filename.includes("..") || !served) return next();
         const filePath = path.join(examplesDir, filename);
         if (!existsSync(filePath)) return next();
         try {
