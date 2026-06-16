@@ -52,6 +52,39 @@ export const LeftCol = styled.div`
   }
 `;
 
+// Subtle author link pinned to the viewport's bottom-left corner.
+export const GithubLink = styled.a`
+  position: fixed;
+  right: 20px;
+  bottom: 18px;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  color: var(--ink-3);
+  border: 1px solid transparent;
+  transition: color 150ms, border-color 150ms, background 150ms;
+
+  &:hover {
+    color: var(--ink);
+    border-color: var(--rule-2);
+    background: var(--panel);
+  }
+  &:focus-visible {
+    outline: none;
+    color: var(--ink);
+    box-shadow: 0 0 0 2px rgba(196, 153, 70, 0.4);
+  }
+
+  @media (max-width: 767px) {
+    left: 12px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+  }
+`;
+
 // ── Marketing copy ───────────────────────────────────────────────────────────
 
 export const TagLine = styled.div`

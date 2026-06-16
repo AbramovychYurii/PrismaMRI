@@ -13,7 +13,7 @@ import { APP_NAME } from '@/constants';
 import { useViewerActions } from '@/hooks';
 import { type FsEntry, collectFilesFromEntry } from '@/lib/import/scan-folder';
 import { useVolumeStore } from '@/store';
-import { FolderOpen } from 'lucide-react';
+import { FolderOpen, Github } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
   ButtonsRow,
@@ -27,6 +27,7 @@ import {
   FormatItem,
   FormatList,
   FormatToken,
+  GithubLink,
   ImportMain,
   LeftCol,
   LoadingSubText,
@@ -241,6 +242,15 @@ export function ImportOverlay() {
 
         <ExamplesSection />
       </ContentWrap>
+
+      <GithubLink
+        href="https://github.com/AbramovychYurii/PrismaMRI"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Author's GitHub profile (opens in a new tab)"
+      >
+        <Github size={20} strokeWidth={1.75} aria-hidden="true" focusable={false} />
+      </GithubLink>
 
       {pendingSeries && (
         <SeriesPickerModal
