@@ -18,7 +18,8 @@
 import { ReportModal } from '@/components/mcp/ReportModal';
 import { AuroraSparkles } from '@/components/ui/AuroraSparkles';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
-import { SEVERITY_HEX, SEVERITY_LABEL, SEVERITY_RANK } from '@/constants';
+import { PLANE_LABEL, SEVERITY_HEX, SEVERITY_LABEL, SEVERITY_RANK } from '@/constants';
+import { sliceNumber } from '@/lib/volume/plane';
 import { useVolumeStore } from '@/store/volumeStore';
 import type { AiAnnotation, SlicePlane, VolumeCursor } from '@/types';
 import { ChevronLeft, ChevronRight, FileText, Sparkles, Trash2, X } from 'lucide-react';
@@ -56,12 +57,8 @@ import {
   TopRow,
 } from './AnnotationHud.styles';
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
 function sliceInfo(plane: SlicePlane, v: VolumeCursor): string {
-  if (plane === 'coronal') return `Coronal · slice ${v.y + 1}`;
-  if (plane === 'sagittal') return `Sagittal · slice ${v.x + 1}`;
-  return `Axial · slice ${v.z + 1}`;
+  return `${PLANE_LABEL[plane].primary} · slice ${sliceNumber(v, plane)}`;
 }
 
 function orderAll(list: AiAnnotation[]): AiAnnotation[] {
@@ -69,8 +66,6 @@ function orderAll(list: AiAnnotation[]): AiAnnotation[] {
     (a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] || a.id.localeCompare(b.id),
   );
 }
-
-// ── SparkleIcon — gradient-stroked Sparkles used by the pill ─────────────────
 
 const SPARKLE_ICON_STYLE: React.CSSProperties = {
   filter: 'drop-shadow(0 0 5px rgba(180,160,255,.45))',
@@ -104,8 +99,6 @@ const SparkleIcon = memo(function SparkleIcon() {
   );
 });
 
-// ── Component ────────────────────────────────────────────────────────────────
-
 /** Duration of the pill entrance animation in ms — keep in sync with the keyframes. */
 const ENTRANCE_DURATION_MS = 1400;
 /** Count-up easing duration when the pill first appears, in ms. */
@@ -122,7 +115,6 @@ export function AnnotationHud() {
   const [confirmDismiss, setConfirmDismiss] = useState(false);
   const [showReport, setShowReport] = useState(false);
 
-  // ── Pill entrance animation ───────────────────────────────────────────
   // The pill plays its full multi-layer entrance only the first time it
   // appears for a given run.  Subsequent re-renders (collapse/expand,
   // annotation count changes) reuse the static look + continuous ring slide.
@@ -148,7 +140,6 @@ export function AnnotationHud() {
     if (!has) hadFindingsRef.current = false;
   }, [annotations.length]);
 
-  // ── Count-up: ticks the displayed number from 0 → final over ~520 ms ──
   const [displayedCount, setDisplayedCount] = useState(annotations.length);
   useEffect(() => {
     if (!entranceActive || reduceMotion.current) {
@@ -169,7 +160,6 @@ export function AnnotationHud() {
     return () => cancelAnimationFrame(raf);
   }, [entranceActive, annotations.length]);
 
-  // ── Auto-open when a new finding is focused ───────────────────────────
   const prevActiveId = useRef<string | null>(null);
   useEffect(() => {
     if (activeId && activeId !== prevActiveId.current) {
@@ -178,7 +168,6 @@ export function AnnotationHud() {
     prevActiveId.current = activeId;
   }, [activeId]);
 
-  // ── Esc collapses the card ────────────────────────────────────────────
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -196,7 +185,6 @@ export function AnnotationHud() {
 
   const active = activeId ? annotations.find((a) => a.id === activeId) : null;
 
-  // ── Collapsed pill ────────────────────────────────────────────────────
   if (!open) {
     // `key` forces a full remount on each entrance so all keyframe
     // animations restart cleanly (avoids needing to toggle the animation
@@ -222,7 +210,6 @@ export function AnnotationHud() {
     );
   }
 
-  // ── Expanded card ─────────────────────────────────────────────────────
   const shown = active ?? ordered[0];
   const color = SEVERITY_HEX[shown.severity];
   const idx = ordered.findIndex((a) => a.id === shown.id);

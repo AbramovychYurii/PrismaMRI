@@ -7,188 +7,139 @@ import {
   PLANE_LABEL,
   accentRgba,
 } from '@/constants';
-import type { DrawFracs } from '@/hooks/useMeasurementInteraction';
 import { useMeasurementInteraction } from '@/hooks/useMeasurementInteraction';
 import { useSliceImage } from '@/hooks/useSliceImage';
 import { useSliceScroll } from '@/hooks/useSliceScroll';
-import { clamp } from '@/lib/volume/math';
+import {
+  type LetterboxRect,
+  imageToPanel,
+  letterboxRect,
+  pointerToImageFrac,
+} from '@/lib/volume/letterbox';
+import {
+  fracToVoxel,
+  planeAspect,
+  sliceAxis,
+  sliceCount,
+  sliceNumber,
+  voxelToFrac,
+} from '@/lib/volume/plane';
 import { useVolumeStore } from '@/store';
-import type { SlicePlane, VolumeCursor } from '@/types';
+import type { SliceImage, SlicePlane, Vec3, VolumeCursor } from '@/types';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-// ── Pure geometry helpers ─────────────────────────────────────────────────
-
-function physicalAspect(
-  plane: SlicePlane,
-  dims: readonly [number, number, number],
-  spacing: readonly [number, number, number],
-): number {
-  const [sx, sy, sz] = spacing;
-  const [w, h, d] = dims;
-  if (plane === 'coronal') return (w * sx) / (d * sz);
-  if (plane === 'sagittal') return (h * sy) / (d * sz);
-  return (w * sx) / (h * sy);
-}
-
-/** Returns the letterboxed image rect as panel-space fractions [0..1]. */
-function computeDrawFracs(physAspect: number, cw: number, ch: number): DrawFracs {
-  if (physAspect >= cw / ch) {
-    const drawH = cw / physAspect;
-    return { xF: 0, yF: (ch - drawH) / 2 / ch, wF: 1, hF: drawH / ch };
-  }
-  const drawW = ch * physAspect;
-  return { xF: (cw - drawW) / 2 / cw, yF: 0, wF: drawW / cw, hF: 1 };
-}
-
-function imageToPanel(imgFx: number, imgFy: number, df: DrawFracs) {
-  return { fx: df.xF + imgFx * df.wF, fy: df.yF + imgFy * df.hF };
-}
-
-function panelToImage(panelFx: number, panelFy: number, df: DrawFracs) {
-  return {
-    fx: clamp((panelFx - df.xF) / df.wF, 0, 1),
-    fy: clamp((panelFy - df.yF) / df.hF, 0, 1),
-  };
-}
-
-function sliceIndexInfo(
-  plane: SlicePlane,
-  dims: readonly [number, number, number] | undefined,
-  cursor: VolumeCursor | null,
-): { idx: number; total: number } {
-  if (!dims || !cursor) return { idx: 0, total: 0 };
-  if (plane === 'coronal') return { idx: cursor.y + 1, total: dims[1] };
-  if (plane === 'sagittal') return { idx: cursor.x + 1, total: dims[0] };
-  return { idx: cursor.z + 1, total: dims[2] };
-}
-
 /**
- * Crosshair position as 0..1 fractions of the (stretched) slice image.
- * Coronal/Sagittal render z reversed (row 0 = z=depth-1).
+ * Which axis colours each crosshair line. Independent of the geometry in
+ * `plane.ts` — this is purely the panel's visual key.
  */
-function crosshairFrac(
-  plane: SlicePlane,
-  dims: readonly [number, number, number],
-  c: VolumeCursor,
-): { fx: number; fy: number } {
-  const [w, h, d] = dims;
-  if (plane === 'coronal') {
-    return { fx: c.x / Math.max(1, w - 1), fy: (d - 1 - c.z) / Math.max(1, d - 1) };
-  }
-  if (plane === 'sagittal') {
-    return { fx: c.y / Math.max(1, h - 1), fy: (d - 1 - c.z) / Math.max(1, d - 1) };
-  }
-  return { fx: c.x / Math.max(1, w - 1), fy: c.y / Math.max(1, h - 1) };
-}
+const CROSSHAIR_AXES: Record<SlicePlane, { v: Axis; h: Axis }> = {
+  coronal: { v: 'y', h: 'z' },
+  sagittal: { v: 'x', h: 'z' },
+  axial: { v: 'y', h: 'x' },
+};
 
-/**
- * Which axis each crosshair line represents on a panel — the vertical line
- * carries the `fx` coordinate, the horizontal line the `fy`. Each panel shows
- * the two axes orthogonal to its own, tinted with their system colors.
- */
-function crosshairAxes(plane: SlicePlane): { v: Axis; h: Axis } {
-  if (plane === 'coronal') return { v: 'y', h: 'z' };
-  if (plane === 'sagittal') return { v: 'x', h: 'z' };
-  return { v: 'y', h: 'x' };
-}
+export const axisColor = (axis: Axis) => ACCENT_VAR[AXIS_ACCENT[axis]];
+export const axisGlow = (axis: Axis) => accentRgba(AXIS_ACCENT[axis], 0.45);
 
-export const axisColor = (a: Axis) => ACCENT_VAR[AXIS_ACCENT[a]];
-export const axisGlow = (a: Axis) => accentRgba(AXIS_ACCENT[a], 0.45);
-
-// ── Exported pure utility ─────────────────────────────────────────────────
-
-/**
- * Converts a mouse click position to a new cursor in voxel space.
- * Extracted so both SlicePanel and ExpandedSlicePanel share the same logic.
- */
+/** Where a click lands in voxel space, keeping the plane's own slice index. */
 export function cursorFromClick(
-  e: { clientX: number; clientY: number },
+  event: { clientX: number; clientY: number },
   canvas: HTMLCanvasElement,
   plane: SlicePlane,
-  dims: readonly [number, number, number],
+  dims: Vec3,
   cursor: VolumeCursor,
-  drawFracs: DrawFracs | null,
+  rect: LetterboxRect | null,
 ): VolumeCursor {
-  const rect = canvas.getBoundingClientRect();
-  const panelFx = clamp((e.clientX - rect.left) / rect.width, 0, 1);
-  const panelFy = clamp((e.clientY - rect.top) / rect.height, 0, 1);
-  const { fx, fy } = drawFracs
-    ? panelToImage(panelFx, panelFy, drawFracs)
-    : { fx: panelFx, fy: panelFy };
-  const [w, h, d] = dims;
-  const next: VolumeCursor = { ...cursor };
-  if (plane === 'coronal') {
-    next.x = Math.round(fx * (w - 1));
-    next.z = Math.round((1 - fy) * (d - 1));
-  } else if (plane === 'sagittal') {
-    next.y = Math.round(fx * (h - 1));
-    next.z = Math.round((1 - fy) * (d - 1));
-  } else {
-    next.x = Math.round(fx * (w - 1));
-    next.y = Math.round(fy * (h - 1));
-  }
-  return next;
+  const { fx, fy } = pointerToImageFrac(event, canvas, rect);
+  return fracToVoxel(plane, fx, fy, cursor, dims);
 }
 
-// ── Hook ──────────────────────────────────────────────────────────────────
+function useCanvasSize(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
+  const [size, setSize] = useState({ w: 1, h: 1 });
 
-export interface SlicePanelCore {
-  // Canvas
-  canvasRef: React.RefObject<HTMLCanvasElement | null>;
-  // Geometry
-  drawFracs: DrawFracs | null;
-  // Slice info
-  idx: number;
-  total: number;
-  // Visual crosshair
-  cross: { fx: number; fy: number } | null;
-  adjustedDots: Array<{ fx: number; fy: number }>;
-  axes: { v: Axis; h: Axis };
-  // Styling
-  accentColor: string;
-  planeLabel: { primary: string; secondary: string };
-  // Active state
-  isActive: boolean;
-  // Store state
-  cursor: VolumeCursor | null;
-  dims: readonly [number, number, number] | undefined;
-  scrubVisible: boolean;
-  // Store actions
-  setCursor: (c: VolumeCursor) => void;
-  setActivePlane: (p: SlicePlane) => void;
-  setScrubVisible: (axis: SlicePlane, value: boolean) => void;
-  requestSnapToView: (plane: SlicePlane) => void;
-  // Handlers
-  onWheel: (e: React.WheelEvent) => void;
-  handleScrub: (nextSlice: number) => void;
-  handleContextMenu: (e: React.MouseEvent) => void;
-  onSnapToView: () => void;
-  // Measurement
-  measurement: ReturnType<typeof useMeasurementInteraction>['measurement'];
-  menu: ReturnType<typeof useMeasurementInteraction>['menu'];
-  closeMenu: ReturnType<typeof useMeasurementInteraction>['closeMenu'];
-  onMeasureFrom: ReturnType<typeof useMeasurementInteraction>['onMeasureFrom'];
-  onMeasureTo: ReturnType<typeof useMeasurementInteraction>['onMeasureTo'];
-  onClear: ReturnType<typeof useMeasurementInteraction>['onClear'];
-  beginDragMeasurement: ReturnType<typeof useMeasurementInteraction>['beginDrag'];
-  updateDragMeasurement: ReturnType<typeof useMeasurementInteraction>['updateDrag'];
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      setSize({ w: Math.max(1, width), h: Math.max(1, height) });
+    });
+    observer.observe(canvas);
+    return () => observer.disconnect();
+  }, [canvasRef]);
+
+  return size;
 }
 
 /**
- * Encapsulates the shared state and behaviour of slice panels.
- * Both `SlicePanel` (rail) and `ExpandedSlicePanel` (fullscreen portal)
- * use this hook so canvas setup, rendering, scrubbing, and measurement
- * logic live in exactly one place.
- *
- * @param halfSlabs  When > 0, renders a Slab MIP of this many slices on each
- *                   side of the current slice (expanded panel only).
+ * Paints `image` into the canvas, letterboxed to `rect`. The offscreen buffer
+ * is only resized when the slice dimensions change, so scrubbing repaints
+ * without reallocating.
  */
-export function useSlicePanelCore(plane: SlicePlane, halfSlabs = 0): SlicePanelCore {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+function useCanvasPainter(
+  canvasRef: React.RefObject<HTMLCanvasElement | null>,
+  image: SliceImage | null,
+  rect: LetterboxRect | null,
+  size: { w: number; h: number },
+) {
   const offscreen = useRef<HTMLCanvasElement | null>(null);
-  const [canvasSize, setCanvasSize] = useState({ w: 1, h: 1 });
 
-  // ── Store selectors ───────────────────────────────────────────────────
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const width = Math.max(1, Math.floor(size.w * dpr));
+    const height = Math.max(1, Math.floor(size.h * dpr));
+    if (canvas.width !== width) canvas.width = width;
+    if (canvas.height !== height) canvas.height = height;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.fillStyle = CANVAS_BG;
+    ctx.fillRect(0, 0, width, height);
+    if (!image) return;
+
+    if (!offscreen.current) offscreen.current = document.createElement('canvas');
+    const buffer = offscreen.current;
+    if (buffer.width !== image.width) buffer.width = image.width;
+    if (buffer.height !== image.height) buffer.height = image.height;
+
+    const bufferCtx = buffer.getContext('2d');
+    if (!bufferCtx) return;
+    bufferCtx.putImageData(
+      new ImageData(image.data as Uint8ClampedArray<ArrayBuffer>, image.width, image.height),
+      0,
+      0,
+    );
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    if (rect) {
+      ctx.drawImage(
+        buffer,
+        rect.x * width,
+        rect.y * height,
+        rect.width * width,
+        rect.height * height,
+      );
+    } else {
+      ctx.drawImage(buffer, 0, 0, width, height);
+    }
+  }, [canvasRef, image, rect, size]);
+}
+
+/**
+ * Shared state and behaviour of a slice panel — canvas painting, scrubbing,
+ * crosshair and measurement — so the rail panel and the fullscreen portal stay
+ * in lockstep.
+ *
+ * `halfSlabs` > 0 renders a Slab MIP of that many slices on each side.
+ */
+export function useSlicePanelCore(plane: SlicePlane, halfSlabs = 0) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasSize = useCanvasSize(canvasRef);
+
   const activePlane = useVolumeStore((s) => s.activePlane);
   const setActivePlane = useVolumeStore((s) => s.setActivePlane);
   const setCursor = useVolumeStore((s) => s.setCursor);
@@ -199,40 +150,24 @@ export function useSlicePanelCore(plane: SlicePlane, halfSlabs = 0): SlicePanelC
   const scrubVisible = useVolumeStore((s) => s.scrubVisible[plane]);
   const setScrubVisible = useVolumeStore((s) => s.setScrubVisible);
 
-  // ── Canvas size tracking ──────────────────────────────────────────────
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ro = new ResizeObserver((entries) => {
-      const { width, height } = entries[0].contentRect;
-      setCanvasSize({ w: Math.max(1, width), h: Math.max(1, height) });
-    });
-    ro.observe(canvas);
-    return () => ro.disconnect();
-  }, []);
+  const drawFracs = useMemo<LetterboxRect | null>(
+    () =>
+      dims && spacing
+        ? letterboxRect(planeAspect(plane, dims, spacing), canvasSize.w, canvasSize.h)
+        : null,
+    [plane, dims, spacing, canvasSize],
+  );
 
-  // ── Geometry ──────────────────────────────────────────────────────────
-  const drawFracs = useMemo<DrawFracs | null>(() => {
-    if (!dims || !spacing) return null;
-    return computeDrawFracs(physicalAspect(plane, dims, spacing), canvasSize.w, canvasSize.h);
-  }, [plane, dims, spacing, canvasSize]);
-
-  // ── Sub-hooks ─────────────────────────────────────────────────────────
   const measureInteraction = useMeasurementInteraction(plane, dims, cursor);
   const image = useSliceImage(plane, halfSlabs);
   const onWheel = useSliceScroll(plane);
 
-  // ── Derived values ────────────────────────────────────────────────────
-  const isActive = activePlane === plane;
-  const { idx, total } = sliceIndexInfo(plane, dims, cursor);
-  const axes = crosshairAxes(plane);
-  const accentColor = PLANE_ACCENT[plane];
-  const planeLabel = PLANE_LABEL[plane];
+  useCanvasPainter(canvasRef, image, drawFracs, canvasSize);
 
   const cross = useMemo(() => {
     if (!dims || !cursor) return null;
-    const imgFrac = crosshairFrac(plane, dims, cursor);
-    return drawFracs ? imageToPanel(imgFrac.fx, imgFrac.fy, drawFracs) : imgFrac;
+    const { fx, fy } = voxelToFrac(plane, cursor, dims);
+    return drawFracs ? imageToPanel(fx, fy, drawFracs) : { fx, fy };
   }, [plane, dims, cursor, drawFracs]);
 
   const adjustedDots = useMemo(
@@ -243,60 +178,10 @@ export function useSlicePanelCore(plane: SlicePlane, halfSlabs = 0): SlicePanelC
     [measureInteraction.measureDots, drawFracs],
   );
 
-  // ── Canvas paint ──────────────────────────────────────────────────────
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const dpr = window.devicePixelRatio || 1;
-    const cw = Math.max(1, Math.floor(canvasSize.w * dpr));
-    const ch = Math.max(1, Math.floor(canvasSize.h * dpr));
-    if (canvas.width !== cw) canvas.width = cw;
-    if (canvas.height !== ch) canvas.height = ch;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.fillStyle = CANVAS_BG;
-    ctx.fillRect(0, 0, cw, ch);
-    if (!image) return;
-
-    if (!offscreen.current) offscreen.current = document.createElement('canvas');
-    const off = offscreen.current;
-    // Setting width/height reallocates and clears the canvas — only do it when
-    // the slice dimensions actually change (they're constant while scrubbing a
-    // given plane), so a scroll-through repaints without a per-frame realloc.
-    if (off.width !== image.width) off.width = image.width;
-    if (off.height !== image.height) off.height = image.height;
-    const octx = off.getContext('2d');
-    if (!octx) return;
-    octx.putImageData(
-      new ImageData(image.data as Uint8ClampedArray<ArrayBuffer>, image.width, image.height),
-      0,
-      0,
-    );
-
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    if (drawFracs) {
-      ctx.drawImage(
-        off,
-        drawFracs.xF * cw,
-        drawFracs.yF * ch,
-        drawFracs.wF * cw,
-        drawFracs.hF * ch,
-      );
-    } else {
-      ctx.drawImage(off, 0, 0, cw, ch);
-    }
-  }, [image, drawFracs, canvasSize]);
-
-  // ── Handlers ─────────────────────────────────────────────────────────
   const handleScrub = useCallback(
     (nextSlice: number) => {
       if (!cursor) return;
-      const i = nextSlice - 1;
-      if (plane === 'coronal') setCursor({ ...cursor, y: i });
-      else if (plane === 'sagittal') setCursor({ ...cursor, x: i });
-      else setCursor({ ...cursor, z: i });
+      setCursor({ ...cursor, [sliceAxis(plane)]: nextSlice - 1 });
     },
     [cursor, plane, setCursor],
   );
@@ -305,19 +190,17 @@ export function useSlicePanelCore(plane: SlicePlane, halfSlabs = 0): SlicePanelC
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      // Right-click no longer auto-rotates the 3-D model — that's now opt-in
-      // via the new "View from this side" menu item (see MeasureMenu).
-      if (canvasRef.current) {
-        measureInteraction.openMenu(e, canvasRef.current, drawFracs);
-      }
+      if (canvasRef.current) measureInteraction.openMenu(e, canvasRef.current, drawFracs);
     },
     [measureInteraction.openMenu, drawFracs],
   );
 
-  /** Rotate the 3-D model to face this plane. Wired into the context menu. */
-  const onSnapToView = useCallback(() => {
-    requestSnapToView(plane);
-  }, [requestSnapToView, plane]);
+  const onSnapToView = useCallback(() => requestSnapToView(plane), [requestSnapToView, plane]);
+
+  const { idx, total } =
+    dims && cursor
+      ? { idx: sliceNumber(cursor, plane), total: sliceCount(dims, plane) }
+      : { idx: 0, total: 0 };
 
   return {
     canvasRef,
@@ -326,10 +209,10 @@ export function useSlicePanelCore(plane: SlicePlane, halfSlabs = 0): SlicePanelC
     total,
     cross,
     adjustedDots,
-    axes,
-    accentColor,
-    planeLabel,
-    isActive,
+    axes: CROSSHAIR_AXES[plane],
+    accentColor: PLANE_ACCENT[plane],
+    planeLabel: PLANE_LABEL[plane],
+    isActive: activePlane === plane,
     cursor,
     dims,
     scrubVisible,
@@ -351,3 +234,5 @@ export function useSlicePanelCore(plane: SlicePlane, halfSlabs = 0): SlicePanelC
     updateDragMeasurement: measureInteraction.updateDrag,
   };
 }
+
+export type SlicePanelCore = ReturnType<typeof useSlicePanelCore>;

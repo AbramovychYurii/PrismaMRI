@@ -11,8 +11,6 @@ import { useVolumeStore } from '@/store';
 import { ChevronDown, Layers } from 'lucide-react';
 import styled from 'styled-components';
 
-// ── Styled components ──────────────────────────────────────────────────────
-
 const Wrap = styled.div`
   position: absolute;
   top: 22px;
@@ -90,14 +88,10 @@ const Chevron = styled(ChevronDown)`
   color: var(--ink-3);
 `;
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-
 function optionLabel(s: SeriesChoice): string {
   const bits = [s.label, s.orientation, `${s.count} sl`].filter(Boolean);
   return bits.join(' · ');
 }
-
-// ── Component ──────────────────────────────────────────────────────────────
 
 export function StageSeriesSelect() {
   const seriesList = useVolumeStore((s) => s.seriesList);

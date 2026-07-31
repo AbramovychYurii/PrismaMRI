@@ -1,93 +1,35 @@
-import { clamp } from '@/lib/volume/math';
+import { type LetterboxRect, pointerToImageFrac } from '@/lib/volume/letterbox';
+import { fracToVoxel, sliceIndex, voxelToFrac } from '@/lib/volume/plane';
 import { useVolumeStore } from '@/store';
 import type { ActiveMeasurement, MeasurementPoint, SlicePlane, VolumeCursor } from '@/types';
 import { useCallback, useMemo, useState } from 'react';
 
-// ── Types ──────────────────────────────────────────────────────────────────
+type PointerLike = { clientX: number; clientY: number };
+type Dims = readonly [number, number, number];
 
-/** Letterboxed image rect as fractions of the panel [0..1]. */
-export interface DrawFracs {
-  xF: number;
-  yF: number;
-  wF: number;
-  hF: number;
-}
-
-// ── Pure helpers ───────────────────────────────────────────────────────────
-
-function measureDotFrac(
+/** Dot position on the panel, or null when the point sits on a different slice. */
+function dotOnSlice(
   plane: SlicePlane,
-  dims: readonly [number, number, number],
+  dims: Dims,
   cursor: VolumeCursor,
-  pt: MeasurementPoint,
+  point: MeasurementPoint,
 ): { fx: number; fy: number } | null {
-  const [w, h, d] = dims;
-  if (plane === 'coronal') {
-    if (pt.y !== cursor.y) return null;
-    return {
-      fx: pt.x / Math.max(1, w - 1),
-      fy: (d - 1 - pt.z) / Math.max(1, d - 1),
-    };
-  }
-  if (plane === 'sagittal') {
-    if (pt.x !== cursor.x) return null;
-    return {
-      fx: pt.y / Math.max(1, h - 1),
-      fy: (d - 1 - pt.z) / Math.max(1, d - 1),
-    };
-  }
-  if (pt.z !== cursor.z) return null;
-  return { fx: pt.x / Math.max(1, w - 1), fy: pt.y / Math.max(1, h - 1) };
+  if (sliceIndex(point, plane) !== sliceIndex(cursor, plane)) return null;
+  return voxelToFrac(plane, point, dims);
 }
 
-function collectDots(
+function visibleDots(
   plane: SlicePlane,
-  dims: readonly [number, number, number] | undefined,
+  dims: Dims | undefined,
   cursor: VolumeCursor | null,
   measurement: ActiveMeasurement | null,
 ): Array<{ fx: number; fy: number }> {
   if (!dims || !cursor || !measurement) return [];
-  const dots: Array<{ fx: number; fy: number }> = [];
-  const from = measureDotFrac(plane, dims, cursor, measurement.from);
-  if (from) dots.push(from);
-  if (measurement.to) {
-    const to = measureDotFrac(plane, dims, cursor, measurement.to);
-    if (to) dots.push(to);
-  }
-  return dots;
+  const points = measurement.to ? [measurement.from, measurement.to] : [measurement.from];
+  return points
+    .map((point) => dotOnSlice(plane, dims, cursor, point))
+    .filter((dot): dot is { fx: number; fy: number } => dot !== null);
 }
-
-function screenToVoxel(
-  plane: SlicePlane,
-  dims: readonly [number, number, number],
-  cursor: VolumeCursor,
-  canvas: HTMLCanvasElement,
-  e: { clientX: number; clientY: number },
-  drawFracs?: DrawFracs | null,
-): MeasurementPoint {
-  const rect = canvas.getBoundingClientRect();
-  let fx = clamp((e.clientX - rect.left) / rect.width, 0, 1);
-  let fy = clamp((e.clientY - rect.top) / rect.height, 0, 1);
-  if (drawFracs) {
-    fx = clamp((fx - drawFracs.xF) / drawFracs.wF, 0, 1);
-    fy = clamp((fy - drawFracs.yF) / drawFracs.hF, 0, 1);
-  }
-  const [w, h, d] = dims;
-  const voxel: MeasurementPoint = { ...cursor };
-  if (plane === 'coronal') {
-    voxel.x = Math.round(fx * (w - 1));
-    voxel.z = Math.round((1 - fy) * (d - 1));
-  } else if (plane === 'sagittal') {
-    voxel.y = Math.round(fx * (h - 1));
-    voxel.z = Math.round((1 - fy) * (d - 1));
-  } else {
-    voxel.x = Math.round(fx * (w - 1));
-    voxel.y = Math.round(fy * (h - 1));
-  }
-  return voxel;
-}
-
-// ── Hook ───────────────────────────────────────────────────────────────────
 
 interface MenuState {
   screenX: number;
@@ -97,7 +39,7 @@ interface MenuState {
 
 export function useMeasurementInteraction(
   plane: SlicePlane,
-  dims: readonly [number, number, number] | undefined,
+  dims: Dims | undefined,
   cursor: VolumeCursor | null,
 ) {
   const measurement = useVolumeStore((s) => s.measurement);
@@ -108,20 +50,25 @@ export function useMeasurementInteraction(
   const [menu, setMenu] = useState<MenuState | null>(null);
 
   const measureDots = useMemo(
-    () => collectDots(plane, dims, cursor, measurement),
+    () => visibleDots(plane, dims, cursor, measurement),
     [plane, dims, cursor, measurement],
   );
 
-  const openMenu = useCallback(
-    (e: React.MouseEvent, canvas: HTMLCanvasElement, drawFracs?: DrawFracs | null) => {
-      if (!dims || !cursor) return;
-      setMenu({
-        screenX: e.clientX,
-        screenY: e.clientY,
-        voxel: screenToVoxel(plane, dims, cursor, canvas, e, drawFracs),
-      });
+  const voxelAtPointer = useCallback(
+    (event: PointerLike, canvas: HTMLCanvasElement, rect?: LetterboxRect | null) => {
+      if (!dims || !cursor) return null;
+      const { fx, fy } = pointerToImageFrac(event, canvas, rect ?? null);
+      return fracToVoxel(plane, fx, fy, cursor, dims);
     },
     [plane, dims, cursor],
+  );
+
+  const openMenu = useCallback(
+    (e: React.MouseEvent, canvas: HTMLCanvasElement, rect?: LetterboxRect | null) => {
+      const voxel = voxelAtPointer(e, canvas, rect);
+      if (voxel) setMenu({ screenX: e.clientX, screenY: e.clientY, voxel });
+    },
+    [voxelAtPointer],
   );
 
   const closeMenu = useCallback(() => setMenu(null), []);
@@ -135,39 +82,23 @@ export function useMeasurementInteraction(
   }, [menu, setMeasurementTo]);
 
   /**
-   * Start a drag-measurement at the pointer position — used by Shift+drag in
-   * the fullscreen panel.  Seeds both `from` and `to` to the same voxel so the
-   * line is well-defined from frame 0 (distance reads 0 mm until the user
-   * actually moves the cursor).
+   * Seeds `from` only — leaving `to` null until the pointer actually moves keeps
+   * a bare click from creating a zero-length measurement with two stacked dots.
    */
   const beginDrag = useCallback(
-    (
-      e: { clientX: number; clientY: number },
-      canvas: HTMLCanvasElement,
-      drawFracs?: DrawFracs | null,
-    ) => {
-      if (!dims || !cursor) return;
-      const voxel = screenToVoxel(plane, dims, cursor, canvas, e, drawFracs);
-      // Seed `from` only.  `to` stays null until the first real movement —
-      // that way a bare click never creates a degenerate from-equals-to
-      // measurement (which would render two dots at the same coordinate).
-      setMeasurementFrom(voxel);
+    (event: PointerLike, canvas: HTMLCanvasElement, rect?: LetterboxRect | null) => {
+      const voxel = voxelAtPointer(event, canvas, rect);
+      if (voxel) setMeasurementFrom(voxel);
     },
-    [plane, dims, cursor, setMeasurementFrom],
+    [voxelAtPointer, setMeasurementFrom],
   );
 
-  /** Continuously update the `to` point while the user drags. */
   const updateDrag = useCallback(
-    (
-      e: { clientX: number; clientY: number },
-      canvas: HTMLCanvasElement,
-      drawFracs?: DrawFracs | null,
-    ) => {
-      if (!dims || !cursor) return;
-      const voxel = screenToVoxel(plane, dims, cursor, canvas, e, drawFracs);
-      setMeasurementTo(voxel);
+    (event: PointerLike, canvas: HTMLCanvasElement, rect?: LetterboxRect | null) => {
+      const voxel = voxelAtPointer(event, canvas, rect);
+      if (voxel) setMeasurementTo(voxel);
     },
-    [plane, dims, cursor, setMeasurementTo],
+    [voxelAtPointer, setMeasurementTo],
   );
 
   return {

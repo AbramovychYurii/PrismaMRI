@@ -4,8 +4,6 @@ import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
 
-// ── Data ───────────────────────────────────────────────────────────────────
-
 interface ShortcutRow {
   action: string;
   keys: string[];
@@ -44,8 +42,6 @@ const SECTIONS: Array<{ label: string; rows: ShortcutRow[] }> = [
     ],
   },
 ];
-
-// ── Styled components ──────────────────────────────────────────────────────
 
 const Backdrop = styled.div`
   position: fixed;
@@ -154,8 +150,6 @@ const KeyDivider = styled.span`
   color: var(--ink-4);
   user-select: none;
 `;
-
-// ── Component ──────────────────────────────────────────────────────────────
 
 interface Props {
   onClose: () => void;

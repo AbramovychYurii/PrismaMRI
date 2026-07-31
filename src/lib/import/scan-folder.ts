@@ -42,8 +42,6 @@ export async function fromDirectoryHandle(
   return { rootName: handle.name, files };
 }
 
-// ── Drag-and-drop via the legacy FileSystem Entry API ──────────────────────
-
 /**
  * Minimal surface of the FileSystem Entry API. Only the properties used by
  * {@link collectFilesFromEntry} are declared — the full spec is not needed.

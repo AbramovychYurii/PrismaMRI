@@ -4,8 +4,6 @@ import { SessionCell } from '@/components/dock/SessionCell';
 import { StudyCell } from '@/components/dock/StudyCell';
 import styled from 'styled-components';
 
-// ── Styled components ──────────────────────────────────────────────────────
-
 const ScrollWrap = styled.div`
   height: 100%;
   overflow-y: auto;
@@ -44,8 +42,6 @@ const SectionRule = styled.span`
   height: 1px;
   background: var(--rule);
 `;
-
-// ── Component ──────────────────────────────────────────────────────────────
 
 function CtrlSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (

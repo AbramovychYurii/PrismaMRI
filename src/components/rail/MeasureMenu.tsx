@@ -4,8 +4,6 @@ import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
 
-// ── Styled components ──────────────────────────────────────────────────────
-
 const Menu = styled.div`
   position: fixed;
   z-index: var(--z-popover);
@@ -56,8 +54,6 @@ const Divider = styled.div`
   background: var(--rule);
   margin: 3px 0;
 `;
-
-// ── Component ──────────────────────────────────────────────────────────────
 
 interface Props {
   x: number;

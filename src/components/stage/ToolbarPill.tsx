@@ -9,8 +9,6 @@ import type { PlanesMode, ToolbarState } from '@/types';
 import { Maximize2, PanelRight } from 'lucide-react';
 import styled from 'styled-components';
 
-// ── Types ──────────────────────────────────────────────────────────────────
-
 interface ToolbarButton {
   id: Exclude<keyof ToolbarState, 'planes'>;
   icon: React.ReactNode;
@@ -20,8 +18,6 @@ interface ToolbarButton {
   /** Hide this button on mobile — it's meaningless without the sidebar. */
   mobileHidden?: boolean;
 }
-
-// ── Icons ──────────────────────────────────────────────────────────────────
 
 /** Isometric cube — top face same size as the single-slice icon */
 function IconLayersAll() {
@@ -91,8 +87,6 @@ function IconLayerOne() {
   );
 }
 
-// ── Constants ──────────────────────────────────────────────────────────────
-
 const BUTTONS: ToolbarButton[] = [
   {
     id: 'focus',
@@ -109,8 +103,6 @@ const BUTTONS: ToolbarButton[] = [
     mobileHidden: true,
   },
 ];
-
-// ── Styled components ──────────────────────────────────────────────────────
 
 const PillWrap = styled.div`
   position: absolute;
@@ -154,8 +146,6 @@ const ToolBtn = styled.button<{ $on: boolean; $hover: boolean }>`
     justify-content: center;
   }
 `;
-
-// ── Sub-components ─────────────────────────────────────────────────────────
 
 const PLANES_TIP: Record<PlanesMode, string> = {
   off: 'Show slice planes',

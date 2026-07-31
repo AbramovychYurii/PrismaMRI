@@ -2,8 +2,6 @@ import { ACCENT_VAR, AXIS_ACCENT, type Axis } from '@/constants';
 import { useVolumeStore } from '@/store';
 import styled from 'styled-components';
 
-// ── Styled components ──────────────────────────────────────────────────────
-
 const CursorSection = styled.div`
   font-family: var(--mono);
   margin-bottom: 12px;
@@ -61,8 +59,6 @@ const TipKey = styled.b`
   color: var(--ink-2);
   font-weight: 500;
 `;
-
-// ── Constants ──────────────────────────────────────────────────────────────
 
 const AXES: Axis[] = ['x', 'y', 'z'];
 

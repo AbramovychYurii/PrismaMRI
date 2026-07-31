@@ -2,8 +2,6 @@ import { HistogramBar } from '@/components/dock/HistogramBar';
 import { useVolumeStore } from '@/store';
 import styled from 'styled-components';
 
-// ── Styled components ──────────────────────────────────────────────────────
-
 const DisplayCellWrap = styled.div`
   display: flex;
   flex-direction: column;
@@ -58,8 +56,6 @@ const SliderHint = styled.div`
   color: var(--ink-3);
   line-height: 1.4;
 `;
-
-// ── Sub-components ─────────────────────────────────────────────────────────
 
 interface SliderRowProps {
   name: 'Window' | 'Level';

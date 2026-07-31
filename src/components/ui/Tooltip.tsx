@@ -2,8 +2,6 @@ import { memo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
 
-// ── Shared tooltip box ──────────────────────────────────────────────────────
-
 const TipBox = styled.div<{ $x: number; $y: number; $above: boolean }>`
   position: fixed;
   left: ${({ $x }) => $x}px;
@@ -32,8 +30,6 @@ const TipBox = styled.div<{ $x: number; $y: number; $above: boolean }>`
   }
 `;
 
-// ── useTooltip hook — attach to any element directly ───────────────────────
-
 /**
  * Returns mouse-event handlers + a portal node. Use when you need to attach
  * tooltip behaviour to a component that can't accept a wrapper (e.g. a
@@ -60,8 +56,6 @@ export function useTooltip(label: string, above = false) {
 
   return { onMouseEnter, onMouseLeave, portal };
 }
-
-// ── <Tooltip> wrapper — use when you control the children ──────────────────
 
 interface TooltipProps {
   label: string;

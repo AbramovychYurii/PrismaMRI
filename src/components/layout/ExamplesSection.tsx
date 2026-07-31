@@ -6,8 +6,6 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
 
-// ── Types ──────────────────────────────────────────────────────────────────
-
 interface ExampleMeta {
   id: string;
   file: string;
@@ -22,8 +20,6 @@ interface ExampleMeta {
   /** Has a pre-recorded AI report available via the SessionPanel demo button. */
   hasAiReport?: boolean;
 }
-
-// ── Constants ──────────────────────────────────────────────────────────────
 
 const BASE = import.meta.env.BASE_URL;
 
@@ -84,8 +80,6 @@ const EXAMPLES: ExampleMeta[] = [
     thumbnail: `${BASE}examples/thumbnails/full_body.png`,
   },
 ];
-
-// ── Styled components ──────────────────────────────────────────────────────
 
 const ExamplesSectionWrap = styled.section`
   width: 100%;
@@ -354,8 +348,6 @@ const CardDesc = styled.div`
   color: var(--ink-3);
   line-height: 1.4;
 `;
-
-// ── Sub-components ─────────────────────────────────────────────────────────
 
 function ExampleCard({
   example,

@@ -2,7 +2,6 @@ import * as THREE from 'three';
 
 const DOT_COLOR = new THREE.Color(0xff4500);
 
-// ── Tuning knobs ───────────────────────────────────────────────────────────
 // All sizes are relative to sceneSize (max physical extent of the volume, mm).
 
 /** Sphere radius = sceneSize × this */

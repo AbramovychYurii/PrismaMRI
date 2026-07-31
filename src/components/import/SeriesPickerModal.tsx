@@ -13,8 +13,6 @@ import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import styled, { keyframes } from 'styled-components';
 
-// ── Animations ──────────────────────────────────────────────────────────────
-
 const fadeIn = keyframes`
   from { opacity: 0; }
   to   { opacity: 1; }
@@ -24,8 +22,6 @@ const scaleIn = keyframes`
   from { transform: scale(0.95) translateY(6px); opacity: 0; }
   to   { transform: scale(1)    translateY(0);   opacity: 1; }
 `;
-
-// ── Styled components ─────────────────────────────────────────────────────────
 
 const Backdrop = styled.div`
   position: fixed;
@@ -192,8 +188,6 @@ const CancelBtn = styled.button`
   }
 `;
 
-// ── Props ──────────────────────────────────────────────────────────────────
-
 export interface SeriesPickerModalProps {
   series: SeriesChoice[];
   /** Called with the chosen series key. */
@@ -201,8 +195,6 @@ export interface SeriesPickerModalProps {
   /** Called when the user dismisses the picker (Esc, backdrop, Cancel, ✕). */
   onCancel: () => void;
 }
-
-// ── Component ──────────────────────────────────────────────────────────────
 
 export function SeriesPickerModal({ series, onSelect, onCancel }: SeriesPickerModalProps) {
   // Esc → cancel

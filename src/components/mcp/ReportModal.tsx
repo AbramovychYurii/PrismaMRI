@@ -9,12 +9,13 @@
  */
 
 import { AuroraSparkles } from '@/components/ui/AuroraSparkles';
-import { SEVERITY_HEX, SEVERITY_LABEL } from '@/constants';
+import { PLANE_LABEL, SEVERITY_HEX, SEVERITY_LABEL } from '@/constants';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { waitForPaint } from '@/lib/mcp/canvas-utils';
 import { generateReport } from '@/lib/reportPdf';
+import { sliceNumber } from '@/lib/volume/plane';
 import { useVolumeStore } from '@/store/volumeStore';
-import type { AiAnnotation } from '@/types';
+import type { AiAnnotation, SlicePlane } from '@/types';
 import { Download, FileText, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -71,19 +72,9 @@ import {
   SpinIcon,
 } from './ReportModal.styles';
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+const planeName = (plane: SlicePlane) => PLANE_LABEL[plane].primary;
 
-function planeName(plane: string) {
-  return plane.charAt(0).toUpperCase() + plane.slice(1);
-}
-
-function sliceNum(a: AiAnnotation) {
-  if (a.plane === 'coronal') return a.voxel.y + 1;
-  if (a.plane === 'sagittal') return a.voxel.x + 1;
-  return a.voxel.z + 1;
-}
-
-// ── Capture ──────────────────────────────────────────────────────────────────
+const sliceNum = (a: AiAnnotation) => sliceNumber(a.voxel, a.plane);
 
 type Capture = { data: string; ar: number };
 
@@ -139,13 +130,9 @@ function captureRaw(src: HTMLCanvasElement): Capture {
   };
 }
 
-// ── Stable inline-style references ──────────────────────────────────────────
-
 /** Avoid allocating a fresh `style` object on every render of the disabled toggle. */
 const FORMAT_TOGGLE_DISABLED_STYLE: React.CSSProperties = { opacity: 0.4 };
 const FORMAT_TOGGLE_ENABLED_STYLE: React.CSSProperties = { opacity: 1 };
-
-// ── Component ────────────────────────────────────────────────────────────────
 
 type Scope = 'finding' | 'all';
 type Format = 'images' | 'markers';
@@ -186,7 +173,6 @@ export function ReportModal({ finding, findingIndex, allFindings, onClose }: Pro
       return next;
     });
 
-  // ── Capture preview thumbnails — synchronous, NO cursor changes ──────────
   // Captures whatever slice each plane canvas currently shows.
   // This prevents any background viewer repaint when options/scope change.
   // biome-ignore lint/correctness/useExhaustiveDependencies: canvasRefs does not change identity; scope/showImages/showMarkers are the real triggers
@@ -292,7 +278,6 @@ export function ReportModal({ finding, findingIndex, allFindings, onClose }: Pro
         <MobileCloseBtn type="button" aria-label="Close" onClick={onClose}>
           <X size={16} />
         </MobileCloseBtn>
-        {/* ── Left: export controls ──────────────────────────────────────── */}
         <LeftPanel>
           <div>
             <PanelLabel>Export</PanelLabel>
@@ -373,7 +358,6 @@ export function ReportModal({ finding, findingIndex, allFindings, onClose }: Pro
           </DownloadArea>
         </LeftPanel>
 
-        {/* ── Right: preview ─────────────────────────────────────────────── */}
         <RightPanel>
           <PreviewHeader>
             <PreviewLabel>

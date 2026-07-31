@@ -12,8 +12,6 @@ import styled from 'styled-components';
 
 export const DOCK_H = 200;
 
-// ── Styled components ──────────────────────────────────────────────────────
-
 const HeadLine = styled.span`
   flex: 1;
   height: 1px;
@@ -93,8 +91,6 @@ const DockPanel = styled.div<{ $open: boolean; $reduced: boolean }>`
   align-items: stretch;
   padding-bottom: 12px;
 `;
-
-// ── Sub-components ─────────────────────────────────────────────────────────
 
 function CellHead({ title }: { title: string }) {
   return (

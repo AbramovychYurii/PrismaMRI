@@ -14,6 +14,25 @@ interface DirPickerWindow {
   showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>;
 }
 
+const IDLE_LOADING = { active: false, percent: 0, stage: 'idle' as const, message: '' };
+
+function pickFiles(
+  options: { accept?: string; directory?: boolean },
+  onPick: (files: FileList) => void,
+): void {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.multiple = true;
+  if (options.accept) input.accept = options.accept;
+  if (options.directory) input.webkitdirectory = true;
+  input.onchange = () => {
+    if (input.files) onPick(input.files);
+  };
+  input.click();
+}
+
+const isAbort = (err: unknown) => err instanceof DOMException && err.name === 'AbortError';
+
 /**
  * Top-level app glue: worker-backed loading, file/folder pickers, and the
  * global keyboard shortcuts. Also installs the debounced W/L commit and
@@ -33,10 +52,46 @@ export function useViewerApp() {
 
   const abortRef = useRef<AbortController | null>(null);
 
-  // Pending multi-series picker: the list shown to the user, plus the resolver
-  // that the picker UI calls with the chosen series key (or null to cancel).
+  /** Series list shown by the picker, plus the resolver its buttons call. */
   const [pendingSeries, setPendingSeries] = useState<SeriesChoice[] | null>(null);
   const seriesResolveRef = useRef<((key: string | null) => void) | null>(null);
+
+  /** Cancels any load in flight and arms a fresh abort controller. */
+  const beginLoad = useCallback(
+    (message: string) => {
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setError(null);
+      setLoading({ active: true, percent: 0, stage: 'scanning', message });
+      return controller;
+    },
+    [setError, setLoading],
+  );
+
+  const failLoad = useCallback(
+    (err: unknown, fallbackMessage: string) => {
+      if (isAbort(err)) {
+        setLoading(IDLE_LOADING);
+        return;
+      }
+      const message = err instanceof Error ? err.message : fallbackMessage;
+      setError(message);
+      setLoading({ ...IDLE_LOADING, stage: 'error', message });
+    },
+    [setError, setLoading],
+  );
+
+  /** Suspends the load while the user picks a series; null means they cancelled. */
+  const askForSeries = useCallback(async (series: SeriesChoice[]) => {
+    const chosen = await new Promise<string | null>((resolve) => {
+      seriesResolveRef.current = resolve;
+      setPendingSeries(series);
+    });
+    seriesResolveRef.current = null;
+    setPendingSeries(null);
+    return chosen;
+  }, []);
 
   const loadFromSource = useCallback(
     async (
@@ -46,18 +101,7 @@ export function useViewerApp() {
       // the other series after the chosen one loads.
       seriesList?: SeriesChoice[],
     ): Promise<void> => {
-      // Cancel any in-progress load before starting a new one.
-      abortRef.current?.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
-
-      setError(null);
-      setLoading({
-        active: true,
-        percent: 0,
-        stage: 'scanning',
-        message: 'Reading…',
-      });
+      const controller = beginLoad('Reading…');
       try {
         const out = await loadVolumeInWorker(
           source,
@@ -75,59 +119,51 @@ export function useViewerApp() {
           seriesKey,
         );
 
-        // Multi-series source: pause and let the user choose, then re-load the
-        // same source restricted to the chosen series.
         if (out.kind === 'series-choice') {
           abortRef.current = null;
-          setLoading({ active: false, percent: 0, stage: 'idle', message: '' });
-          const chosen = await new Promise<string | null>((resolve) => {
-            seriesResolveRef.current = resolve;
-            setPendingSeries(out.series);
-          });
-          seriesResolveRef.current = null;
-          setPendingSeries(null);
-          if (chosen === null) return; // cancelled
+          setLoading(IDLE_LOADING);
+          const chosen = await askForSeries(out.series);
+          if (chosen === null) return;
           await loadFromSource(source, chosen, out.series);
           return;
         }
 
         const { volume, prepared3D, histogram } = out.result;
-        // Commit setVolume + the route change synchronously so ImportOverlay
-        // starts unmounting before any further work. We deliberately do NOT
-        // clear loading.active here: the route swap doesn't guarantee the
-        // example cards have actually left the DOM (the heavy AppGrid mount
-        // can hold the previous frame on screen), so flipping it to false
-        // mid-transition would briefly un-dim the cards. ViewerPage clears
-        // it from a mount effect — guaranteed to fire only after the viewer
-        // has taken over.
+        // Synchronous so ImportOverlay starts unmounting before anything else
+        // runs. `loading.active` deliberately stays true: the route swap alone
+        // doesn't guarantee the example cards have left the DOM, and clearing
+        // it mid-transition would briefly un-dim them. ViewerPage clears it
+        // from a mount effect instead.
         flushSync(() => {
           setVolume(volume, prepared3D, histogram);
           navigate('/viewer');
         });
-        // Retain the series context so the stage switcher can re-assemble a
-        // different series in place; drop it for single-series / non-DICOM.
+
         if (seriesList && seriesList.length > 1) {
           setSeriesContext(source, seriesList, seriesKey ?? null);
         } else {
           clearSeriesContext();
         }
-        // Save to IndexedDB in the background — don't block the UI.
+
         volumeDb.saveVolume(volume, prepared3D, histogram).catch(() => {
-          // Non-critical: storage might be full or unavailable.
+          /* storage full or unavailable — the volume still loaded */
         });
       } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') {
-          setLoading({ active: false, percent: 0, stage: 'idle', message: '' });
-          return;
-        }
-        const message = err instanceof Error ? err.message : 'Failed to load volume.';
-        setError(message);
-        setLoading({ active: false, percent: 0, stage: 'error', message });
+        failLoad(err, 'Failed to load volume.');
       } finally {
         if (abortRef.current === controller) abortRef.current = null;
       }
     },
-    [setError, setLoading, setVolume, setSeriesContext, clearSeriesContext, navigate],
+    [
+      beginLoad,
+      failLoad,
+      askForSeries,
+      setLoading,
+      setVolume,
+      setSeriesContext,
+      clearSeriesContext,
+      navigate,
+    ],
   );
 
   /** Resolve the open series picker with a chosen key, or null to cancel. */
@@ -148,8 +184,8 @@ export function useViewerApp() {
     [loadFromSource],
   );
 
+  /** Cancels the series picker if it is open, otherwise aborts the worker. */
   const cancelLoad = useCallback(() => {
-    // If the series picker is open, cancel that; otherwise abort the worker.
     if (seriesResolveRef.current) {
       seriesResolveRef.current(null);
       return;
@@ -160,57 +196,36 @@ export function useViewerApp() {
 
   const openFiles = useCallback(
     (files: FileList | File[]) => {
-      const arr = Array.from(files);
-      if (arr.length === 0) return;
-      void loadFromSource(fromFileList(arr));
+      const picked = Array.from(files);
+      if (picked.length === 0) return;
+      void loadFromSource(fromFileList(picked));
     },
     [loadFromSource],
   );
 
   const openFolder = useCallback(async () => {
-    const w = window as unknown as DirPickerWindow;
-    if (w.showDirectoryPicker) {
-      try {
-        const handle = await w.showDirectoryPicker();
-        const source = await fromDirectoryHandle(handle);
-        await loadFromSource(source);
-      } catch (err) {
-        if ((err as DOMException)?.name !== 'AbortError') {
-          setError(err instanceof Error ? err.message : 'Folder pick failed.');
-        }
-      }
+    const picker = (window as unknown as DirPickerWindow).showDirectoryPicker;
+    if (!picker) {
+      pickFiles({ directory: true }, openFiles);
       return;
     }
-    // Fallback: hidden webkitdirectory input
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.webkitdirectory = true;
-    input.multiple = true;
-    input.onchange = () => {
-      if (input.files) openFiles(input.files);
-    };
-    input.click();
+    try {
+      const handle = await picker();
+      await loadFromSource(await fromDirectoryHandle(handle));
+    } catch (err) {
+      if (!isAbort(err)) {
+        setError(err instanceof Error ? err.message : 'Folder pick failed.');
+      }
+    }
   }, [loadFromSource, openFiles, setError]);
 
   const openFile = useCallback(() => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.dcm,.nii,.gz,.nrrd,.nhdr,.mha,.mhd,.zip';
-    input.multiple = true;
-    input.onchange = () => {
-      if (input.files) openFiles(input.files);
-    };
-    input.click();
+    pickFiles({ accept: '.dcm,.nii,.gz,.nrrd,.nhdr,.mha,.mhd,.zip' }, openFiles);
   }, [openFiles]);
 
   const loadFromUrl = useCallback(
     async (url: string, filename: string) => {
-      abortRef.current?.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
-
-      setError(null);
-      setLoading({ active: true, percent: 0, stage: 'scanning', message: 'Fetching…' });
+      const controller = beginLoad('Fetching…');
       try {
         const blob = await fetchBlobWithProgress(
           url,
@@ -220,29 +235,20 @@ export function useViewerApp() {
           },
           controller.signal,
         );
-        const file = new File([blob], filename);
-        openFiles([file]);
+        openFiles([new File([blob], filename)]);
       } catch (err) {
-        if (err instanceof DOMException && err.name === 'AbortError') {
-          setLoading({ active: false, percent: 0, stage: 'idle', message: '' });
-          return;
-        }
-        const message = err instanceof Error ? err.message : 'Failed to fetch example.';
-        setError(message);
-        setLoading({ active: false, percent: 0, stage: 'error', message });
+        failLoad(err, 'Failed to fetch example.');
       } finally {
         if (abortRef.current === controller) abortRef.current = null;
       }
     },
-    [openFiles, setError, setLoading],
+    [openFiles, beginLoad, failLoad, setLoading],
   );
 
   const [showShortcuts, setShowShortcuts] = useState(false);
 
-  // Global shortcuts: Esc → close shortcuts modal only, ⌘/Ctrl+O → open
-  // folder, ? → toggle shortcuts.  Esc no longer navigates back to the import
-  // screen — that's now strictly a click on the "Back to import" button so a
-  // stray Esc can't dump the user out of a long-loaded volume.
+  // Esc only closes the shortcuts modal — never navigates back to import, so a
+  // stray press can't dump the user out of a long-loaded volume.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;

@@ -1,38 +1,15 @@
 /**
- * AnnotationOverlay
- *
- * Renders AI findings on a single 2-D slice panel.  Each marker is anchored to
- * the slice on which it was detected: it only appears when the current slice on
- * this plane is within the active slab range of the finding's voxel coordinate.
- *
- * Markers are colour-coded by clinical severity, thin enough not to obscure the
- * underlying anatomy, and clickable — selecting one focuses it (opens the
- * summary card and emphasises it in 3-D).
+ * Renders AI findings on one 2-D slice panel. A marker appears only while the
+ * current slice is within the active slab range of the finding's voxel, and
+ * selecting it focuses the finding across the whole app.
  */
 
 import { SEVERITY_HEX } from '@/constants';
+import { sliceIndex } from '@/lib/volume/plane';
 import { useVolumeStore } from '@/store/volumeStore';
-import type { AiAnnotation, SlicePlane, VolumeCursor } from '@/types';
+import type { AiAnnotation, SlicePlane } from '@/types';
 import { memo, useMemo } from 'react';
 import styled from 'styled-components';
-
-// ── Geometry ─────────────────────────────────────────────────────────────────
-
-/** The finding's slice index on a given plane (0-based voxel coord). */
-function sliceCoord(plane: SlicePlane, v: VolumeCursor): number {
-  if (plane === 'coronal') return v.y;
-  if (plane === 'sagittal') return v.x;
-  return v.z;
-}
-
-/** Current cursor's slice index on a given plane. */
-function cursorCoord(plane: SlicePlane, c: VolumeCursor): number {
-  if (plane === 'coronal') return c.y;
-  if (plane === 'sagittal') return c.x;
-  return c.z;
-}
-
-// ── Styled components ────────────────────────────────────────────────────────
 
 const Overlay = styled.div`
   position: absolute;
@@ -92,8 +69,6 @@ const PinLabel = styled.span<{
   pointer-events: none;
 `;
 
-// ── Component ────────────────────────────────────────────────────────────────
-
 const PinItem = memo(function PinItem({
   annotation,
   active,
@@ -145,17 +120,15 @@ export function AnnotationOverlay({
 
   // Reveal markers on the exact slice ±1, widening with the active slab.
   const tol = Math.max(halfSlabs, 1);
-  const cur = cursor ? cursorCoord(plane, cursor) : 0;
+  const currentSlice = cursor ? sliceIndex(cursor, plane) : 0;
 
-  // Memoise the visibility list so that scroll across slices that don't pass
-  // through any finding doesn't re-create the array (avoids downstream churn).
   const visible = useMemo(() => {
     if (!cursor) return [];
     return annotations
       .filter((a) => a.plane === plane)
-      .map((a) => ({ a, dist: Math.abs(sliceCoord(plane, a.voxel) - cur) }))
+      .map((a) => ({ a, dist: Math.abs(sliceIndex(a.voxel, plane) - currentSlice) }))
       .filter(({ dist }) => dist <= tol);
-  }, [annotations, plane, cur, tol, cursor]);
+  }, [annotations, plane, currentSlice, tol, cursor]);
 
   if (!cursor || visible.length === 0) return null;
 

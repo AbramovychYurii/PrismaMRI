@@ -11,11 +11,7 @@
 import { DOCK_H } from '@/components/dock/Dock';
 import styled, { keyframes } from 'styled-components';
 
-// ── Shared button states ─────────────────────────────────────────────────────
-
 export type BtnState = 'idle' | 'ok' | 'err';
-
-// ── Animations ───────────────────────────────────────────────────────────────
 
 const pulse = keyframes`
   0%,100% { opacity:1; }
@@ -32,8 +28,6 @@ const borderGlow = keyframes`
     border-color: rgba(80,200,120,0.95);
   }
 `;
-
-// ── Shell ────────────────────────────────────────────────────────────────────
 
 export const Panel = styled.div<{ $dockOpen: boolean }>`
   position: fixed;
@@ -123,8 +117,6 @@ export const PanelBody = styled.div`
   gap: 10px;
 `;
 
-// ── Row / value pairs ────────────────────────────────────────────────────────
-
 export const Row = styled.div`
   display: flex;
   flex-direction: column;
@@ -144,8 +136,6 @@ export const Value = styled.span`
   color: var(--ink-2);
   word-break: break-all;
 `;
-
-// ── Action buttons ───────────────────────────────────────────────────────────
 
 export const ActionBtn = styled.button<{
   $state?: BtnState;
@@ -227,8 +217,6 @@ export const Divider = styled.div`
   margin: 2px 0;
 `;
 
-// ── How-it-works box ─────────────────────────────────────────────────────────
-
 export const HowItWorksBox = styled.div`
   display: flex;
   flex-direction: column;
@@ -294,8 +282,6 @@ export const CapabilityText = styled.span`
   letter-spacing: 0.02em;
 `;
 
-// ── InfoTip ──────────────────────────────────────────────────────────────────
-
 export const InfoBubble = styled.div<{ $x: number; $y: number }>`
   position: fixed;
   left: ${({ $x }) => $x}px;
@@ -329,8 +315,6 @@ export const InfoBtn = styled.button`
   line-height: 1;
   &:hover { color: var(--ink-2); }
 `;
-
-// ── Minimised pill (floating icon) ───────────────────────────────────────────
 
 export const MinimisedPill = styled.button<{
   $connected: boolean;
@@ -372,8 +356,6 @@ export const MinimisedPill = styled.button<{
     right: 12px;
   }
 `;
-
-// ── Prompt-example box ───────────────────────────────────────────────────────
 
 export const PromptBox = styled.div`
   position: relative;

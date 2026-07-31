@@ -1,8 +1,6 @@
 import { useVolumeStore } from '@/store';
 import styled from 'styled-components';
 
-// ── Styled components ──────────────────────────────────────────────────────
-
 const StripGrid = styled.div`
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -47,8 +45,6 @@ const MeasureVal = styled(RunVal)`
   font-size: 13px;
   font-weight: 700;
 `;
-
-// ── Sub-components ─────────────────────────────────────────────────────────
 
 function RunCell({
   k,

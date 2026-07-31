@@ -1,16 +1,3 @@
-/**
- * SlicePanel — single 2-D plane viewer (rail and fullscreen).
- *
- * One panel per plane is rendered inside the Rail aside. Each panel reads its
- * own slice from the active volume, draws it onto a canvas via
- * `useSlicePanelCore`, and overlays crosshair + measurement + AI markers.
- *
- * Expanding a panel mounts an `ExpandedSlicePanel` portal that renders the
- * same content fullscreen with larger controls.
- *
- * All visual styling lives in `SlicePanel.styles.ts`.
- */
-
 import { AnnotationOverlay } from '@/components/mcp/AnnotationOverlay';
 import { MeasureMenu } from '@/components/rail/MeasureMenu';
 import { SliceScrubber } from '@/components/rail/SliceScrubber';
@@ -18,11 +5,17 @@ import { Tooltip } from '@/components/ui/Tooltip';
 import { PLANE_FOOTER, PLANE_GLYPH } from '@/constants';
 import { useHalfSlabs } from '@/hooks/useHalfSlabs';
 import { useIsMobile } from '@/hooks/useIsMobile';
-import { axisColor, axisGlow, cursorFromClick, useSlicePanelCore } from '@/hooks/useSlicePanelCore';
+import {
+  type SlicePanelCore,
+  axisColor,
+  axisGlow,
+  cursorFromClick,
+  useSlicePanelCore,
+} from '@/hooks/useSlicePanelCore';
 import { useVolumeStore } from '@/store/volumeStore';
 import type { SlicePlane } from '@/types';
 import { ChevronsUpDown, Download, Maximize2, Minimize2 } from 'lucide-react';
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ActiveBorder,
@@ -52,27 +45,20 @@ import {
   TrayBtn,
 } from './SlicePanel.styles';
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+const MEASURE_LINE_STROKE_STYLE: React.CSSProperties = { stroke: 'var(--measure)' };
 
-/** Downloads the current canvas slice as a PNG file. */
 function downloadSlice(canvas: HTMLCanvasElement | null, plane: SlicePlane, idx: number): void {
   if (!canvas) return;
   canvas.toBlob((blob) => {
     if (!blob) return;
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `prismamri-${plane}-${idx}.png`;
-    a.click();
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `prismamri-${plane}-${idx}.png`;
+    link.click();
     URL.revokeObjectURL(url);
   }, 'image/png');
 }
-
-// ── Inline style constants (avoid per-render object allocations) ──────────
-
-const MEASURE_LINE_STROKE_STYLE: React.CSSProperties = { stroke: 'var(--measure)' };
-
-// ── TrayButton ─────────────────────────────────────────────────────────────
 
 const TrayButton = memo(function TrayButton({
   label,
@@ -107,7 +93,59 @@ const TrayButton = memo(function TrayButton({
   );
 });
 
-// ── Shared crosshair + measurement overlay ─────────────────────────────────
+function ExportSliceButton({ core, plane, large }: PanelPartProps & { large?: boolean }) {
+  return (
+    <TrayButton
+      large={large}
+      label="Export slice as PNG"
+      onClick={() => downloadSlice(core.canvasRef.current, plane, core.idx)}
+    >
+      <Download size={large ? 13 : 11} />
+    </TrayButton>
+  );
+}
+
+interface PanelPartProps {
+  core: SlicePanelCore;
+  plane: SlicePlane;
+}
+
+function PlaneHeading({ core, plane }: PanelPartProps) {
+  return (
+    <PanelHeader>
+      <PlaneGlyph $color={core.accentColor}>{PLANE_GLYPH[plane]}</PlaneGlyph>
+      <PlaneLabel>
+        <PlaneLabelAccent $color={core.accentColor}>{core.planeLabel.primary}</PlaneLabelAccent>
+        {` · ${core.planeLabel.secondary}`}
+      </PlaneLabel>
+    </PanelHeader>
+  );
+}
+
+function SliceCount({ idx, total }: { idx: number; total: number }) {
+  return (
+    <SliceCounter>
+      <span>{idx}</span>
+      <SliceDim> / {total}</SliceDim>
+    </SliceCounter>
+  );
+}
+
+function MeasureContextMenu({ core }: { core: SlicePanelCore }) {
+  if (!core.menu) return null;
+  return (
+    <MeasureMenu
+      x={core.menu.screenX}
+      y={core.menu.screenY}
+      hasMeasurementFrom={core.measurement !== null}
+      onMeasureFrom={core.onMeasureFrom}
+      onMeasureTo={core.onMeasureTo}
+      onSnapToView={core.onSnapToView}
+      onClear={core.onClear}
+      onClose={core.closeMenu}
+    />
+  );
+}
 
 const CrosshairAndDots = memo(function CrosshairAndDots({
   cross,
@@ -156,10 +194,8 @@ const CrosshairAndDots = memo(function CrosshairAndDots({
         </MeasureLine>
       )}
       {adjustedDots.map((dot, i) => (
-        // Stable index key — we render at most 2 dots and they're identified
-        // by position in the array (0 = from, 1 = to).  Using fx/fy in the key
-        // breaks reconciliation when both points coincide (Shift+click without
-        // drag), leaking dead nodes into the DOM as the user clicks around.
+        // Keyed by role (0 = from, 1 = to): coordinates collide when both
+        // points coincide, which breaks reconciliation and leaks DOM nodes.
         <MeasureDot
           // biome-ignore lint/suspicious/noArrayIndexKey: stable role-based key
           key={i}
@@ -186,193 +222,174 @@ const CrosshairAndDots = memo(function CrosshairAndDots({
   );
 });
 
-// ── ExpandedSlicePanel ──────────────────────────────────────────────────────
+/**
+ * Moves the crosshair to the click position. The first click on an unfocused
+ * panel only focuses it — rotating the 3-D model stays opt-in via the context
+ * menu's "View from this side".
+ */
+function useCrosshairClick(core: SlicePanelCore, plane: SlicePlane) {
+  const { canvasRef, dims, cursor, drawFracs, isActive, setActivePlane, setCursor } = core;
+  return useCallback(
+    (e: React.MouseEvent) => {
+      if (!isActive) {
+        setActivePlane(plane);
+        return;
+      }
+      if (!canvasRef.current || !dims || !cursor) return;
+      setCursor(cursorFromClick(e, canvasRef.current, plane, dims, cursor, drawFracs));
+    },
+    [canvasRef, dims, cursor, drawFracs, isActive, setActivePlane, setCursor, plane],
+  );
+}
 
-function ExpandedSlicePanel({
-  plane,
-  onClose,
-}: {
-  plane: SlicePlane;
-  onClose: () => void;
-}) {
-  // Slab MIP now lives in the global store so it stays in sync across the
-  // rail panels and the fullscreen view, and is controlled from RenderCell.
-  const slabMm = useVolumeStore((s) => s.slabMm);
-  const halfSlabs = useHalfSlabs(plane, slabMm);
+const DRAG_THRESHOLD_PX = 3;
 
-  const {
-    canvasRef,
-    drawFracs,
-    idx,
-    total,
-    cross,
-    adjustedDots,
-    axes,
-    accentColor,
-    planeLabel,
-    isActive,
-    cursor,
-    dims,
-    scrubVisible,
-    setScrubVisible,
-    setCursor,
-    setActivePlane,
-    onWheel,
-    handleScrub,
-    handleContextMenu,
-    onSnapToView,
-    measurement,
-    menu,
-    onMeasureFrom,
-    onMeasureTo,
-    onClear,
-    closeMenu,
-    beginDragMeasurement,
-    updateDragMeasurement,
-  } = useSlicePanelCore(plane, halfSlabs);
+interface DragState {
+  pointerId: number | null;
+  startX: number;
+  startY: number;
+  started: boolean;
+}
 
-  /**
-   * Tracks an in-flight Shift-drag.  We deliberately don't write any
-   * measurement to the store on `pointerdown` — only on the first pointermove
-   * that exceeds `DRAG_THRESHOLD_PX`.  This avoids two problems:
-   *  • A bare Shift-click (no drag) would otherwise create a degenerate
-   *    `from === to` measurement and leave an orange dot behind.
-   *  • Two dots at the same coordinate produced duplicate React keys, which
-   *    broke reconciliation and leaked nodes as the user clicked around.
-   */
-  const DRAG_THRESHOLD_PX = 3;
-  const dragRef = useRef<{
-    pointerId: number | null;
-    startX: number;
-    startY: number;
-    started: boolean;
-  }>({ pointerId: null, startX: 0, startY: 0, started: false });
+const NO_DRAG: DragState = { pointerId: null, startX: 0, startY: 0, started: false };
 
-  const footer = PLANE_FOOTER[plane];
+/**
+ * Shift+drag measurement. Nothing reaches the store until the pointer clears
+ * {@link DRAG_THRESHOLD_PX}, so a bare Shift+click neither drops a zero-length
+ * measurement nor wipes the existing one.
+ */
+function useShiftDragMeasurement(core: SlicePanelCore, plane: SlicePlane) {
+  const drag = useRef<DragState>(NO_DRAG);
+  const { canvasRef, dims, cursor, drawFracs, isActive, setActivePlane } = core;
 
-  // Expanding a panel auto-focuses it — first click should move the cursor
-  // immediately, not just focus an already-fullscreen view.
-  useEffect(() => {
-    setActivePlane(plane);
-  }, [plane, setActivePlane]);
-
-  // Esc collapses the fullscreen panel back to the rail view.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
-  function handleClick(e: React.MouseEvent) {
+  const onPointerDown = (e: React.PointerEvent) => {
     e.stopPropagation();
-    // Shift+click is reserved for measurement — don't also move the crosshair.
-    if (e.shiftKey) return;
-    // First click on an inactive panel just focuses it — cursor only moves on
-    // subsequent clicks. Rotating the 3-D model is opt-in via the context-menu
-    // "View from this side" item.
-    if (!isActive) {
-      setActivePlane(plane);
-      return;
-    }
-    if (!canvasRef.current || !dims || !cursor) return;
-    setCursor(cursorFromClick(e, canvasRef.current, plane, dims, cursor, drawFracs));
-  }
-
-  function handlePointerDown(e: React.PointerEvent) {
-    e.stopPropagation();
-    // Shift+drag = measurement.  Left-button pointers only.
     if (!e.shiftKey || e.button !== 0) return;
     if (!canvasRef.current || !dims || !cursor) return;
     e.preventDefault();
     if (!isActive) setActivePlane(plane);
-    // Arm a drag — measurement won't be created until the cursor actually
-    // moves past DRAG_THRESHOLD_PX.  A bare click writes nothing.
-    dragRef.current = {
-      pointerId: e.pointerId,
-      startX: e.clientX,
-      startY: e.clientY,
-      started: false,
-    };
-    // Capture so we keep getting moves/up even if the cursor leaves the panel.
+    drag.current = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, started: false };
+    // Capture so moves keep arriving once the pointer leaves the panel.
     e.currentTarget.setPointerCapture(e.pointerId);
-  }
+  };
 
-  function handlePointerMove(e: React.PointerEvent) {
-    const d = dragRef.current;
-    if (d.pointerId === null || d.pointerId !== e.pointerId) return;
+  const onPointerMove = (e: React.PointerEvent) => {
+    const state = drag.current;
+    if (state.pointerId !== e.pointerId || state.pointerId === null) return;
     if (!canvasRef.current) return;
-    if (!d.started) {
-      const dx = e.clientX - d.startX;
-      const dy = e.clientY - d.startY;
-      if (dx * dx + dy * dy < DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) return;
-      // First real movement — commit the start point now (using the original
-      // pointerdown coordinates, not the slightly-displaced current ones) so
-      // the line begins exactly where the user pressed.
-      beginDragMeasurement({ clientX: d.startX, clientY: d.startY }, canvasRef.current, drawFracs);
-      d.started = true;
-    }
-    updateDragMeasurement(e, canvasRef.current, drawFracs);
-  }
 
-  function handlePointerUp(e: React.PointerEvent) {
-    e.stopPropagation();
-    const d = dragRef.current;
-    if (d.pointerId === e.pointerId) {
-      try {
-        e.currentTarget.releasePointerCapture(e.pointerId);
-      } catch {
-        /* already released */
-      }
-      // If the user pressed Shift+clicked without dragging, nothing was ever
-      // written to the store — nothing to clean up.  The previously-displayed
-      // measurement is intentionally preserved so a stray click doesn't wipe
-      // an existing line.
-      dragRef.current = { pointerId: null, startX: 0, startY: 0, started: false };
+    if (!state.started) {
+      const dx = e.clientX - state.startX;
+      const dy = e.clientY - state.startY;
+      if (dx * dx + dy * dy < DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) return;
+      // Anchor to where the press landed, not to the already-displaced pointer.
+      core.beginDragMeasurement(
+        { clientX: state.startX, clientY: state.startY },
+        canvasRef.current,
+        drawFracs,
+      );
+      state.started = true;
     }
-  }
+    core.updateDragMeasurement(e, canvasRef.current, drawFracs);
+  };
+
+  const onPointerUp = (e: React.PointerEvent) => {
+    e.stopPropagation();
+    if (drag.current.pointerId !== e.pointerId) return;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      /* already released */
+    }
+    drag.current = NO_DRAG;
+  };
+
+  return { onPointerDown, onPointerMove, onPointerUp };
+}
+
+function useEscapeKey(onEscape: () => void) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onEscape();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onEscape]);
+}
+
+/** Pixels of vertical swipe that traverse the plane's full slice range. */
+const TOUCH_SWIPE_FULL_RANGE_PX = 300;
+
+function useSliceSwipe(core: SlicePanelCore, plane: SlicePlane) {
+  const gesture = useRef<{ startY: number; startIdx: number } | null>(null);
+  const { idx, total, isActive, setActivePlane, handleScrub } = core;
+
+  return {
+    onTouchStart: (e: React.TouchEvent) => {
+      if (!isActive) setActivePlane(plane);
+      gesture.current = { startY: e.touches[0].clientY, startIdx: idx };
+    },
+    onTouchMove: (e: React.TouchEvent) => {
+      if (!gesture.current) return;
+      const travelled = gesture.current.startY - e.touches[0].clientY;
+      const step = Math.round((travelled / TOUCH_SWIPE_FULL_RANGE_PX) * total);
+      if (step === 0) return;
+      const nextIdx = Math.max(1, Math.min(total, gesture.current.startIdx + step));
+      handleScrub(nextIdx);
+      gesture.current = { startY: e.touches[0].clientY, startIdx: nextIdx };
+    },
+    onTouchEnd: () => {
+      gesture.current = null;
+    },
+  };
+}
+
+function ExpandedSlicePanel({ plane, onClose }: { plane: SlicePlane; onClose: () => void }) {
+  const slabMm = useVolumeStore((s) => s.slabMm);
+  const halfSlabs = useHalfSlabs(plane, slabMm);
+  const core = useSlicePanelCore(plane, halfSlabs);
+  const { idx, total, isActive, scrubVisible, setScrubVisible, setActivePlane } = core;
+
+  const moveCrosshair = useCrosshairClick(core, plane);
+  const dragHandlers = useShiftDragMeasurement(core, plane);
+  const footer = PLANE_FOOTER[plane];
+
+  // Expanding auto-focuses the panel so the first click moves the crosshair.
+  useEffect(() => {
+    setActivePlane(plane);
+  }, [plane, setActivePlane]);
+
+  useEscapeKey(onClose);
 
   return createPortal(
     <FullscreenOverlay
       $isActive={isActive}
-      onClick={handleClick}
-      onContextMenu={handleContextMenu}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!e.shiftKey) moveCrosshair(e);
+      }}
+      onContextMenu={core.handleContextMenu}
       onWheel={(e) => {
         e.stopPropagation();
-        onWheel(e);
+        core.onWheel(e);
       }}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
+      {...dragHandlers}
     >
-      <StyledCanvas ref={canvasRef as React.Ref<HTMLCanvasElement>} />
+      <StyledCanvas ref={core.canvasRef as React.Ref<HTMLCanvasElement>} />
 
       <CrosshairAndDots
-        cross={cross}
-        axes={axes}
-        adjustedDots={adjustedDots}
-        distanceMm={measurement?.distanceMm ?? null}
+        cross={core.cross}
+        axes={core.axes}
+        adjustedDots={core.adjustedDots}
+        distanceMm={core.measurement?.distanceMm ?? null}
       />
 
       <AnnotationOverlay plane={plane} halfSlabs={halfSlabs} />
 
-      <PanelHeader>
-        <PlaneGlyph $color={accentColor}>{PLANE_GLYPH[plane]}</PlaneGlyph>
-        <PlaneLabel>
-          <PlaneLabelAccent $color={accentColor}>{planeLabel.primary}</PlaneLabelAccent>
-          {` · ${planeLabel.secondary}`}
-        </PlaneLabel>
-      </PanelHeader>
+      <PlaneHeading core={core} plane={plane} />
 
       <ButtonTray>
-        <TrayButton
-          large
-          label="Export slice as PNG"
-          onClick={() => downloadSlice(canvasRef.current, plane, idx)}
-        >
-          <Download size={13} />
-        </TrayButton>
+        <ExportSliceButton core={core} plane={plane} large />
         <TrayButton large label="Collapse panel" onClick={onClose}>
           <Minimize2 size={13} />
         </TrayButton>
@@ -395,7 +412,7 @@ function ExpandedSlicePanel({
           slice={idx}
           total={total}
           visible={scrubVisible}
-          onChange={handleScrub}
+          onChange={core.handleScrub}
         />
       )}
 
@@ -403,152 +420,60 @@ function ExpandedSlicePanel({
         <span>
           {footer.hint} · {footer.code} · SHIFT+DRAG · MEASURE
         </span>
-        {total > 0 && (
-          <SliceCounter>
-            <span>{idx}</span>
-            <SliceDim> / {total}</SliceDim>
-          </SliceCounter>
-        )}
+        {total > 0 && <SliceCount idx={idx} total={total} />}
       </PanelFooter>
 
       {isActive && <ActiveBorder />}
 
-      {menu && (
-        <MeasureMenu
-          x={menu.screenX}
-          y={menu.screenY}
-          hasMeasurementFrom={measurement !== null}
-          onMeasureFrom={onMeasureFrom}
-          onMeasureTo={onMeasureTo}
-          onSnapToView={onSnapToView}
-          onClear={onClear}
-          onClose={closeMenu}
-        />
-      )}
+      <MeasureContextMenu core={core} />
     </FullscreenOverlay>,
     document.body,
   );
 }
 
-// ── SlicePanel ─────────────────────────────────────────────────────────────
-
-/** Sensitivity of touch-swipe slice navigation — pixels per full range traversal. */
-const TOUCH_SWIPE_FULL_RANGE_PX = 300;
-
 export function SlicePanel({ plane }: { plane: SlicePlane }) {
   const [expanded, setExpanded] = useState(false);
   const isMobile = useIsMobile();
-  // Slab MIP comes from the global store — controlled in the Render dock cell
-  // and applied uniformly to all three rail panels + the fullscreen view.
   const slabMm = useVolumeStore((s) => s.slabMm);
   const halfSlabs = useHalfSlabs(plane, slabMm);
   const setCanvasRef = useVolumeStore((s) => s.setCanvasRef);
 
-  const {
-    canvasRef,
-    drawFracs,
-    idx,
-    total,
-    cross,
-    adjustedDots,
-    axes,
-    accentColor,
-    planeLabel,
-    isActive,
-    cursor,
-    dims,
-    scrubVisible,
-    setScrubVisible,
-    setCursor,
-    setActivePlane,
-    onWheel,
-    handleScrub,
-    handleContextMenu,
-    onSnapToView,
-    measurement,
-    menu,
-    onMeasureFrom,
-    onMeasureTo,
-    onClear,
-    closeMenu,
-  } = useSlicePanelCore(plane, halfSlabs);
-  // Touch-swipe slice navigation — tracks gesture start state.
-  const touchRef = useRef<{ startY: number; startIdx: number } | null>(null);
+  const core = useSlicePanelCore(plane, halfSlabs);
+  const { canvasRef, idx, total, isActive, scrubVisible, setScrubVisible } = core;
 
-  // Register canvas with the store so useMcpBridge can capture it.
+  const moveCrosshair = useCrosshairClick(core, plane);
+  const swipeHandlers = useSliceSwipe(core, plane);
+
+  // Registered so useMcpBridge can capture this canvas.
   useEffect(() => {
     setCanvasRef(plane, canvasRef.current);
     return () => setCanvasRef(plane, null);
   }, [plane, setCanvasRef, canvasRef]);
 
-  const isLast = plane === 'axial';
-  // On mobile the scrubber is always visible — no toggle needed.
+  // The scrubber is always on mobile — there is no toggle there.
   const scrubberVisible = isMobile || scrubVisible;
-
-  function handleClick(e: React.MouseEvent) {
-    // First click on an inactive panel just focuses it — cursor only moves on
-    // subsequent clicks. Rotating the 3-D model is opt-in via the context-menu
-    // "View from this side" item.
-    if (!isActive) {
-      setActivePlane(plane);
-      return;
-    }
-    if (!canvasRef.current || !dims || !cursor) return;
-    setCursor(cursorFromClick(e, canvasRef.current, plane, dims, cursor, drawFracs));
-  }
-
-  function handleTouchStart(e: React.TouchEvent) {
-    if (!isActive) setActivePlane(plane);
-    const t = e.touches[0];
-    touchRef.current = { startY: t.clientY, startIdx: idx };
-  }
-
-  function handleTouchMove(e: React.TouchEvent) {
-    if (!touchRef.current) return;
-    const t = e.touches[0];
-    const dy = touchRef.current.startY - t.clientY;
-    // Sensitivity: traverse full range over 300 px of swipe.
-    const step = Math.round((dy / TOUCH_SWIPE_FULL_RANGE_PX) * total);
-    if (step === 0) return;
-    const newIdx = Math.max(1, Math.min(total, touchRef.current.startIdx + step));
-    handleScrub(newIdx);
-    touchRef.current = { startY: t.clientY, startIdx: newIdx };
-  }
-
-  function handleTouchEnd() {
-    touchRef.current = null;
-  }
 
   return (
     <PanelWrap
       data-testid={`slice-panel-${plane}`}
-      onClick={handleClick}
-      onContextMenu={handleContextMenu}
-      onWheel={onWheel}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      $isLast={isLast}
+      onClick={moveCrosshair}
+      onContextMenu={core.handleContextMenu}
+      onWheel={core.onWheel}
+      {...swipeHandlers}
+      $isLast={plane === 'axial'}
       $isActive={isActive}
     >
       <StyledCanvas ref={canvasRef as React.Ref<HTMLCanvasElement>} />
 
       <CrosshairAndDots
-        cross={cross}
-        axes={axes}
-        adjustedDots={adjustedDots}
-        distanceMm={measurement?.distanceMm ?? null}
+        cross={core.cross}
+        axes={core.axes}
+        adjustedDots={core.adjustedDots}
+        distanceMm={core.measurement?.distanceMm ?? null}
       />
 
-      <PanelHeader>
-        <PlaneGlyph $color={accentColor}>{PLANE_GLYPH[plane]}</PlaneGlyph>
-        <PlaneLabel>
-          <PlaneLabelAccent $color={accentColor}>{planeLabel.primary}</PlaneLabelAccent>
-          {` · ${planeLabel.secondary}`}
-        </PlaneLabel>
-      </PanelHeader>
+      <PlaneHeading core={core} plane={plane} />
 
-      {/* ── Mobile: flex-column right rail (Scrubber → Download → Counter) ── */}
       {isMobile ? (
         <MobileRightCol>
           {total > 0 && (
@@ -558,15 +483,10 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
               total={total}
               visible
               inline
-              onChange={handleScrub}
+              onChange={core.handleScrub}
             />
           )}
-          <TrayButton
-            label="Export slice as PNG"
-            onClick={() => downloadSlice(canvasRef.current, plane, idx)}
-          >
-            <Download size={11} />
-          </TrayButton>
+          <ExportSliceButton core={core} plane={plane} />
           {total > 0 && (
             <MobileCounter>
               {idx}
@@ -575,7 +495,6 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
           )}
         </MobileRightCol>
       ) : (
-        /* ── Desktop: ButtonTray (top-right) + absolute Scrubber ── */
         <>
           <ButtonTray>
             <TrayButton label="Expand panel" onClick={() => setExpanded(true)}>
@@ -597,7 +516,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
               slice={idx}
               total={total}
               visible={scrubVisible}
-              onChange={handleScrub}
+              onChange={core.handleScrub}
             />
           )}
         </>
@@ -607,28 +526,12 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
         <span>
           {PLANE_FOOTER[plane].hint} · {PLANE_FOOTER[plane].code}
         </span>
-        {!isMobile && total > 0 && (
-          <SliceCounter>
-            <span>{idx}</span>
-            <SliceDim> / {total}</SliceDim>
-          </SliceCounter>
-        )}
+        {!isMobile && total > 0 && <SliceCount idx={idx} total={total} />}
       </PanelFooter>
 
       {isActive && <ActiveBorder />}
 
-      {menu && (
-        <MeasureMenu
-          x={menu.screenX}
-          y={menu.screenY}
-          hasMeasurementFrom={measurement !== null}
-          onMeasureFrom={onMeasureFrom}
-          onMeasureTo={onMeasureTo}
-          onSnapToView={onSnapToView}
-          onClear={onClear}
-          onClose={closeMenu}
-        />
-      )}
+      <MeasureContextMenu core={core} />
 
       <AnnotationOverlay plane={plane} halfSlabs={halfSlabs} />
 

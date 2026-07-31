@@ -1,4 +1,5 @@
 import { buildInt16WLLut, grayToRgba, mapIntensityToGray } from '@/lib/volume/math';
+import { sliceCount } from '@/lib/volume/plane';
 import type { LoadedVolume, SliceImage, SlicePlane, SliceWindowLevel } from '@/types';
 
 const MAX_CACHE = 64;
@@ -18,148 +19,138 @@ function cacheKey(plane: SlicePlane, index: number, wl: SliceWindowLevel, halfSl
 }
 
 function getEntry(volume: LoadedVolume): CacheEntry {
-  let e = cache.get(volume);
-  if (!e) {
-    e = { order: [], map: new Map(), lut: null, lutWindow: Number.NaN, lutLevel: Number.NaN };
-    cache.set(volume, e);
+  let entry = cache.get(volume);
+  if (!entry) {
+    entry = { order: [], map: new Map(), lut: null, lutWindow: Number.NaN, lutLevel: Number.NaN };
+    cache.set(volume, entry);
   }
-  return e;
+  return entry;
 }
 
-/** Returns a cached Int16 LUT for this volume+WL, rebuilding only when WL changes. */
+/** Cached Int16 W/L lookup table, rebuilt only when the window or level changes. */
 function getLut(volume: LoadedVolume, wl: SliceWindowLevel): Uint8Array | null {
   if (!(volume.voxels instanceof Int16Array)) return null;
-  const e = getEntry(volume);
-  if (e.lut && e.lutWindow === wl.window && e.lutLevel === wl.level) return e.lut;
-  e.lut = buildInt16WLLut(wl);
-  e.lutWindow = wl.window;
-  e.lutLevel = wl.level;
-  return e.lut;
+  const entry = getEntry(volume);
+  if (entry.lut && entry.lutWindow === wl.window && entry.lutLevel === wl.level) return entry.lut;
+  entry.lut = buildInt16WLLut(wl);
+  entry.lutWindow = wl.window;
+  entry.lutLevel = wl.level;
+  return entry.lut;
 }
 
-function store(volume: LoadedVolume, key: string, img: SliceImage): SliceImage {
-  const e = getEntry(volume);
-  e.map.set(key, img);
-  e.order.push(key);
-  if (e.order.length > MAX_CACHE) {
-    const evict = e.order.shift();
-    if (evict) e.map.delete(evict);
+function store(volume: LoadedVolume, key: string, image: SliceImage): SliceImage {
+  const entry = getEntry(volume);
+  entry.map.set(key, image);
+  entry.order.push(key);
+  if (entry.order.length > MAX_CACHE) {
+    const evicted = entry.order.shift();
+    if (evicted) entry.map.delete(evicted);
   }
-  return img;
+  return image;
 }
 
-/** Axial: XY plane at fixed z. width = dimX, height = dimY. */
-export function extractAxialImage(
-  volume: LoadedVolume,
-  z: number,
+/**
+ * How a plane's pixels map onto the linear voxel buffer. Rows of the coronal
+ * and sagittal images run bottom-up so anatomy stays head-up, which is why
+ * their `rowStart` walks backwards through z.
+ */
+interface SliceLayout {
+  width: number;
+  height: number;
+  /** Voxel index of the leftmost pixel of `row` within slice `index`. */
+  rowStart(index: number, row: number): number;
+  /** Voxel-index step between horizontally adjacent pixels. */
+  columnStep: number;
+}
+
+function sliceLayout(plane: SlicePlane, dims: readonly [number, number, number]): SliceLayout {
+  const [w, h, d] = dims;
+  const sliceStride = w * h;
+  if (plane === 'axial') {
+    return {
+      width: w,
+      height: h,
+      rowStart: (z, row) => sliceStride * z + w * row,
+      columnStep: 1,
+    };
+  }
+  if (plane === 'coronal') {
+    return {
+      width: w,
+      height: d,
+      rowStart: (y, row) => w * y + sliceStride * (d - 1 - row),
+      columnStep: 1,
+    };
+  }
+  return {
+    width: h,
+    height: d,
+    rowStart: (x, row) => x + sliceStride * (d - 1 - row),
+    columnStep: w,
+  };
+}
+
+/** Applies W/L to a plane of raw scalars, writing opaque grayscale RGBA. */
+function scalarsToRgba(
+  scalars: ArrayLike<number>,
+  count: number,
+  lut: Uint8Array | null,
   wl: SliceWindowLevel,
-): SliceImage {
-  const [w, h] = volume.meta.dims;
-  const data = new Uint8ClampedArray(w * h * 4);
-  const base = w * h * z;
-  const vox = volume.voxels;
-  const lut = getLut(volume, wl);
-  const total = w * h;
+): Uint8ClampedArray {
+  const data = new Uint8ClampedArray(count * 4);
   if (lut) {
-    for (let i = 0; i < total; i++) {
-      const g = lut[(vox[base + i] as number) + 32768];
-      const o = i * 4;
-      data[o] = data[o + 1] = data[o + 2] = g;
-      data[o + 3] = 255;
-    }
+    for (let i = 0; i < count; i++) grayToRgba(lut[Math.round(scalars[i]) + 32768], data, i * 4);
   } else {
-    for (let i = 0; i < total; i++) {
-      grayToRgba(mapIntensityToGray(vox[base + i], wl), data, i * 4);
-    }
+    for (let i = 0; i < count; i++) grayToRgba(mapIntensityToGray(scalars[i], wl), data, i * 4);
   }
-  return { width: w, height: h, data };
+  return data;
 }
 
-/**
- * Coronal: XZ plane at fixed y. width = dimX, height = dimZ.
- * z iterates from depth-1 down to 0 so the head is up (anatomical).
- */
-export function extractCoronalImage(
+function extractPlaneImage(
   volume: LoadedVolume,
-  y: number,
+  plane: SlicePlane,
+  index: number,
   wl: SliceWindowLevel,
 ): SliceImage {
-  const [w, h, d] = volume.meta.dims;
-  const data = new Uint8ClampedArray(w * d * 4);
-  const vox = volume.voxels;
+  const { width, height, rowStart, columnStep } = sliceLayout(plane, volume.meta.dims);
+  const voxels = volume.voxels;
   const lut = getLut(volume, wl);
-  for (let row = 0; row < d; row++) {
-    const base = w * (y + h * (d - 1 - row));
-    const dstRow = w * row;
+  const data = new Uint8ClampedArray(width * height * 4);
+
+  for (let row = 0; row < height; row++) {
+    const base = rowStart(index, row);
+    const dst = row * width;
     if (lut) {
-      for (let x = 0; x < w; x++) {
-        const g = lut[(vox[base + x] as number) + 32768];
-        const o = (dstRow + x) * 4;
-        data[o] = data[o + 1] = data[o + 2] = g;
-        data[o + 3] = 255;
+      for (let col = 0; col < width; col++) {
+        grayToRgba(lut[(voxels[base + col * columnStep] as number) + 32768], data, (dst + col) * 4);
       }
     } else {
-      for (let x = 0; x < w; x++) {
-        grayToRgba(mapIntensityToGray(vox[base + x], wl), data, (dstRow + x) * 4);
+      for (let col = 0; col < width; col++) {
+        grayToRgba(mapIntensityToGray(voxels[base + col * columnStep], wl), data, (dst + col) * 4);
       }
     }
   }
-  return { width: w, height: d, data };
+
+  return { width, height, data };
 }
 
 /**
- * Sagittal: YZ plane at fixed x. width = dimY, height = dimZ.
- * z iterates from depth-1 down to 0 (anatomical).
+ * Reusable accumulation buffer for slab MIP — a fresh Float32Array per scroll
+ * tick (up to ~1 MB) would dominate GC at 60 fps. Safe because each call runs
+ * to completion on the single JS thread.
  */
-export function extractSagittalImage(
-  volume: LoadedVolume,
-  x: number,
-  wl: SliceWindowLevel,
-): SliceImage {
-  const [w, h, d] = volume.meta.dims;
-  const data = new Uint8ClampedArray(h * d * 4);
-  const vox = volume.voxels;
-  const lut = getLut(volume, wl);
-  for (let row = 0; row < d; row++) {
-    const zBase = w * h * (d - 1 - row);
-    const dstRow = h * row;
-    if (lut) {
-      for (let y = 0; y < h; y++) {
-        const g = lut[(vox[x + w * y + zBase] as number) + 32768];
-        const o = (dstRow + y) * 4;
-        data[o] = data[o + 1] = data[o + 2] = g;
-        data[o + 3] = 255;
-      }
-    } else {
-      for (let y = 0; y < h; y++) {
-        grayToRgba(mapIntensityToGray(vox[x + w * y + zBase], wl), data, (dstRow + y) * 4);
-      }
-    }
-  }
-  return { width: h, height: d, data };
-}
+let mipBuffer: Float32Array | null = null;
 
-// ── Slab MIP helpers ───────────────────────────────────────────────────────
-
-/**
- * Module-level reusable accumulation buffer for slab MIP.
- * Avoids allocating a fresh Float32Array (up to ~1 MB for 512×512) on every
- * scroll tick, which would cause heavy GC pressure at 60 fps.
- * Safe because JS is single-threaded — each call completes before the next.
- */
-let _mipBuf: Float32Array | null = null;
-function getMipBuf(size: number): Float32Array {
-  if (!_mipBuf || _mipBuf.length < size) {
-    _mipBuf = new Float32Array(size);
-  }
-  _mipBuf.fill(Number.NEGATIVE_INFINITY, 0, size);
-  return _mipBuf;
+function takeMipBuffer(size: number): Float32Array {
+  if (!mipBuffer || mipBuffer.length < size) mipBuffer = new Float32Array(size);
+  mipBuffer.fill(Number.NEGATIVE_INFINITY, 0, size);
+  return mipBuffer;
 }
 
 /**
- * Maximum Intensity Projection across a slab of `halfSlabs` slices on each
- * side of `centerIndex`. Per-pixel max is computed in raw scalar space before
- * the W/L LUT is applied, so the result faithfully represents peak intensity.
+ * Maximum Intensity Projection across `halfSlabs` slices either side of
+ * `centerIndex`. The per-pixel maximum is taken in raw scalar space before W/L
+ * is applied, so the result reflects true peak intensity.
  */
 export function extractSlabMipImage(
   volume: LoadedVolume,
@@ -168,100 +159,27 @@ export function extractSlabMipImage(
   halfSlabs: number,
   wl: SliceWindowLevel,
 ): SliceImage {
-  const [w, h, d] = volume.meta.dims;
-  const vox = volume.voxels;
-  const lut = getLut(volume, wl);
+  const dims = volume.meta.dims;
+  const { width, height, rowStart, columnStep } = sliceLayout(plane, dims);
+  const voxels = volume.voxels;
+  const total = width * height;
+  const peaks = takeMipBuffer(total);
 
-  if (plane === 'axial') {
-    const z0 = Math.max(0, centerIndex - halfSlabs);
-    const z1 = Math.min(d - 1, centerIndex + halfSlabs);
-    const total = w * h;
-    const maxVals = getMipBuf(total);
-    for (let z = z0; z <= z1; z++) {
-      const base = w * h * z;
-      for (let i = 0; i < total; i++) {
-        const v = vox[base + i] as number;
-        if (v > maxVals[i]) maxVals[i] = v;
+  const first = Math.max(0, centerIndex - halfSlabs);
+  const last = Math.min(sliceCount(dims, plane) - 1, centerIndex + halfSlabs);
+
+  for (let index = first; index <= last; index++) {
+    for (let row = 0; row < height; row++) {
+      const base = rowStart(index, row);
+      const dst = row * width;
+      for (let col = 0; col < width; col++) {
+        const value = voxels[base + col * columnStep] as number;
+        if (value > peaks[dst + col]) peaks[dst + col] = value;
       }
     }
-    const data = new Uint8ClampedArray(total * 4);
-    if (lut) {
-      for (let i = 0; i < total; i++) {
-        const g = lut[Math.round(maxVals[i]) + 32768];
-        const o = i * 4;
-        data[o] = data[o + 1] = data[o + 2] = g;
-        data[o + 3] = 255;
-      }
-    } else {
-      for (let i = 0; i < total; i++) {
-        grayToRgba(mapIntensityToGray(maxVals[i], wl), data, i * 4);
-      }
-    }
-    return { width: w, height: h, data };
   }
 
-  if (plane === 'coronal') {
-    const y0 = Math.max(0, centerIndex - halfSlabs);
-    const y1 = Math.min(h - 1, centerIndex + halfSlabs);
-    const total = w * d;
-    const maxVals = getMipBuf(total);
-    for (let y = y0; y <= y1; y++) {
-      for (let row = 0; row < d; row++) {
-        const base = w * (y + h * (d - 1 - row));
-        const dstRow = w * row;
-        for (let x = 0; x < w; x++) {
-          const v = vox[base + x] as number;
-          const idx = dstRow + x;
-          if (v > maxVals[idx]) maxVals[idx] = v;
-        }
-      }
-    }
-    const data = new Uint8ClampedArray(total * 4);
-    if (lut) {
-      for (let i = 0; i < total; i++) {
-        const g = lut[Math.round(maxVals[i]) + 32768];
-        const o = i * 4;
-        data[o] = data[o + 1] = data[o + 2] = g;
-        data[o + 3] = 255;
-      }
-    } else {
-      for (let i = 0; i < total; i++) {
-        grayToRgba(mapIntensityToGray(maxVals[i], wl), data, i * 4);
-      }
-    }
-    return { width: w, height: d, data };
-  }
-
-  // sagittal
-  const x0 = Math.max(0, centerIndex - halfSlabs);
-  const x1 = Math.min(w - 1, centerIndex + halfSlabs);
-  const total = h * d;
-  const maxVals = getMipBuf(total);
-  for (let x = x0; x <= x1; x++) {
-    for (let row = 0; row < d; row++) {
-      const zBase = w * h * (d - 1 - row);
-      const dstRow = h * row;
-      for (let y = 0; y < h; y++) {
-        const v = vox[x + w * y + zBase] as number;
-        const idx = dstRow + y;
-        if (v > maxVals[idx]) maxVals[idx] = v;
-      }
-    }
-  }
-  const data = new Uint8ClampedArray(total * 4);
-  if (lut) {
-    for (let i = 0; i < total; i++) {
-      const g = lut[Math.round(maxVals[i]) + 32768];
-      const o = i * 4;
-      data[o] = data[o + 1] = data[o + 2] = g;
-      data[o + 3] = 255;
-    }
-  } else {
-    for (let i = 0; i < total; i++) {
-      grayToRgba(mapIntensityToGray(maxVals[i], wl), data, i * 4);
-    }
-  }
-  return { width: h, height: d, data };
+  return { width, height, data: scalarsToRgba(peaks, total, getLut(volume, wl), wl) };
 }
 
 export function extractSliceGrayImage(
@@ -272,18 +190,12 @@ export function extractSliceGrayImage(
   halfSlabs = 0,
 ): SliceImage {
   const key = cacheKey(plane, index, wl, halfSlabs);
-  const e = getEntry(volume);
-  const hit = e.map.get(key);
-  if (hit) return hit;
-  let img: SliceImage;
-  if (halfSlabs > 0) {
-    img = extractSlabMipImage(volume, plane, index, halfSlabs, wl);
-  } else if (plane === 'axial') {
-    img = extractAxialImage(volume, index, wl);
-  } else if (plane === 'coronal') {
-    img = extractCoronalImage(volume, index, wl);
-  } else {
-    img = extractSagittalImage(volume, index, wl);
-  }
-  return store(volume, key, img);
+  const cached = getEntry(volume).map.get(key);
+  if (cached) return cached;
+
+  const image =
+    halfSlabs > 0
+      ? extractSlabMipImage(volume, plane, index, halfSlabs, wl)
+      : extractPlaneImage(volume, plane, index, wl);
+  return store(volume, key, image);
 }

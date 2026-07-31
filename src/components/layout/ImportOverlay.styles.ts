@@ -7,8 +7,6 @@
 
 import styled from 'styled-components';
 
-// ── Shell ────────────────────────────────────────────────────────────────────
-
 export const ImportMain = styled.main`
   position: fixed;
   inset: 0;
@@ -85,8 +83,6 @@ export const GithubLink = styled.a`
   }
 `;
 
-// ── Marketing copy ───────────────────────────────────────────────────────────
-
 export const TagLine = styled.div`
   font-family: var(--mono);
   font-size: 14px;
@@ -132,8 +128,6 @@ export const DescParagraph = styled.p`
   margin-bottom: 16px;
 `;
 
-// ── Supported-formats badges ─────────────────────────────────────────────────
-
 export const FormatList = styled.ul`
   list-style: none;
   margin: 0;
@@ -176,8 +170,6 @@ export const DisclaimerText = styled.p`
   letter-spacing: 0.04em;
   margin: 0;
 `;
-
-// ── Drop zone ────────────────────────────────────────────────────────────────
 
 export const DropZone = styled.div<{ $hover: boolean }>`
   position: relative;

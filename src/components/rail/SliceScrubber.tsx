@@ -12,8 +12,6 @@ import {
 } from 'react';
 import styled from 'styled-components';
 
-// ── Constants ──────────────────────────────────────────────────────────────
-
 const PLANE_NAME: Record<SlicePlane, string> = {
   coronal: 'Coronal',
   sagittal: 'Sagittal',
@@ -24,8 +22,6 @@ const HOLD_DELAY_MS = 350;
 const HOLD_REPEAT_MS = 50;
 const INSET = 4;
 const THUMB_PILL_H = 16;
-
-// ── Styled components ──────────────────────────────────────────────────────
 
 const ChevronBtn = styled.button<{
   $hover: boolean;
@@ -155,8 +151,6 @@ const ThumbPill = styled.div<{ $accent: string }>`
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
 `;
 
-// ── Types ──────────────────────────────────────────────────────────────────
-
 export interface SliceScrubberProps {
   axis: SlicePlane;
   slice: number; // 1-indexed
@@ -169,13 +163,9 @@ export interface SliceScrubberProps {
   large?: boolean;
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-
 function clampSlice(n: number, total: number): number {
   return n < 1 ? 1 : n > total ? total : n;
 }
-
-// ── ChevronButton ──────────────────────────────────────────────────────────
 
 function ChevronButton({
   dir,
@@ -243,8 +233,6 @@ function ChevronButton({
     </ChevronBtn>
   );
 }
-
-// ── SliceScrubber ──────────────────────────────────────────────────────────
 
 export function SliceScrubber({
   axis,

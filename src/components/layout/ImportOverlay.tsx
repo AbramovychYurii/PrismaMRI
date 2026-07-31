@@ -41,8 +41,6 @@ import {
   TwoColGrid,
 } from './ImportOverlay.styles';
 
-// ── Data ───────────────────────────────────────────────────────────────────
-
 const FORMATS = [
   { token: 'DCM', rest: ' series' },
   { token: 'NII', rest: ' · nii.gz' },
@@ -85,14 +83,10 @@ function formatLoadingTitle(loading: {
   return loading.message || 'Loading…';
 }
 
-// ── Stable inline-style references ──────────────────────────────────────────
-
 const FOLDER_OPEN_ICON_STYLE: React.CSSProperties = {
   color: 'var(--amber)',
   marginBottom: 22,
 };
-
-// ── Component ──────────────────────────────────────────────────────────────
 
 export function ImportOverlay() {
   const [hover, setHover] = useState(false);
@@ -181,7 +175,6 @@ export function ImportOverlay() {
             </DisclaimerText>
           </LeftCol>
 
-          {/* ── Drop zone ── */}
           <div>
             <DropZone
               as="section"

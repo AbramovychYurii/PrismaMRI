@@ -4,8 +4,6 @@ import { Loader, Share2 } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 
-// ── Styled components ──────────────────────────────────────────────────────
-
 const Wrap = styled.div`
   position: relative;
 `;
@@ -81,8 +79,6 @@ const ItemBtn = styled.button<{ $hover: boolean }>`
   min-height: 32px;
 `;
 
-// ── Icons ──────────────────────────────────────────────────────────────────
-
 function IconMoreHorizontal() {
   return (
     <svg viewBox="0 0 20 20" width={20} height={20} fill="currentColor" aria-hidden="true">
@@ -132,8 +128,6 @@ function IconVideo() {
   );
 }
 
-// ── MenuItem ───────────────────────────────────────────────────────────────
-
 function MenuItem({
   icon,
   label,
@@ -157,8 +151,6 @@ function MenuItem({
     </ItemBtn>
   );
 }
-
-// ── StageMenu ──────────────────────────────────────────────────────────────
 
 interface Props {
   previewRef: React.MutableRefObject<ThreePreview | null>;

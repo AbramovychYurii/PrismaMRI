@@ -1,77 +1,7 @@
-/**
- * Voxel-space helpers used by the MCP bridge to translate between MCP
- * arguments (1-indexed slice numbers, plane-fraction coordinates) and the
- * viewer's internal 3-D voxel cursor.
- *
- * Pure — no React, no Zustand, no DOM.
- */
-
+import { PLANE_GEOMETRY, volumeCenter } from '@/lib/volume/plane';
 import type { LoadedVolume, SlicePlane, VolumeCursor } from '@/types';
 
-// ── Slice indexing ───────────────────────────────────────────────────────────
-
-/** Returns the 1-based slice index for the given plane at the cursor. */
-export function sliceIndex(cursor: VolumeCursor, plane: SlicePlane): number {
-  return plane === 'coronal' ? cursor.y + 1 : plane === 'sagittal' ? cursor.x + 1 : cursor.z + 1;
-}
-
-/** Total slice count along the plane's primary axis. */
-export function sliceTotal(dims: [number, number, number], plane: SlicePlane): number {
-  return plane === 'coronal' ? dims[1] : plane === 'sagittal' ? dims[0] : dims[2];
-}
-
-/** Clamp a single voxel coordinate to `[0, max - 1]`. */
-export function clampVoxel(v: number, max: number): number {
-  return Math.max(0, Math.min(max - 1, v));
-}
-
-// ── Slab MIP geometry ────────────────────────────────────────────────────────
-
-/** Slab thickness in mm → half-slab slice count for a plane. */
-export function halfSlabsFor(
-  plane: SlicePlane,
-  slabMm: number,
-  spacing: readonly [number, number, number],
-): number {
-  if (slabMm <= 0) return 0;
-  const mmPerSlice = plane === 'axial' ? spacing[2] : plane === 'coronal' ? spacing[1] : spacing[0];
-  return Math.max(1, Math.round(slabMm / 2 / mmPerSlice));
-}
-
-// ── Fraction-to-voxel conversion ─────────────────────────────────────────────
-
-/**
- * Derive a full voxel position from a plane + canvas fraction + current cursor,
- * so a 2-D placement also yields a 3-D-anchored point. Mirrors cursorFromClick.
- */
-export function voxelFromFrac(
-  plane: SlicePlane,
-  fx: number,
-  fy: number,
-  cursor: VolumeCursor,
-  dims: readonly [number, number, number],
-): VolumeCursor {
-  const [w, h, d] = dims;
-  const v: VolumeCursor = { ...cursor };
-  if (plane === 'coronal') {
-    v.x = Math.round(fx * (w - 1));
-    v.z = Math.round((1 - fy) * (d - 1));
-  } else if (plane === 'sagittal') {
-    v.y = Math.round(fx * (h - 1));
-    v.z = Math.round((1 - fy) * (d - 1));
-  } else {
-    v.x = Math.round(fx * (w - 1));
-    v.y = Math.round(fy * (h - 1));
-  }
-  return v;
-}
-
-// ── Anatomy snapping ─────────────────────────────────────────────────────────
-
-/**
- * Read a single voxel's scalar value (post slope/intercept).
- * Returns −Infinity if the coordinate is outside the volume bounds.
- */
+/** Scalar value at a voxel (post slope/intercept), or −Infinity when out of bounds. */
 export function getVoxelScalar(
   voxels: Float32Array | Int16Array,
   dims: readonly [number, number, number],
@@ -84,54 +14,43 @@ export function getVoxelScalar(
   return voxels[x + y * w + z * w * h];
 }
 
-/** Hard cap on the walk distance — anatomy snapping bails after this many steps. */
 const SNAP_MAX_STEPS = 300;
 
-/** Fraction of `[scalarMin, scalarMax]` that separates air from soft tissue. */
+/**
+ * Fraction of `[scalarMin, scalarMax]` separating air from soft tissue —
+ * 15 % holds across CT and CBCT.
+ */
 const SNAP_TISSUE_FRACTION = 0.15;
 
 /**
- * If the target voxel lands in air / outside anatomy, walk one step at a time
- * toward the slice centre (on the two axes visible in the current plane) until
- * we find a voxel above the tissue threshold.
- *
- * Threshold is adaptive: scalarMin + 15 % of the full scalar range, which
- * safely separates air from soft tissue and bone across CT and CBCT modalities.
- *
- * Returns the original voxel unchanged when it is already inside anatomy.
+ * Walks a voxel that landed in air toward the slice centre until it reaches
+ * anatomy, moving one step along each of the plane's two visible axes per
+ * iteration. Returns the input unchanged when it is already inside anatomy or
+ * when no anatomy is found within {@link SNAP_MAX_STEPS}.
  */
 export function snapToAnatomy(
   voxel: VolumeCursor,
   plane: SlicePlane,
   volume: LoadedVolume,
 ): VolumeCursor {
-  const threshold = volume.scalarMin + (volume.scalarMax - volume.scalarMin) * SNAP_TISSUE_FRACTION;
   const { voxels, meta } = volume;
   const { dims } = meta;
+  const threshold = volume.scalarMin + (volume.scalarMax - volume.scalarMin) * SNAP_TISSUE_FRACTION;
+  const isAnatomy = (v: VolumeCursor) => getVoxelScalar(voxels, dims, v.x, v.y, v.z) >= threshold;
 
-  if (getVoxelScalar(voxels, dims, voxel.x, voxel.y, voxel.z) >= threshold) return voxel;
+  if (isAnatomy(voxel)) return voxel;
 
-  // Centre of the volume on each axis.
-  const cx = Math.floor(dims[0] / 2);
-  const cy = Math.floor(dims[1] / 2);
-  const cz = Math.floor(dims[2] / 2);
+  const center = volumeCenter(dims);
+  const { horizontal, vertical } = PLANE_GEOMETRY[plane];
+  const stepToCenter = (v: VolumeCursor, axis: 'x' | 'y' | 'z') => {
+    if (v[axis] !== center[axis]) v[axis] += v[axis] > center[axis] ? -1 : 1;
+  };
 
-  let { x, y, z } = voxel;
-
+  const walker = { ...voxel };
   for (let step = 0; step < SNAP_MAX_STEPS; step++) {
-    // Move one step toward slice-plane centre on the two displayed axes.
-    if (plane === 'coronal') {
-      if (x !== cx) x += x > cx ? -1 : 1;
-      if (z !== cz) z += z > cz ? -1 : 1;
-    } else if (plane === 'sagittal') {
-      if (y !== cy) y += y > cy ? -1 : 1;
-      if (z !== cz) z += z > cz ? -1 : 1;
-    } else {
-      if (x !== cx) x += x > cx ? -1 : 1;
-      if (y !== cy) y += y > cy ? -1 : 1;
-    }
-    if (getVoxelScalar(voxels, dims, x, y, z) >= threshold) return { x, y, z };
+    stepToCenter(walker, horizontal);
+    stepToCenter(walker, vertical);
+    if (isAnatomy(walker)) return { ...walker };
   }
-
-  return voxel; // fallback: original position if anatomy not found
+  return voxel;
 }

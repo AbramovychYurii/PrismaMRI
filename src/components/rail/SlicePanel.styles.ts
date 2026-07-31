@@ -9,15 +9,11 @@
 import { accentRgba } from '@/constants';
 import styled from 'styled-components';
 
-// ── Tuning knobs ─────────────────────────────────────────────────────────────
-
 /** Fixed pixel size of measurement dots on 2-D slice panels. */
 export const MEASURE_DOT_PX = 8;
 
 /** Pre-computed box-shadow for measurement dots (constant size). */
 export const MEASURE_DOT_SHADOW = `0 0 ${MEASURE_DOT_PX * 0.7}px var(--measure), 0 0 ${MEASURE_DOT_PX * 1.6}px var(--measure-glow)`;
-
-// ── Panel shell ──────────────────────────────────────────────────────────────
 
 export const PanelWrap = styled.div<{ $isLast: boolean; $isActive: boolean }>`
   position: relative;
@@ -35,8 +31,6 @@ export const StyledCanvas = styled.canvas`
   height: 100%;
   display: block;
 `;
-
-// ── Crosshair overlay ────────────────────────────────────────────────────────
 
 export const CrosshairOverlay = styled.div`
   position: absolute;
@@ -79,8 +73,6 @@ export const CrossDot = styled.span`
   border-radius: 99px;
   opacity: 0.7;
 `;
-
-// ── Header (plane glyph + label) ─────────────────────────────────────────────
 
 export const PanelHeader = styled.div`
   position: absolute;
@@ -143,8 +135,6 @@ export const SliceDim = styled.span`
   color: var(--ink-3);
 `;
 
-// ── Footer (axis hint + code) ────────────────────────────────────────────────
-
 export const PanelFooter = styled.div<{ $scrubVisible: boolean }>`
   position: absolute;
   bottom: 8px;
@@ -162,8 +152,6 @@ export const PanelFooter = styled.div<{ $scrubVisible: boolean }>`
   transition: right 160ms ease;
 `;
 
-// ── Active state border ──────────────────────────────────────────────────────
-
 export const ActiveBorder = styled.div`
   position: absolute;
   inset: 0;
@@ -172,8 +160,6 @@ export const ActiveBorder = styled.div`
   pointer-events: none;
   box-shadow: inset 0 0 0 1px ${accentRgba('amber', 0.15)};
 `;
-
-// ── Measurement overlay ──────────────────────────────────────────────────────
 
 export const MeasureLine = styled.svg`
   position: absolute;
@@ -212,8 +198,6 @@ export const MeasureLabel = styled.div`
   box-shadow: 0 0 6px var(--measure-glow);
   font-variant-numeric: tabular-nums;
 `;
-
-// ── Button tray (top-right) ──────────────────────────────────────────────────
 
 export const ButtonTray = styled.div`
   position: absolute;
@@ -284,8 +268,6 @@ export const TrayBtn = styled.button<{ $active?: boolean; $large?: boolean }>`
     border-radius: 6px;
   }
 `;
-
-// ── Fullscreen expansion ─────────────────────────────────────────────────────
 
 export const FullscreenOverlay = styled.div<{ $isActive: boolean }>`
   position: fixed;

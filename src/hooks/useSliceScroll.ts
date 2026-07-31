@@ -1,35 +1,33 @@
 import { clamp } from '@/lib/volume/math';
+import { sliceAxis, sliceCount } from '@/lib/volume/plane';
 import { useVolumeStore } from '@/store/volumeStore';
 import type { SlicePlane } from '@/types';
 import { useCallback, useEffect, useRef } from 'react';
 
-function axisFor(plane: SlicePlane): 'x' | 'y' | 'z' {
-  return plane === 'coronal' ? 'y' : plane === 'sagittal' ? 'x' : 'z';
+/** Moves the cursor `steps` slices along `plane`. Returns false when no volume is open. */
+function stepSlice(plane: SlicePlane, steps: number): boolean {
+  const { volume, cursor, setCursor } = useVolumeStore.getState();
+  if (!volume || !cursor) return false;
+  const axis = sliceAxis(plane);
+  const next = clamp(cursor[axis] + steps, 0, sliceCount(volume.meta.dims, plane) - 1);
+  if (next === cursor[axis]) return true;
+  setCursor({ ...cursor, [axis]: next });
+  return true;
 }
 
-function maxIndexFor(plane: SlicePlane, dims: readonly [number, number, number]): number {
-  return plane === 'coronal' ? dims[1] - 1 : plane === 'sagittal' ? dims[0] - 1 : dims[2] - 1;
-}
-
-/** Pixels of wheel delta required to advance one slice. Trackpads emit small
- *  fractional deltas at high frequency; ~28 px ≈ one mouse-wheel notch. */
+/** Pixels of wheel delta per slice — roughly one mouse-wheel notch. */
 const WHEEL_PX_PER_STEP = 28;
 
-/** Max slices advanced per animation frame — caps work when a fast flick or a
- *  high-DPI mouse wheel produces a huge delta in one go. */
+/** Caps the work a fast flick or high-DPI wheel can queue into a single frame. */
 const MAX_STEPS_PER_FRAME = 3;
 
+const DELTA_MODE_SCALE = [1, 16, 100];
+
 /**
- * Returns a React `onWheel` handler for slice navigation.
- *
- * Wheel events arrive ~120/s on a trackpad — far faster than we can re-render
- * three slice canvases (especially with Slab MIP). We accumulate `deltaY` and
- * flush at most once per animation frame, advancing whole slices only. The
- * residual delta is kept so slow trackpad scrolls eventually cross the
- * threshold and step exactly once, instead of ping-ponging.
- *
- * No `preventDefault` — the app layout is `overflow: hidden`, so page scroll
- * isn't a concern and avoiding it dodges React's passive-listener warning.
+ * Wheel handler for slice navigation. Trackpads emit ~120 events/s, far more
+ * than three canvases can repaint, so deltas accumulate and flush at most once
+ * per frame. The remainder is carried over, letting slow scrolls cross the
+ * threshold exactly once instead of ping-ponging.
  */
 export function useSliceScroll(plane: SlicePlane) {
   const accumulated = useRef(0);
@@ -45,39 +43,24 @@ export function useSliceScroll(plane: SlicePlane) {
 
   return useCallback(
     (e: React.WheelEvent) => {
-      // Normalise line/page modes to pixels so the threshold makes sense.
-      const scale = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1;
-      accumulated.current += e.deltaY * scale;
-
+      accumulated.current += e.deltaY * (DELTA_MODE_SCALE[e.deltaMode] ?? 1);
       if (rafId.current !== null) return;
+
       rafId.current = requestAnimationFrame(() => {
         rafId.current = null;
         const delta = accumulated.current;
-        // Only step when we have at least one full slice's worth of delta —
-        // avoids the slow-scroll ping-pong that happens when we consume more
-        // than we received.
-        const rawStep = Math.trunc(delta / WHEEL_PX_PER_STEP);
-        if (rawStep === 0) return;
-        const step = Math.max(-MAX_STEPS_PER_FRAME, Math.min(MAX_STEPS_PER_FRAME, rawStep));
-        accumulated.current = delta - step * WHEEL_PX_PER_STEP;
+        const wholeSteps = Math.trunc(delta / WHEEL_PX_PER_STEP);
+        if (wholeSteps === 0) return;
 
-        const { volume, cursor, setCursor } = useVolumeStore.getState();
-        if (!volume || !cursor) {
-          accumulated.current = 0;
-          return;
-        }
-        const axis = axisFor(plane);
-        const max = maxIndexFor(plane, volume.meta.dims);
-        const next = clamp(cursor[axis] + step, 0, max);
-        if (next !== cursor[axis]) setCursor({ ...cursor, [axis]: next });
+        const steps = clamp(wholeSteps, -MAX_STEPS_PER_FRAME, MAX_STEPS_PER_FRAME);
+        accumulated.current = delta - steps * WHEEL_PX_PER_STEP;
+        if (!stepSlice(plane, steps)) accumulated.current = 0;
       });
     },
     [plane],
   );
 }
 
-/** Number keys → which plane they focus.  Order matches the panel stack
- *  (coronal / sagittal / axial, top to bottom). */
 const PLANE_FOCUS_KEYS: Record<string, SlicePlane> = {
   '1': 'coronal',
   '2': 'sagittal',
@@ -85,10 +68,9 @@ const PLANE_FOCUS_KEYS: Record<string, SlicePlane> = {
 };
 
 /**
- * Global 1 / 2 / 3 keys: focus the coronal / sagittal / axial plane.
- * Focusing a plane is what arrow stepping and the crosshair act on, so this is
- * a fast keyboard alternative to clicking a panel.  Modifier combos (⌘1 etc.,
- * which switch browser tabs) and typing in inputs are ignored.
+ * 1 / 2 / 3 focus the coronal / sagittal / axial plane — the same focus that
+ * arrow stepping and the crosshair act on. Modifier combos and text fields are
+ * left alone.
  */
 export function usePlaneFocusKeys(): void {
   useEffect(() => {
@@ -116,14 +98,10 @@ export function useActivePlaneKeys(): void {
     if (!activePlane) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
-      const { volume, cursor, setCursor } = useVolumeStore.getState();
+      const { volume, cursor } = useVolumeStore.getState();
       if (!volume || !cursor) return;
       e.preventDefault();
-      const axis = axisFor(activePlane);
-      const max = maxIndexFor(activePlane, volume.meta.dims);
-      const delta = e.key === 'ArrowUp' ? 1 : -1;
-      const next = clamp(cursor[axis] + delta, 0, max);
-      if (next !== cursor[axis]) setCursor({ ...cursor, [axis]: next });
+      stepSlice(activePlane, e.key === 'ArrowUp' ? 1 : -1);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);

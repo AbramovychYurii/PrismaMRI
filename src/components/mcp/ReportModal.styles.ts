@@ -9,8 +9,6 @@
 import { Loader } from 'lucide-react';
 import styled, { keyframes } from 'styled-components';
 
-// ── Animations ───────────────────────────────────────────────────────────────
-
 const fadeIn = keyframes`
   from { opacity: 0; }
   to   { opacity: 1; }
@@ -25,8 +23,6 @@ const spin = keyframes`
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
 `;
-
-// ── Shell ────────────────────────────────────────────────────────────────────
 
 export const Backdrop = styled.div`
   position: fixed;
@@ -67,8 +63,6 @@ export const Shell = styled.div`
     overflow-y: auto;
   }
 `;
-
-// ── Left panel: export controls ──────────────────────────────────────────────
 
 export const LeftPanel = styled.div`
   width: 300px;
@@ -116,8 +110,6 @@ export const PanelSub = styled.p`
   color: var(--ink-3);
   line-height: 1.4;
 `;
-
-// ── Scope picker ─────────────────────────────────────────────────────────────
 
 export const SectionLabel = styled.span`
   font-size: 9px;
@@ -184,8 +176,6 @@ export const ScopeDesc = styled.div`
   line-height: 1.4;
 `;
 
-// ── Format toggles ───────────────────────────────────────────────────────────
-
 export const FormatSection = styled.div``;
 
 export const FormatRow = styled.div`
@@ -209,8 +199,6 @@ export const FormatToggle = styled.button<{ $active: boolean }>`
     ${({ $active }) => !$active && 'border-color: var(--ink-4); color: var(--ink-2);'}
   }
 `;
-
-// ── Download button ──────────────────────────────────────────────────────────
 
 export const DownloadArea = styled.div`
   margin-top: auto;
@@ -244,8 +232,6 @@ export const DownloadBtn = styled.button<{ $loading?: boolean }>`
 export const SpinIcon = styled(Loader)`
   animation: ${spin} 700ms linear infinite;
 `;
-
-// ── Right panel: preview ─────────────────────────────────────────────────────
 
 export const RightPanel = styled.div`
   flex: 1;
@@ -330,8 +316,6 @@ export const PreviewScroll = styled.div`
   }
 `;
 
-// ── Document (printable preview) ─────────────────────────────────────────────
-
 export const Doc = styled.div`
   background: #fafaf8;
   color: #1a1814;
@@ -407,8 +391,6 @@ export const DocSectionLabel = styled.div`
   color: #888;
   margin-bottom: 10px;
 `;
-
-// ── Finding card ─────────────────────────────────────────────────────────────
 
 export const FindingCard = styled.div<{ $color: string }>`
   border-left: 3px solid ${({ $color }) => $color};

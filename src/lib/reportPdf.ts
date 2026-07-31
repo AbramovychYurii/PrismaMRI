@@ -5,10 +5,10 @@
  * thumbnail data URLs) and returns a PDF Blob.  No React hooks inside.
  */
 
-import type { AiAnnotation, AnnotationSeverity, ParsedVolumeMeta } from '@/types';
+import { PLANE_LABEL } from '@/constants';
+import { sliceNumber } from '@/lib/volume/plane';
+import type { AiAnnotation, AnnotationSeverity, ParsedVolumeMeta, SlicePlane } from '@/types';
 import jsPDF from 'jspdf';
-
-// ── Severity mappings for PDF ────────────────────────────────────────────────
 
 const PDF_LABEL: Record<AnnotationSeverity, string> = {
   critical: 'CRITICAL',
@@ -25,25 +25,15 @@ const SEVERITY_RGB: Record<AnnotationSeverity, [number, number, number]> = {
   comment: [52, 199, 89], // #34c759
 };
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
-
 function hexToRgb(hex: string): [number, number, number] {
   const v = Number.parseInt(hex.replace('#', ''), 16);
   return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
 }
 void hexToRgb; // used optionally; keep to avoid lint errors
 
-function planeName(plane: string): string {
-  return plane.charAt(0).toUpperCase() + plane.slice(1);
-}
+const planeName = (plane: SlicePlane) => PLANE_LABEL[plane].primary;
 
-function sliceNum(a: AiAnnotation): number {
-  if (a.plane === 'coronal') return a.voxel.y + 1;
-  if (a.plane === 'sagittal') return a.voxel.x + 1;
-  return a.voxel.z + 1;
-}
-
-// ── Types ────────────────────────────────────────────────────────────────────
+const sliceNum = (a: AiAnnotation) => sliceNumber(a.voxel, a.plane);
 
 export interface ReportParams {
   findings: AiAnnotation[];
@@ -60,8 +50,6 @@ export interface ReportParams {
   today: string;
 }
 
-// ── Page layout constants (mm) ───────────────────────────────────────────────
-
 const PW = 210; // page width
 const PH = 297; // page height
 const ML = 18; // left margin
@@ -73,15 +61,11 @@ const XR = ML + CW; // right edge = 192
 
 const COL3 = CW / 3; // ~58 mm per meta column
 
-// ── Colours ──────────────────────────────────────────────────────────────────
-
 const INK: [number, number, number] = [26, 24, 20];
 const INK2: [number, number, number] = [80, 75, 65];
 const INK3: [number, number, number] = [130, 120, 105];
 const RULE: [number, number, number] = [220, 215, 205];
 const CARD_BG: [number, number, number] = [245, 243, 238]; // #f5f3ee
-
-// ── Draw helpers ─────────────────────────────────────────────────────────────
 
 function setColor(doc: jsPDF, rgb: [number, number, number]) {
   doc.setTextColor(rgb[0], rgb[1], rgb[2]);
@@ -233,8 +217,6 @@ function drawFindingCard(
   return y + cardH + 4;
 }
 
-// ── Main export ──────────────────────────────────────────────────────────────
-
 export function generateReport(params: ReportParams): Blob {
   const {
     findings,
@@ -253,8 +235,6 @@ export function generateReport(params: ReportParams): Blob {
   doc.setLineWidth(0.2);
 
   let y = MT;
-
-  // ── HEADER ──────────────────────────────────────────────────────────────────
 
   // Logo: Prisma + MRI (italic)
   doc.setFontSize(16);
@@ -299,8 +279,6 @@ export function generateReport(params: ReportParams): Blob {
   doc.line(ML, y, XR, y);
   doc.setLineWidth(0.2);
   y += 7;
-
-  // ── VOLUME METADATA ──────────────────────────────────────────────────────────
 
   if (volumeMeta) {
     const huRange =
@@ -358,8 +336,6 @@ export function generateReport(params: ReportParams): Blob {
     y += 8;
   }
 
-  // ── FINDINGS SECTION ─────────────────────────────────────────────────────────
-
   // Section label
   doc.setFontSize(7);
   doc.setFont('courier', 'normal');
@@ -382,8 +358,6 @@ export function generateReport(params: ReportParams): Blob {
 
     y = drawFindingCard(doc, finding, globalIdx, y, thumb);
   }
-
-  // ── NOTE BOX ─────────────────────────────────────────────────────────────────
 
   const noteText =
     scope === 'finding'

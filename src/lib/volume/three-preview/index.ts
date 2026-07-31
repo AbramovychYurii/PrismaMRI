@@ -75,7 +75,6 @@ export class ThreePreview {
   private readonly _fwdWorld = new THREE.Vector3();
   private readonly _fwdVoxel = new THREE.Vector3();
 
-  // ── Snap-to-plane animation state ─────────────────────────────────────────
   private _snapActive = false;
   private _snapStartTs = 0;
   private readonly _snapFromPos = new THREE.Vector3();
@@ -108,8 +107,6 @@ export class ThreePreview {
     this.resize();
     this.loop();
   }
-
-  // ── Volume ─────────────────────────────────────────────────────────────────
 
   setVolume(prepared: PreparedVolumeFor3D): void {
     if (this.volume) {
@@ -182,8 +179,6 @@ export class ThreePreview {
     this.resize();
   }
 
-  // ── Preset + shading ───────────────────────────────────────────────────────
-
   setRenderPreset(preset: RenderPreset): void {
     const m = this.volume?.material;
     if (!m) return;
@@ -212,8 +207,6 @@ export class ThreePreview {
 
     this.dirty = true;
   }
-
-  // ── Cursor / clim / measurement / planes ──────────────────────────────────
 
   setCursor(cursor: VolumeCursor): void {
     this.cursorPlanes.update(cursor);
@@ -259,8 +252,6 @@ export class ThreePreview {
     this.measurementLine.setBoth(fromW, toW, m.distanceMm, this.sceneSize);
     this.dirty = true;
   }
-
-  // ── AI annotation markers ──────────────────────────────────────────────────
 
   setAnnotations(list: AiAnnotation[]): void {
     this._annotations = list;
@@ -310,8 +301,6 @@ export class ThreePreview {
     this.dirty = true;
   }
 
-  // ── Snap-to-plane ──────────────────────────────────────────────────────────
-
   /**
    * Smoothly animate the camera to the standard anatomical view for `plane`.
    * The camera distance (zoom) is preserved; only orientation changes.
@@ -354,8 +343,6 @@ export class ThreePreview {
     return t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
   }
 
-  // ── Resize ─────────────────────────────────────────────────────────────────
-
   resize(): void {
     const rect = this.canvas.getBoundingClientRect();
     const w = Math.max(1, Math.floor(rect.width));
@@ -369,8 +356,6 @@ export class ThreePreview {
     this.controls?.handleResize();
     this.dirty = true;
   }
-
-  // ── Internals ──────────────────────────────────────────────────────────────
 
   /** Sync camera position + ray direction into shader uniforms (voxel space). */
   private updateCameraUniform(): void {
@@ -407,7 +392,6 @@ export class ThreePreview {
     // from its internal _eye every frame).
     if (this._recording) return;
 
-    // ── Snap animation ───────────────────────────────────────────────────────
     if (this._snapActive) {
       // Latch start timestamp on the first frame of this animation.
       if (this._snapStartTs === 0) this._snapStartTs = ts;

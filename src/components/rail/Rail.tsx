@@ -3,8 +3,6 @@ import { useVolumeStore } from '@/store';
 import type { SlicePlane } from '@/types';
 import styled from 'styled-components';
 
-// ── Styled components ──────────────────────────────────────────────────────
-
 const RailAside = styled.aside`
   grid-area: rail;
   background: var(--panel);
@@ -13,8 +11,6 @@ const RailAside = styled.aside`
   flex-direction: column;
   overflow: visible;
 `;
-
-// ── Constants ──────────────────────────────────────────────────────────────
 
 const PLANES: SlicePlane[] = ['coronal', 'sagittal', 'axial'];
 

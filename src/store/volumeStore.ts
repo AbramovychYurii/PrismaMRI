@@ -2,6 +2,7 @@ import { isSlicePlane } from '@/constants';
 import * as annotationsStorage from '@/lib/annotationsStorage';
 import type { ImportSource, SeriesChoice } from '@/lib/import/types';
 import { createThrottledStorage } from '@/lib/throttledStorage';
+import { clampToDims, volumeCenter } from '@/lib/volume/plane';
 import type { ThreePreview } from '@/lib/volume/three-preview';
 import { deriveVolumeId } from '@/lib/volumeId';
 import type {
@@ -180,11 +181,7 @@ export const useVolumeStore = create<VolumeState & VolumeActions>()(
           volume,
           prepared3D,
           histogram,
-          cursor: {
-            x: Math.floor(volume.meta.dims[0] / 2),
-            y: Math.floor(volume.meta.dims[1] / 2),
-            z: Math.floor(volume.meta.dims[2] / 2),
-          },
+          cursor: volumeCenter(volume.meta.dims),
           wl: volume.windowLevel,
           wlDraft: volume.windowLevel,
           measurement: null,
@@ -203,53 +200,24 @@ export const useVolumeStore = create<VolumeState & VolumeActions>()(
         const activeVolumeId = deriveVolumeId(volume);
         const aiAnnotations = annotationsStorage.load(activeVolumeId);
         const dims = volume.meta.dims;
-        const clampAxis = (v: number, max: number) => Math.max(0, Math.min(max - 1, v));
-        set((state) => {
-          // Clamp the persisted cursor against this volume's dims.  Same tab keeps
-          // the same volume, so this is normally a no-op — but a stale persisted
-          // cursor from a different dataset (e.g. after a bug-triggered swap)
-          // would otherwise stick at out-of-bounds coordinates.
-          const cursor = state.cursor
-            ? {
-                x: clampAxis(state.cursor.x, dims[0]),
-                y: clampAxis(state.cursor.y, dims[1]),
-                z: clampAxis(state.cursor.z, dims[2]),
-              }
-            : {
-                x: Math.floor(dims[0] / 2),
-                y: Math.floor(dims[1] / 2),
-                z: Math.floor(dims[2] / 2),
-              };
-          // Drop activeAnnotationId if the finding no longer exists for this volume.
-          const activeAnnotationId =
-            state.activeAnnotationId && aiAnnotations.some((a) => a.id === state.activeAnnotationId)
-              ? state.activeAnnotationId
-              : null;
-          return {
-            volume,
-            prepared3D,
-            histogram,
-            activeVolumeId,
-            aiAnnotations,
-            cursor,
-            activeAnnotationId,
-            error: null,
-          };
-        });
+        set((state) => ({
+          volume,
+          prepared3D,
+          histogram,
+          activeVolumeId,
+          aiAnnotations,
+          cursor: state.cursor ? clampToDims(state.cursor, dims) : volumeCenter(dims),
+          activeAnnotationId: aiAnnotations.some((a) => a.id === state.activeAnnotationId)
+            ? state.activeAnnotationId
+            : null,
+          error: null,
+        }));
       },
 
       setCursor: (cursor) =>
         set((state) => {
           const dims = state.volume?.meta.dims;
-          if (!dims) return { cursor };
-          const clampAxis = (v: number, max: number) => Math.max(0, Math.min(max - 1, v));
-          return {
-            cursor: {
-              x: clampAxis(cursor.x, dims[0]),
-              y: clampAxis(cursor.y, dims[1]),
-              z: clampAxis(cursor.z, dims[2]),
-            },
-          };
+          return { cursor: dims ? clampToDims(cursor, dims) : cursor };
         }),
 
       setActivePlane: (activePlane) => set({ activePlane }),
@@ -373,18 +341,14 @@ export const useVolumeStore = create<VolumeState & VolumeActions>()(
 
       focusAnnotation: (id) =>
         set((state) => {
-          const a = state.aiAnnotations.find((x) => x.id === id);
-          if (!a) return {};
+          const finding = state.aiAnnotations.find((a) => a.id === id);
+          if (!finding) return {};
           const dims = state.volume?.meta.dims;
-          const clampAxis = (v: number, max: number) => Math.max(0, Math.min(max - 1, v));
-          const cursor = dims
-            ? {
-                x: clampAxis(a.voxel.x, dims[0]),
-                y: clampAxis(a.voxel.y, dims[1]),
-                z: clampAxis(a.voxel.z, dims[2]),
-              }
-            : a.voxel;
-          return { cursor, activePlane: a.plane, activeAnnotationId: id };
+          return {
+            cursor: dims ? clampToDims(finding.voxel, dims) : finding.voxel,
+            activePlane: finding.plane,
+            activeAnnotationId: id,
+          };
         }),
 
       setMcpConnected: (mcpConnected) => set({ mcpConnected }),
@@ -408,32 +372,9 @@ export const useVolumeStore = create<VolumeState & VolumeActions>()(
       reset: () => set(initialState),
     }),
     {
-      // ── Persistence ──────────────────────────────────────────────────────
-      // Stores a small subset of UI state in sessionStorage so a page reload
-      // doesn't reset the user's W/L, slice positions, render preset, etc.
-      //
-      // Why sessionStorage (not localStorage / IDB):
-      //   • Per-tab isolation — matches the per-tab IDB cache fix.  Two
-      //     tabs on different volumes keep their own UI state.
-      //   • Survives reload and "reopen closed tab" in Chrome.
-      //   • Clears naturally on tab close — no zombie state stuck on disk.
-      //
-      // What's persisted: only fields a user would notice resetting (W/L,
-      // cursor, active plane, toolbar toggles, render preset, slab, mobile
-      // tab, focused finding, current measurement).
-      //
-      // What's NOT persisted:
-      //   • volume / prepared3D / histogram — already cached in IndexedDB
-      //   • aiAnnotations — already persisted per-volume in localStorage
-      //   • DOM refs (canvasRefs, previewInstance) — non-serialisable
-      //   • Loading / error / agent runtime flags — transient
-      //   • snapSeq / snapPlane / activeVolumeId — derived or internal
+      // sessionStorage keeps UI state per-tab, matching the per-tab IDB volume
+      // cache; throttling stops 60 Hz drags from stringifying on every frame.
       name: 'prisma-mri-ui-state',
-      // Throttled so the ~60 Hz interaction updates (W/L drag, measurement
-      // drag, wheel-scrub) don't each pay a synchronous JSON.stringify +
-      // sessionStorage write on the main thread. Coalesced writes flush on a
-      // short trailing timer and synchronously on pagehide / tab-hide, so a
-      // reload still restores the latest UI state.
       storage: createJSONStorage(() => createThrottledStorage(sessionStorage)),
       version: 1,
       partialize: (state) => ({

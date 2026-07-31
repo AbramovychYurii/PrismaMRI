@@ -7,8 +7,6 @@ import { useVolumeStore } from '@/store';
 import { useRef } from 'react';
 import styled, { css } from 'styled-components';
 
-// ── Styled components ──────────────────────────────────────────────────────
-
 const focusedStyles = css`
   position: fixed;
   inset: 0;
@@ -63,8 +61,6 @@ const NoVolumePlaceholder = styled.div`
   text-transform: uppercase;
   pointer-events: none;
 `;
-
-// ── Component ──────────────────────────────────────────────────────────────
 
 export function Stage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);

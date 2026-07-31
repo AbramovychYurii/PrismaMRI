@@ -8,8 +8,6 @@ import { useVolumeStore } from '@/store';
 import { MonitorDown } from 'lucide-react';
 import styled from 'styled-components';
 
-// ── Styled components ──────────────────────────────────────────────────────
-
 const StyledHeader = styled.header`
   grid-area: header;
   border-bottom: 1px solid var(--rule);

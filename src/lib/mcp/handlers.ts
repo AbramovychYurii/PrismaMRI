@@ -1,29 +1,28 @@
-/**
- * MCP action handlers — one function per protocol command.
- *
- * Each handler reads the global volume store, performs its side effect
- * (cursor move, capture, annotation, …), and reports back via `ok` / `fail`.
- *
- * Split out from `useMcpBridge` so each command lives independently and the
- * dispatcher in the bridge stays a thin lookup table.
- */
-
-import { useVolumeStore } from '@/store/volumeStore';
-import type { AiAnnotation, AnnotationSeverity, MeasurementPoint, SlicePlane } from '@/types';
-
+import { clamp } from '@/lib/volume/math';
+import {
+  clampToDims,
+  fracToVoxel,
+  slabHalfSlices,
+  sliceAxis,
+  sliceCount,
+  sliceIndex,
+  sliceNumber,
+  volumeCenter,
+} from '@/lib/volume/plane';
 import { extractSliceGrayImage } from '@/lib/volume/slices';
+import { useVolumeStore } from '@/store/volumeStore';
+import type {
+  AiAnnotation,
+  AnnotationSeverity,
+  LoadedVolume,
+  MeasurementPoint,
+  SlicePlane,
+  VolumeCursor,
+} from '@/types';
+
 import { captureCanvas, renderSliceForMcp, waitForPaint } from './canvas-utils';
 import { MCP_JPEG_QUALITY, MCP_MAX_EDGE, SEVERITIES, WL_PRESETS } from './constants';
-import {
-  clampVoxel,
-  halfSlabsFor,
-  sliceIndex,
-  sliceTotal,
-  snapToAnatomy,
-  voxelFromFrac,
-} from './voxel-utils';
-
-// ── Public types ─────────────────────────────────────────────────────────────
+import { snapToAnatomy } from './voxel-utils';
 
 /** Free-form message body — handlers narrow individual fields as needed. */
 export type HandlerMessage = Record<string, unknown> & { id: string; action: string };
@@ -36,55 +35,69 @@ export interface HandlerContext {
 
 export type Handler = (ctx: HandlerContext) => void | Promise<void>;
 
-// ── State ────────────────────────────────────────────────────────────────────
+type VolumeStoreState = ReturnType<typeof useVolumeStore.getState>;
+type LoadedState = VolumeStoreState & { volume: LoadedVolume; cursor: VolumeCursor };
+
+/**
+ * Reports "No volume loaded" and returns null unless a volume is open. The
+ * store only ever sets a cursor alongside a volume, so both are narrowed here.
+ */
+function requireLoaded(fail: (error: string) => void): LoadedState | null {
+  const state = useVolumeStore.getState();
+  if (!state.volume || !state.cursor) {
+    fail('No volume loaded');
+    return null;
+  }
+  return state as LoadedState;
+}
+
+function sliceNumbers(cursor: VolumeCursor) {
+  return {
+    coronal: sliceNumber(cursor, 'coronal'),
+    sagittal: sliceNumber(cursor, 'sagittal'),
+    axial: sliceNumber(cursor, 'axial'),
+  };
+}
+
+function sliceTotals(dims: readonly [number, number, number]) {
+  return {
+    coronal: sliceCount(dims, 'coronal'),
+    sagittal: sliceCount(dims, 'sagittal'),
+    axial: sliceCount(dims, 'axial'),
+  };
+}
+
+function sliceImagesAt(state: LoadedState, cursor: VolumeCursor) {
+  const render = (plane: SlicePlane) =>
+    renderSliceForMcp(
+      extractSliceGrayImage(state.volume, plane, sliceIndex(cursor, plane), state.wl, 0),
+    );
+  return { coronal: render('coronal'), sagittal: render('sagittal'), axial: render('axial') };
+}
 
 const handleGetState: Handler = ({ ok }) => {
   const { volume, cursor, wl, renderPreset } = useVolumeStore.getState();
   const dims = volume?.meta.dims ?? null;
-  const spacing = volume?.meta.spacing ?? null;
   ok({
     volumeLoaded: volume !== null,
     dims,
-    spacing,
+    spacing: volume?.meta.spacing ?? null,
     cursor,
-    sliceIndices:
-      cursor && dims
-        ? {
-            coronal: sliceIndex(cursor, 'coronal'),
-            sagittal: sliceIndex(cursor, 'sagittal'),
-            axial: sliceIndex(cursor, 'axial'),
-          }
-        : null,
-    sliceTotals: dims
-      ? {
-          coronal: sliceTotal(dims, 'coronal'),
-          sagittal: sliceTotal(dims, 'sagittal'),
-          axial: sliceTotal(dims, 'axial'),
-        }
-      : null,
+    sliceIndices: cursor && dims ? sliceNumbers(cursor) : null,
+    sliceTotals: dims ? sliceTotals(dims) : null,
     wl,
     preset: renderPreset,
   });
 };
 
-// ── Overview ─────────────────────────────────────────────────────────────────
-
 const handleOverview: Handler = ({ ok, fail }) => {
-  const { volume, wl, setCursor } = useVolumeStore.getState();
-  if (!volume) {
-    fail('No volume loaded');
-    return;
-  }
+  const state = requireLoaded(fail);
+  if (!state) return;
 
-  const { dims, spacing, modality, scanner, protocol } = volume.meta;
-  const centre = {
-    x: Math.floor(dims[0] / 2),
-    y: Math.floor(dims[1] / 2),
-    z: Math.floor(dims[2] / 2),
-  };
-  // Update UI crosshair without waiting for canvas repaint —
-  // images are rendered directly from the voxel buffer (background-safe).
-  setCursor(centre);
+  const { dims, spacing, modality, scanner, protocol } = state.volume.meta;
+  const center = volumeCenter(dims);
+  state.setCursor(center);
+
   ok({
     meta: {
       dims,
@@ -92,108 +105,64 @@ const handleOverview: Handler = ({ ok, fail }) => {
       modality,
       scanner,
       protocol,
-      scalarMin: volume.scalarMin,
-      scalarMax: volume.scalarMax,
-      formatId: volume.formatId,
+      scalarMin: state.volume.scalarMin,
+      scalarMax: state.volume.scalarMax,
+      formatId: state.volume.formatId,
     },
-    cursor: centre,
-    sliceIndices: {
-      coronal: centre.y + 1,
-      sagittal: centre.x + 1,
-      axial: centre.z + 1,
-    },
-    images: {
-      coronal: renderSliceForMcp(extractSliceGrayImage(volume, 'coronal', centre.y, wl, 0)),
-      sagittal: renderSliceForMcp(extractSliceGrayImage(volume, 'sagittal', centre.x, wl, 0)),
-      axial: renderSliceForMcp(extractSliceGrayImage(volume, 'axial', centre.z, wl, 0)),
-    },
+    cursor: center,
+    sliceIndices: sliceNumbers(center),
+    images: sliceImagesAt(state, center),
   });
 };
 
-// ── Navigate ─────────────────────────────────────────────────────────────────
-
 const handleNavigate: Handler = ({ msg, ok, fail }) => {
+  const state = requireLoaded(fail);
+  if (!state) return;
   const plane = msg.plane as SlicePlane;
   const slice = msg.slice as number;
-  const { cursor, volume, setCursor } = useVolumeStore.getState();
-  if (!cursor || !volume) {
-    fail('No volume loaded');
-    return;
-  }
-  const dims = volume.meta.dims;
-  const cur = { ...cursor };
-  if (plane === 'coronal') cur.y = clampVoxel(slice - 1, dims[1]);
-  if (plane === 'sagittal') cur.x = clampVoxel(slice - 1, dims[0]);
-  if (plane === 'axial') cur.z = clampVoxel(slice - 1, dims[2]);
-  setCursor(cur);
+  const dims = state.volume.meta.dims;
+  state.setCursor(clampToDims({ ...state.cursor, [sliceAxis(plane)]: slice - 1 }, dims));
   ok();
 };
 
 const handleStep: Handler = ({ msg, ok, fail }) => {
+  const state = requireLoaded(fail);
+  if (!state) return;
   const plane = msg.plane as SlicePlane;
   const steps = msg.steps as number;
-  const { cursor, volume, setCursor } = useVolumeStore.getState();
-  if (!cursor || !volume) {
-    fail('No volume loaded');
-    return;
-  }
-  const dims = volume.meta.dims;
-  const total = sliceTotal(dims, plane);
-  const cur = { ...cursor };
-  if (plane === 'coronal') cur.y = clampVoxel(cursor.y + steps, dims[1]);
-  if (plane === 'sagittal') cur.x = clampVoxel(cursor.x + steps, dims[0]);
-  if (plane === 'axial') cur.z = clampVoxel(cursor.z + steps, dims[2]);
-  setCursor(cur);
-  ok({ slice: sliceIndex(cur, plane), total });
+  const dims = state.volume.meta.dims;
+  const next = clampToDims(
+    { ...state.cursor, [sliceAxis(plane)]: sliceIndex(state.cursor, plane) + steps },
+    dims,
+  );
+  state.setCursor(next);
+  ok({ slice: sliceNumber(next, plane), total: sliceCount(dims, plane) });
 };
 
 const handleNavigateCenter: Handler = ({ ok, fail }) => {
-  const { volume, setCursor } = useVolumeStore.getState();
-  if (!volume) {
-    fail('No volume loaded');
-    return;
-  }
-  const { dims } = volume.meta;
-  const centre = {
-    x: Math.floor(dims[0] / 2),
-    y: Math.floor(dims[1] / 2),
-    z: Math.floor(dims[2] / 2),
-  };
-  setCursor(centre);
-  ok({
-    sliceIndices: {
-      coronal: centre.y + 1,
-      sagittal: centre.x + 1,
-      axial: centre.z + 1,
-    },
-  });
+  const state = requireLoaded(fail);
+  if (!state) return;
+  const center = volumeCenter(state.volume.meta.dims);
+  state.setCursor(center);
+  ok({ sliceIndices: sliceNumbers(center) });
 };
-
-// ── Window / level ───────────────────────────────────────────────────────────
 
 const handleSetWl: Handler = ({ msg, ok }) => {
   const wl = { window: msg.window as number, level: msg.level as number };
-  const state = useVolumeStore.getState();
-  state.setWL(wl);
-  state.setWLDraft(wl);
+  const { setWL, setWLDraft } = useVolumeStore.getState();
+  setWL(wl);
+  setWLDraft(wl);
   ok();
 };
 
 const handleApplyWlPreset: Handler = ({ msg, ok, fail }) => {
-  const preset = msg.preset as string;
-  const { volume, setWL, setWLDraft } = useVolumeStore.getState();
-  if (!volume) {
-    fail('No volume loaded');
-    return;
-  }
-  const fracs = WL_PRESETS[preset] ?? WL_PRESETS.full_range;
-  const range = volume.scalarMax - volume.scalarMin;
-  const wl = {
-    window: range * fracs[0],
-    level: volume.scalarMin + range * fracs[1],
-  };
-  setWL(wl);
-  setWLDraft(wl);
+  const state = requireLoaded(fail);
+  if (!state) return;
+  const [windowFrac, levelFrac] = WL_PRESETS[msg.preset as string] ?? WL_PRESETS.full_range;
+  const range = state.volume.scalarMax - state.volume.scalarMin;
+  const wl = { window: range * windowFrac, level: state.volume.scalarMin + range * levelFrac };
+  state.setWL(wl);
+  state.setWLDraft(wl);
   ok(wl);
 };
 
@@ -211,35 +180,31 @@ const handleSetPreset: Handler = ({ msg, ok, fail }) => {
   ok();
 };
 
+const MAX_SLAB_MM = 50;
+
 const handleSetSlabMm: Handler = ({ msg, ok, fail }) => {
-  const raw = Number(msg.slab_mm);
-  if (!Number.isFinite(raw) || raw < 0) {
+  const requested = Number(msg.slab_mm);
+  if (!Number.isFinite(requested) || requested < 0) {
     fail('slab_mm must be a non-negative number');
     return;
   }
-  const slabMm = Math.min(50, raw);
+  const slabMm = Math.min(MAX_SLAB_MM, requested);
   useVolumeStore.getState().setSlabMm(slabMm);
   ok({ slabMm });
 };
-
-// ── Capture ──────────────────────────────────────────────────────────────────
 
 const handleCaptureSlice: Handler = async ({ msg, ok, fail }) => {
   const plane = msg.plane as SlicePlane;
   const slabMm = (msg.slab_mm as number | undefined) ?? 0;
 
-  // With a slab thickness, render a native-resolution slab-MIP image
-  // straight from the voxel buffer (sharper than a canvas grab, and
-  // independent of the panel's current slab setting).
+  // A slab renders straight from the voxel buffer: sharper than a canvas grab
+  // and independent of the panel's own slab setting.
   if (slabMm > 0) {
-    const { volume, cursor, wl } = useVolumeStore.getState();
-    if (!volume || !cursor) {
-      fail('No volume loaded');
-      return;
-    }
-    const index = plane === 'coronal' ? cursor.y : plane === 'sagittal' ? cursor.x : cursor.z;
-    const half = halfSlabsFor(plane, slabMm, volume.meta.spacing);
-    const image = extractSliceGrayImage(volume, plane, index, wl, half);
+    const state = requireLoaded(fail);
+    if (!state) return;
+    const { volume, cursor, wl } = state;
+    const half = slabHalfSlices(plane, slabMm, volume.meta.spacing);
+    const image = extractSliceGrayImage(volume, plane, sliceIndex(cursor, plane), wl, half);
     ok({ imageData: renderSliceForMcp(image), slabMm });
     return;
   }
@@ -264,79 +229,62 @@ const handleCapture3d: Handler = async ({ ok, fail }) => {
 };
 
 const handleCaptureAll: Handler = ({ ok, fail }) => {
-  const { volume, cursor, wl } = useVolumeStore.getState();
-  if (!volume || !cursor) {
-    fail('No volume loaded');
-    return;
-  }
-  ok({
-    coronal: renderSliceForMcp(extractSliceGrayImage(volume, 'coronal', cursor.y, wl, 0)),
-    sagittal: renderSliceForMcp(extractSliceGrayImage(volume, 'sagittal', cursor.x, wl, 0)),
-    axial: renderSliceForMcp(extractSliceGrayImage(volume, 'axial', cursor.z, wl, 0)),
-  });
+  const state = requireLoaded(fail);
+  if (!state) return;
+  ok(sliceImagesAt(state, state.cursor));
 };
 
+/** Slab thickness for the overview grid — improves lesion visibility without hiding margins. */
+const OVERVIEW_GRID_SLAB_MM = 3;
+
 const handleOverviewGrid: Handler = ({ msg, ok, fail }) => {
+  const state = requireLoaded(fail);
+  if (!state) return;
   const plane = msg.plane as SlicePlane;
-  const count = Math.min(4, Math.max(2, (msg.count as number) ?? 4));
-  const { volume, wl } = useVolumeStore.getState();
-  if (!volume) {
-    fail('No volume loaded');
-    return;
-  }
+  const count = clamp((msg.count as number) ?? 4, 2, 4);
+  const { volume, wl } = state;
+  const total = sliceCount(volume.meta.dims, plane);
+  const half = slabHalfSlices(plane, OVERVIEW_GRID_SLAB_MM, volume.meta.spacing);
 
-  const dims = volume.meta.dims;
-  const total = sliceTotal(dims, plane);
-  // Default 3 mm slab for overview grid — improves lesion visibility
-  // without obscuring fine margins.
-  const half = halfSlabsFor(plane, 3, volume.meta.spacing);
-
-  // Build evenly-spaced 1-based indices.
   const indices = Array.from({ length: count }, (_, i) =>
     Math.round(1 + (i / (count - 1)) * (total - 1)),
   );
-
-  const images = indices.map((slice) => {
-    const idx = slice - 1; // 0-based
-    return renderSliceForMcp(extractSliceGrayImage(volume, plane, idx, wl, half));
-  });
+  const images = indices.map((slice) =>
+    renderSliceForMcp(extractSliceGrayImage(volume, plane, slice - 1, wl, half)),
+  );
 
   ok({ images, indices, total });
 };
 
-// ── Annotations ──────────────────────────────────────────────────────────────
-
 const handleAddAnnotation: Handler = ({ msg, ok, fail }) => {
-  const state = useVolumeStore.getState();
-  const { cursor, volume } = state;
-  if (!cursor || !volume) {
-    fail('No volume loaded');
-    return;
-  }
+  const state = requireLoaded(fail);
+  if (!state) return;
+
   const plane = msg.plane as SlicePlane;
   const fx = msg.fx as number;
   const fy = msg.fy as number;
-  const severity = SEVERITIES.includes(msg.severity as AnnotationSeverity)
-    ? (msg.severity as AnnotationSeverity)
-    : 'serious';
-  const rawVoxel = voxelFromFrac(plane, fx, fy, cursor, volume.meta.dims);
-  const snappedVoxel = snapToAnatomy(rawVoxel, plane, volume);
   const rawConfidence = msg.confidence as number | undefined;
+
   const annotation: Omit<AiAnnotation, 'volumeId'> = {
     id: crypto.randomUUID(),
     plane,
     fx,
     fy,
-    voxel: snappedVoxel,
+    voxel: snapToAnatomy(
+      fracToVoxel(plane, fx, fy, state.cursor, state.volume.meta.dims),
+      plane,
+      state.volume,
+    ),
     label: msg.label as string,
     summary: msg.summary as string | undefined,
-    severity,
-    confidence:
-      rawConfidence != null ? Math.min(100, Math.max(0, Math.round(rawConfidence))) : undefined,
+    severity: SEVERITIES.includes(msg.severity as AnnotationSeverity)
+      ? (msg.severity as AnnotationSeverity)
+      : 'serious',
+    confidence: rawConfidence != null ? clamp(Math.round(rawConfidence), 0, 100) : undefined,
     sizeMm: msg.size_mm != null ? Number(msg.size_mm) : undefined,
   };
+
   state.addAiAnnotation(annotation);
-  // Focus the new finding so it's immediately visible to the user.
   state.setActiveAnnotation(annotation.id);
   ok({ id: annotation.id });
 };
@@ -353,7 +301,7 @@ const handleRemoveAnnotation: Handler = ({ msg, ok, fail }) => {
 };
 
 const handleListAnnotations: Handler = ({ ok }) => {
-  const list = useVolumeStore.getState().aiAnnotations.map((a) => ({
+  const annotations = useVolumeStore.getState().aiAnnotations.map((a) => ({
     id: a.id,
     plane: a.plane,
     voxel: a.voxel,
@@ -361,7 +309,7 @@ const handleListAnnotations: Handler = ({ ok }) => {
     summary: a.summary ?? null,
     severity: a.severity,
   }));
-  ok({ annotations: list, count: list.length });
+  ok({ annotations, count: annotations.length });
 };
 
 const handleClearAnnotations: Handler = ({ ok }) => {
@@ -369,52 +317,42 @@ const handleClearAnnotations: Handler = ({ ok }) => {
   ok();
 };
 
-// ── Measurements ─────────────────────────────────────────────────────────────
-
 const handleSetMeasurement: Handler = ({ msg, ok, fail }) => {
-  const state = useVolumeStore.getState();
-  const { volume } = state;
-  if (!volume) {
-    fail('No volume loaded');
-    return;
-  }
-  const dims = volume.meta.dims;
+  const state = requireLoaded(fail);
+  if (!state) return;
+  const dims = state.volume.meta.dims;
+
   const parsePoint = (key: 'from' | 'to'): MeasurementPoint | null => {
-    const p = msg[key] as Partial<MeasurementPoint> | undefined;
-    if (!p || typeof p !== 'object') return null;
-    const { x, y, z } = p;
+    const point = msg[key] as Partial<MeasurementPoint> | undefined;
+    if (!point || typeof point !== 'object') return null;
+    const { x, y, z } = point;
     if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
-    return {
-      x: clampVoxel(Math.round(x as number), dims[0]),
-      y: clampVoxel(Math.round(y as number), dims[1]),
-      z: clampVoxel(Math.round(z as number), dims[2]),
-    };
+    return clampToDims(
+      { x: Math.round(x as number), y: Math.round(y as number), z: Math.round(z as number) },
+      dims,
+    );
   };
+
   const from = parsePoint('from');
   const to = parsePoint('to');
   if (!from || !to) {
     fail('`from` and `to` must each be {x, y, z} voxel coordinates');
     return;
   }
-  // Replace any existing measurement atomically — placing `from`
-  // wipes the prior `to`, then we set `to` to finalize distance.
+
+  // Setting `from` wipes any prior `to`, so the pair always lands atomically.
   state.setMeasurementFrom(from);
   state.setMeasurementTo(to);
-  const m = useVolumeStore.getState().measurement;
-  ok({
-    from,
-    to,
-    distanceMm: m?.distanceMm ?? null,
-  });
+  ok({ from, to, distanceMm: useVolumeStore.getState().measurement?.distanceMm ?? null });
 };
 
 const handleGetMeasurement: Handler = ({ ok }) => {
-  const m = useVolumeStore.getState().measurement;
+  const measurement = useVolumeStore.getState().measurement;
   ok({
-    hasMeasurement: m !== null,
-    from: m?.from ?? null,
-    to: m?.to ?? null,
-    distanceMm: m?.distanceMm ?? null,
+    hasMeasurement: measurement !== null,
+    from: measurement?.from ?? null,
+    to: measurement?.to ?? null,
+    distanceMm: measurement?.distanceMm ?? null,
   });
 };
 
@@ -423,12 +361,6 @@ const handleClearMeasurement: Handler = ({ ok }) => {
   ok();
 };
 
-// ── Handler registry ─────────────────────────────────────────────────────────
-
-/**
- * Action name → handler function. The bridge dispatcher looks up by name and
- * falls back to a "Unknown action" error when no entry matches.
- */
 export const MCP_HANDLERS: Record<string, Handler> = {
   get_state: handleGetState,
   overview: handleOverview,

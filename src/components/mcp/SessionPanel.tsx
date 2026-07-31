@@ -69,8 +69,6 @@ import {
   Value,
 } from './SessionPanel.styles';
 
-// ── Environment ───────────────────────────────────────────────────────────────
-
 const SERVER_BUNDLE_URL = `${import.meta.env.BASE_URL}dxt-server/index.js`;
 const WS_LIB_URL = `${import.meta.env.BASE_URL}dxt-server/ws/`;
 
@@ -86,8 +84,6 @@ function isLocalMode(): boolean {
     (navigator as { standalone?: boolean }).standalone === true
   );
 }
-
-// ── .dxt download ─────────────────────────────────────────────────────────────
 
 /**
  * The .dxt file is a ZIP of `manifest.json` + a server bundle (Node + ws lib),
@@ -180,8 +176,6 @@ async function downloadDxt(): Promise<void> {
   URL.revokeObjectURL(url);
 }
 
-// ── InfoTip — hover-only popover, used in connected mode ─────────────────────
-
 function InfoTip({ text }: { text: string }) {
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const ref = useRef<HTMLButtonElement>(null);
@@ -213,8 +207,6 @@ function InfoTip({ text }: { text: string }) {
     </>
   );
 }
-
-// ── PromptSection — collapsible example prompt + copy-to-clipboard ──────────
 
 function PromptSection() {
   const [promptOpen, setPromptOpen] = useState(true);
@@ -264,7 +256,6 @@ function PromptSection() {
   );
 }
 
-// ── SessionPanel ──────────────────────────────────────────────────────────────
 //
 // Not connected  →  same for Web and PWA: download button + instructions.
 // Connected      →  differs by mode:
@@ -351,7 +342,6 @@ export function SessionPanel() {
     <>
       {pill}
       <Panel $dockOpen={dockOpen} role="complementary" aria-label="AI agent session panel">
-        {/* ── Header — identical for all states ── */}
         <PanelHeader $connected={mcpConnected} onClick={toggle}>
           <HeaderIcon>
             <Bot size={14} />
@@ -365,9 +355,7 @@ export function SessionPanel() {
           </CollapseBtn>
         </PanelHeader>
 
-        {/* ── Body ── */}
         <PanelBody>
-          {/* ── NOT CONNECTED: same for Web and PWA ── */}
           {!mcpConnected && (
             <>
               <HowItWorksBox>
@@ -478,7 +466,6 @@ export function SessionPanel() {
             </>
           )}
 
-          {/* ── CONNECTED via local WS (PWA) ── */}
           {mcpConnected && local && (
             <>
               <Row>

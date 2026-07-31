@@ -3,8 +3,6 @@ import { ChevronLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 
-// ── Styled components ──────────────────────────────────────────────────────
-
 const BackButton = styled.button`
   display: flex;
   align-items: center;

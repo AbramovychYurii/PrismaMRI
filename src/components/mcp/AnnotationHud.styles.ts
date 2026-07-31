@@ -8,8 +8,6 @@
 
 import styled, { css, keyframes } from 'styled-components';
 
-// ── Layout constants ────────────────────────────────────────────────────────
-
 export const SIDE_OFFSET = 30;
 export const TOP_OFFSET = 22;
 export const MOBILE_TOP = 12;
@@ -17,8 +15,6 @@ export const MOBILE_SIDE = 12;
 
 /** Confidence accent — neutral blue, independent of severity. */
 export const CONFIDENCE_COLOR = '#60a5fa';
-
-// ── Animations ──────────────────────────────────────────────────────────────
 
 const slideDown = keyframes`
   from { transform: translateY(-8px); opacity: 0; }
@@ -34,7 +30,6 @@ const auroraSlide = keyframes`
   to { background-position: 320% 0; }
 `;
 
-// ── Pill entrance animations ────────────────────────────────────────────────
 // One-time, calm effect when findings first appear:
 //   • Pill fades + glides in from slightly above — no overshoot, no blur snap.
 //   • Aurora gradient ring slowly spins up to its continuous loop.
@@ -68,8 +63,6 @@ const digitTick = keyframes`
   0%   { transform: translateY(-3px); opacity: 0; }
   100% { transform: translateY(0);    opacity: 1; }
 `;
-
-// ── Expanded card — row layout: [AccentBar | Body] ──────────────────────────
 
 export const Card = styled.div`
   position: absolute;
@@ -125,8 +118,6 @@ export const Body = styled.div`
     -webkit-overflow-scrolling: touch;
   }
 `;
-
-// ── Top row ─────────────────────────────────────────────────────────────────
 
 export const TopRow = styled.div`
   display: flex;
@@ -189,8 +180,6 @@ export const HeaderBtn = styled.button`
   &:hover { color: var(--ink); }
 `;
 
-// ── Title ────────────────────────────────────────────────────────────────────
-
 export const Title = styled.h3`
   margin: 0;
   font-size: 15px;
@@ -199,8 +188,6 @@ export const Title = styled.h3`
   color: var(--ink);
   line-height: 1.3;
 `;
-
-// ── Confidence bar ───────────────────────────────────────────────────────────
 
 export const ConfidenceRow = styled.div`
   display: flex;
@@ -223,16 +210,12 @@ export const ConfidenceValue = styled.span`
   flex-shrink: 0;
 `;
 
-// ── Summary ──────────────────────────────────────────────────────────────────
-
 export const Summary = styled.p`
   margin: 0;
   font-size: 11.5px;
   line-height: 1.6;
   color: var(--ink-2);
 `;
-
-// ── Tag row (coords + size) ──────────────────────────────────────────────────
 
 export const TagRow = styled.div`
   display: flex;
@@ -261,8 +244,6 @@ export const TagKey = styled.span`
   letter-spacing: 0.12em;
   text-transform: uppercase;
 `;
-
-// ── Divider + right-aligned pagination ───────────────────────────────────────
 
 export const Divider = styled.hr`
   border: none;
@@ -379,8 +360,6 @@ export const NavIndex = styled.span`
   min-width: 34px;
   text-align: center;
 `;
-
-// ── Collapsed pill ───────────────────────────────────────────────────────────
 
 export const PillWrap = styled.div<{ $entrance: boolean }>`
   position: absolute;

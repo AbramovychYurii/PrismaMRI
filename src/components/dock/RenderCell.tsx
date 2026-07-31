@@ -5,15 +5,12 @@ import type { RenderPreset } from '@/types';
 import { Info } from 'lucide-react';
 import styled from 'styled-components';
 
-// ── Slab MIP options shared across all panels (side + fullscreen). ─────────
 const SLAB_PRESETS: Array<[string, number]> = [
   ['Off', 0],
   ['3 mm', 3],
   ['5 mm', 5],
   ['10 mm', 10],
 ];
-
-// ── Styled components ──────────────────────────────────────────────────────
 
 const Wrap = styled.div`
   display: flex;
@@ -55,8 +52,6 @@ const PresetName = styled.span<{ $active: boolean }>`
   text-transform: uppercase;
   color: ${({ $active }) => ($active ? 'var(--amber)' : 'var(--ink-2)')};
 `;
-
-// ── Slab MIP section ───────────────────────────────────────────────────────
 
 /** Mirrors the dock cell heading (HeadTitle + HeadLine in Dock.tsx) so the
  * "Slab MIP" sub-section reads as a peer of "Render Mode" rather than an
@@ -118,15 +113,11 @@ const SlabBtn = styled.button<{ $active: boolean }>`
   }
 `;
 
-// ── Data ───────────────────────────────────────────────────────────────────
-
 const PRESETS: { id: RenderPreset; name: string; desc: string }[] = [
   { id: 'mip', name: 'MIP', desc: 'Max intensity — full range grayscale' },
   { id: 'tissue', name: 'Tissue', desc: 'Fat · muscle · fluid · marrow' },
   { id: 'bone', name: 'Bone', desc: 'Highlights dense bright structures' },
 ];
-
-// ── Sub-components ─────────────────────────────────────────────────────────
 
 function PresetButton({
   name,
@@ -157,8 +148,6 @@ function PresetButton({
     </Tooltip>
   );
 }
-
-// ── RenderCell ─────────────────────────────────────────────────────────────
 
 export function RenderCell() {
   const renderPreset = useVolumeStore((s) => s.renderPreset);

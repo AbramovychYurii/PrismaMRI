@@ -1,7 +1,5 @@
 import styled from 'styled-components';
 
-// ── Styled components ──────────────────────────────────────────────────────
-
 const BrandWrap = styled.div`
   display: flex;
   align-items: center;
@@ -36,8 +34,6 @@ const BrandMriItalic = styled.em`
   color: var(--ink-2);
   font-weight: 400;
 `;
-
-// ── BrandLogo SVG component (brand mark — kept as custom) ──────────────────
 
 function BrandLogo() {
   return (

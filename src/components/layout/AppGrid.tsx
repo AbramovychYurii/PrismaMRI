@@ -14,8 +14,6 @@ import { useVolumeStore } from '@/store';
 import { MonitorDown } from 'lucide-react';
 import styled from 'styled-components';
 
-// ── Desktop layout ─────────────────────────────────────────────────────────
-
 const GridRoot = styled.div<{ $railOpen: boolean }>`
   position: relative;
   z-index: var(--z-layout);
@@ -27,8 +25,6 @@ const GridRoot = styled.div<{ $railOpen: boolean }>`
   width: 100vw;
   gap: 0;
 `;
-
-// ── Mobile layout ──────────────────────────────────────────────────────────
 
 const MobileRoot = styled.div`
   display: flex;
@@ -122,8 +118,6 @@ const MobileControlsWrap = styled.div`
   inset: 0;
 `;
 
-// ── Mobile sub-components ──────────────────────────────────────────────────
-
 function MobileHeader() {
   const loading = useVolumeStore((s) => s.loading);
   const { canInstall, install } = usePwaInstall();
@@ -143,15 +137,12 @@ function MobileHeader() {
   );
 }
 
-// ── Root component ─────────────────────────────────────────────────────────
-
 export function AppGrid() {
   const isMobile = useIsMobile();
   const railOpen = useVolumeStore((s) => s.toolbar.rail);
   const mobileTab = useVolumeStore((s) => s.mobileTab);
   const volumeLoaded = useVolumeStore((s) => s.volume !== null);
 
-  // ── Desktop ──────────────────────────────────────────────────────────────
   if (!isMobile) {
     return (
       <GridRoot className="console" $railOpen={railOpen}>
@@ -163,7 +154,6 @@ export function AppGrid() {
     );
   }
 
-  // ── Mobile ───────────────────────────────────────────────────────────────
   return (
     <MobileRoot>
       <MobileHeader />

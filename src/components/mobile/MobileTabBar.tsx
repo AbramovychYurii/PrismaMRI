@@ -3,8 +3,6 @@ import type { MobileTab } from '@/types';
 import { Box, Settings } from 'lucide-react';
 import styled from 'styled-components';
 
-// ── Styled components ──────────────────────────────────────────────────────
-
 const Bar = styled.nav`
   flex-shrink: 0;
   display: grid;
@@ -38,8 +36,6 @@ const TabLabel = styled.span`
   text-transform: uppercase;
 `;
 
-// ── Plane glyph icon ───────────────────────────────────────────────────────
-
 function PlaneGlyph({
   letter,
   active,
@@ -63,8 +59,6 @@ function PlaneGlyph({
     </span>
   );
 }
-
-// ── Tab definitions ────────────────────────────────────────────────────────
 
 interface Tab {
   id: MobileTab;
@@ -105,8 +99,6 @@ const TABS: Tab[] = [
     icon: (a) => <Settings size={19} strokeWidth={a ? 1.8 : 1.4} />,
   },
 ];
-
-// ── Component ──────────────────────────────────────────────────────────────
 
 export function MobileTabBar() {
   const mobileTab = useVolumeStore((s) => s.mobileTab);

@@ -4,7 +4,6 @@ const DB_NAME = 'prisma-mri';
 const DB_VERSION = 1;
 const STORE_NAME = 'volumes';
 
-// ── Per-tab cache key ────────────────────────────────────────────────────────
 // IndexedDB is shared across all tabs of the same origin, so a single hard-
 // coded key meant whichever tab saved most recently overwrote everyone else's
 // cached volume.  Reloading any other tab would then restore the *wrong*

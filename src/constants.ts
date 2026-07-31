@@ -103,8 +103,6 @@ export const PLANE_LABEL: Record<SlicePlane, { primary: string; secondary: strin
   axial: { primary: 'Axial', secondary: 'transverse' },
 };
 
-// ── AI annotation severity palette ─────────────────────────────────────────
-
 /** Severity → marker colour (hex). Shared by 2-D overlay and 3-D markers. */
 export const SEVERITY_HEX: Record<AnnotationSeverity, string> = {
   critical: '#ff3b30', // red    — critical

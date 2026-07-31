@@ -9,8 +9,6 @@ import {
 import type { PreparedVolumeFor3D } from '@/types';
 import * as THREE from 'three';
 
-// ── Volume texture ─────────────────────────────────────────────────────────
-
 /** Data3DTexture: single-channel Uint8, linear filtering, tight packing. */
 export function buildTexture(prepared: PreparedVolumeFor3D): THREE.Data3DTexture {
   const [w, h, d] = prepared.dims;
@@ -23,8 +21,6 @@ export function buildTexture(prepared: PreparedVolumeFor3D): THREE.Data3DTexture
   tex.needsUpdate = true;
   return tex;
 }
-
-// ── Material ───────────────────────────────────────────────────────────────
 
 export function buildMaterial(
   texture: THREE.Data3DTexture,
@@ -81,8 +77,6 @@ export function buildMaterial(
     side: THREE.BackSide,
   });
 }
-
-// ── VolumeObject ───────────────────────────────────────────────────────────
 
 export interface VolumeObject {
   mesh: THREE.Mesh;

@@ -1,8 +1,6 @@
 import { useVolumeStore } from '@/store';
 import styled from 'styled-components';
 
-// ── Styled components ──────────────────────────────────────────────────────
-
 const StudyGrid = styled.div`
   display: grid;
   grid-template-columns: auto 1fr;
@@ -34,8 +32,6 @@ const RowValue = styled.div`
 const RowDim = styled.span`
   color: var(--ink-3);
 `;
-
-// ── Helpers ────────────────────────────────────────────────────────────────
 
 function formatBytes(n: number) {
   if (n < 1024) return `${n} B`;

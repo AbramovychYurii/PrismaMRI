@@ -14,8 +14,6 @@ import { Bot, ShieldCheck } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import styled, { keyframes } from 'styled-components';
 
-// ── Animation ────────────────────────────────────────────────────────────────
-
 const fadeIn = keyframes`
   from { opacity: 0; }
   to   { opacity: 1; }
@@ -25,8 +23,6 @@ const slideUp = keyframes`
   from { transform: translateY(24px) scale(0.97); opacity: 0; }
   to   { transform: translateY(0)    scale(1);    opacity: 1; }
 `;
-
-// ── Styled components ────────────────────────────────────────────────────────
 
 const Backdrop = styled.div`
   position: fixed;
@@ -144,8 +140,6 @@ const Btn = styled.button<{ $primary?: boolean }>`
     &:hover { background: rgba(255,255,255,0.06); color: var(--ink-2); }
   `}
 `;
-
-// ── Component ────────────────────────────────────────────────────────────────
 
 const CAPABILITIES = [
   'Navigate to any slice and adjust the viewing plane',
