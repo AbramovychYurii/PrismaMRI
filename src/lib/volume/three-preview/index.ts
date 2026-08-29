@@ -1,6 +1,6 @@
+import { cursorToTextureVoxel } from '@/lib/volume/plane';
 import { AnnotationMarkers } from '@/lib/volume/three-preview/annotation-markers';
 import { buildCamera, buildControls, frameCamera } from '@/lib/volume/three-preview/camera';
-import { CursorPlanes } from '@/lib/volume/three-preview/cursor-planes';
 import { MeasurementLine } from '@/lib/volume/three-preview/measurement-line';
 import {
   type VolumeObject,
@@ -19,6 +19,7 @@ import type {
   PlanesMode,
   PreparedVolumeFor3D,
   SlicePlane,
+  Vec3,
   VolumeCursor,
 } from '@/types';
 import * as THREE from 'three';
@@ -47,11 +48,14 @@ export class ThreePreview {
   private camera: THREE.OrthographicCamera;
   private controls: TrackballControls | null = null;
   private volume: VolumeObject | null = null;
-  private readonly cursorPlanes = new CursorPlanes();
   private readonly measurementLine = new MeasurementLine();
   private readonly annotationMarkers = new AnnotationMarkers();
   /** Voxel spacing of the loaded volume — for marker world placement. */
   private _spacing: readonly [number, number, number] = [1, 1, 1];
+  /** Texture dims, and the full-resolution dims the cursor is expressed in.
+   *  The two differ whenever prepareVolumeFor3D had to shrink an axis. */
+  private textureDims: Vec3 = [1, 1, 1];
+  private sourceDims: Vec3 = [1, 1, 1];
   /** Latest annotation list + active id, re-applied when a volume (re)loads. */
   private _annotations: AiAnnotation[] = [];
   private _activeAnnotationId: string | null = null;
@@ -125,7 +129,8 @@ export class ThreePreview {
 
     const dims = prepared.dims;
     const [sx, sy, sz] = prepared.spacing;
-    this.cursorPlanes.setDims(dims, prepared.sourceDims);
+    this.textureDims = dims;
+    this.sourceDims = prepared.sourceDims;
 
     const center = new THREE.Vector3(
       (dims[0] / 2 - 0.5) * sx,
@@ -214,11 +219,10 @@ export class ThreePreview {
   }
 
   setCursor(cursor: VolumeCursor): void {
-    this.cursorPlanes.update(cursor);
     // Sync shader plane position (texture voxel space)
     const m = this.volume?.material;
     if (m) {
-      const [px, py, pz] = this.cursorPlanes.mapCursor(cursor);
+      const [px, py, pz] = cursorToTextureVoxel(cursor, this.textureDims, this.sourceDims);
       m.uniforms.u_planePos.value.set(px, py, pz);
     }
     this.dirty = true;
@@ -294,7 +298,6 @@ export class ThreePreview {
   }
 
   setPlaneMode(mode: PlanesMode, activePlane: SlicePlane): void {
-    this.cursorPlanes.setMode(mode, activePlane);
     const m = this.volume?.material;
     if (m) {
       m.uniforms.u_planeMode.value = mode === 'off' ? 0 : mode === 'active' ? 1 : 2;
@@ -691,7 +694,6 @@ export class ThreePreview {
     cancelAnimationFrame(this.raf);
     this.controls?.dispose();
     if (this.volume) disposeVolumeObject(this.volume);
-    this.cursorPlanes.dispose();
     this.measurementLine.dispose();
     this.annotationMarkers.dispose();
     this.warmTarget.dispose();

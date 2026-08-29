@@ -62,6 +62,30 @@ export function clampToDims(cursor: VolumeCursor, dims: AxisTriple): VolumeCurso
   };
 }
 
+/**
+ * Rescale a full-resolution cursor into the coordinate space of the 3-D
+ * preview texture, where 0 and `dim - 1` are its first and last voxel.
+ *
+ * The texture is often smaller than the volume it came from (see
+ * prepareVolumeFor3D), so the shader's plane uniform cannot take raw cursor
+ * voxels — they have to be expressed in the texture it is actually sampling.
+ * Returns fractional coordinates on purpose: the shader interpolates, so
+ * rounding here would make the plane jump between texels.
+ */
+export function cursorToTextureVoxel(
+  cursor: VolumeCursor,
+  textureDims: AxisTriple,
+  sourceDims: AxisTriple,
+): [number, number, number] {
+  const rescale = (value: number, texture: number, source: number) =>
+    (value / Math.max(1, source - 1)) * (texture - 1);
+  return [
+    rescale(cursor.x, textureDims[0], sourceDims[0]),
+    rescale(cursor.y, textureDims[1], sourceDims[1]),
+    rescale(cursor.z, textureDims[2], sourceDims[2]),
+  ];
+}
+
 /** Width-to-height ratio of the rendered slice in physical (millimetre) space. */
 export function planeAspect(plane: SlicePlane, dims: AxisTriple, spacing: AxisTriple): number {
   const { horizontal, vertical } = PLANE_GEOMETRY[plane];

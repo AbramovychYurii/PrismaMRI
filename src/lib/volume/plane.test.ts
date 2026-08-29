@@ -1,6 +1,7 @@
 import {
   PLANE_GEOMETRY,
   clampToDims,
+  cursorToTextureVoxel,
   fracToVoxel,
   planeAspect,
   slabHalfSlices,
@@ -179,5 +180,127 @@ describe('slabHalfSlices', () => {
 
   it('never rounds a requested slab down to nothing', () => {
     expect(slabHalfSlices('axial', 0.1, [1, 1, 10])).toBe(1);
+  });
+});
+
+describe('cursorToTextureVoxel', () => {
+  it('is the identity when the texture was not shrunk', () => {
+    const dims: Vec3 = [10, 8, 6];
+    for (const voxel of allVoxels(dims)) {
+      expect(cursorToTextureVoxel(voxel, dims, dims)).toEqual([voxel.x, voxel.y, voxel.z]);
+    }
+  });
+
+  it('maps the ends of each axis onto the ends of the texture', () => {
+    const source: Vec3 = [101, 51, 11];
+    const texture: Vec3 = [51, 26, 6];
+    expect(cursorToTextureVoxel({ x: 0, y: 0, z: 0 }, texture, source)).toEqual([0, 0, 0]);
+    expect(cursorToTextureVoxel({ x: 100, y: 50, z: 10 }, texture, source)).toEqual([50, 25, 5]);
+  });
+
+  it('puts the middle of the volume in the middle of the texture', () => {
+    const [x] = cursorToTextureVoxel({ x: 50, y: 0, z: 0 }, [51, 51, 51], [101, 101, 101]);
+    expect(x).toBeCloseTo(25);
+  });
+
+  it('scales each axis by its own ratio', () => {
+    // Only z was reduced — x and y must come through untouched.
+    const source: Vec3 = [9, 9, 101];
+    const texture: Vec3 = [9, 9, 51];
+    expect(cursorToTextureVoxel({ x: 4, y: 7, z: 100 }, texture, source)).toEqual([4, 7, 50]);
+  });
+
+  it('keeps fractional positions instead of snapping to a texel', () => {
+    // The shader interpolates; rounding here would make the plane jump.
+    const [, , z] = cursorToTextureVoxel({ x: 0, y: 0, z: 3 }, [5, 5, 5], [9, 9, 9]);
+    expect(z).toBeCloseTo(1.5);
+    expect(Number.isInteger(z)).toBe(false);
+  });
+
+  it('never leaves the texture', () => {
+    const source: Vec3 = [64, 33, 7];
+    const texture: Vec3 = [32, 17, 7];
+    for (const voxel of allVoxels(source)) {
+      const out = cursorToTextureVoxel(voxel, texture, source);
+      for (let i = 0; i < 3; i++) {
+        expect(out[i]).toBeGreaterThanOrEqual(0);
+        expect(out[i]).toBeLessThanOrEqual(texture[i] - 1);
+      }
+    }
+  });
+
+  it('rises monotonically along each axis', () => {
+    const source: Vec3 = [40, 40, 40];
+    const texture: Vec3 = [13, 13, 13];
+    let previous = -1;
+    for (let x = 0; x < 40; x++) {
+      const [mapped] = cursorToTextureVoxel({ x, y: 0, z: 0 }, texture, source);
+      expect(mapped).toBeGreaterThanOrEqual(previous);
+      previous = mapped;
+    }
+  });
+
+  it('survives a single-voxel axis without dividing by zero', () => {
+    const out = cursorToTextureVoxel({ x: 0, y: 2, z: 0 }, [1, 5, 1], [1, 9, 1]);
+    expect(out.every(Number.isFinite)).toBe(true);
+    expect(out[0]).toBe(0);
+    expect(out[2]).toBe(0);
+  });
+});
+
+/**
+ * cursorToTextureVoxel replaced a `CursorPlanes` class whose only real method
+ * was this arithmetic. The class is gone, so its body is transcribed here as
+ * an oracle: the refactor is only correct if the shader keeps receiving the
+ * exact same plane position it did before.
+ */
+function legacyMapCursor(
+  cursor: VolumeCursor,
+  dims: Vec3,
+  srcDims: Vec3,
+): [number, number, number] {
+  const [w, h, d] = dims;
+  return [
+    (cursor.x / Math.max(1, srcDims[0] - 1)) * (w - 1),
+    (cursor.y / Math.max(1, srcDims[1] - 1)) * (h - 1),
+    (cursor.z / Math.max(1, srcDims[2] - 1)) * (d - 1),
+  ];
+}
+
+describe('cursorToTextureVoxel matches the class it replaced', () => {
+  const cases: Array<{ texture: Vec3; source: Vec3 }> = [
+    { texture: [1, 1, 1], source: [1, 1, 1] }, // degenerate
+    { texture: [8, 6, 4], source: [8, 6, 4] }, // no reduction
+    { texture: [256, 256, 498], source: [512, 512, 996] }, // the old uniform stride
+    { texture: [512, 512, 512], source: [512, 512, 996] }, // per-axis, after the 07 fix
+    { texture: [401, 401, 201], source: [401, 401, 201] },
+    { texture: [17, 33, 5], source: [40, 100, 7] }, // awkward ratios
+  ];
+
+  it('agrees bit for bit across every axis and dimension pair', () => {
+    for (const { texture, source } of cases) {
+      // Coprime strides so the samples do not line up with any dimension.
+      for (let x = 0; x < source[0]; x += 37)
+        for (let y = 0; y < source[1]; y += 41)
+          for (let z = 0; z < source[2]; z += 43) {
+            const cursor = { x, y, z };
+            expect(cursorToTextureVoxel(cursor, texture, source)).toEqual(
+              legacyMapCursor(cursor, texture, source),
+            );
+          }
+    }
+  });
+
+  it('agrees on the exact corners, where off-by-one would hide', () => {
+    for (const { texture, source } of cases) {
+      for (const cursor of [
+        { x: 0, y: 0, z: 0 },
+        { x: source[0] - 1, y: source[1] - 1, z: source[2] - 1 },
+      ]) {
+        expect(cursorToTextureVoxel(cursor, texture, source)).toEqual(
+          legacyMapCursor(cursor, texture, source),
+        );
+      }
+    }
   });
 });
