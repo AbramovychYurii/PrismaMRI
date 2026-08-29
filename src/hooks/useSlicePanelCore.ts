@@ -131,6 +131,7 @@ export function useSlicePanelCore(plane: SlicePlane, halfSlabs = 0) {
   const cursor = useVolumeStore((s) => s.cursor);
   const scrubVisible = useVolumeStore((s) => s.scrubVisible[plane]);
   const setScrubVisible = useVolumeStore((s) => s.setScrubVisible);
+  const setCanvasRef = useVolumeStore((s) => s.setCanvasRef);
 
   const drawFracs = useMemo<LetterboxRect | null>(
     () =>
@@ -145,6 +146,15 @@ export function useSlicePanelCore(plane: SlicePlane, halfSlabs = 0) {
   const onWheel = useSliceScroll(plane);
 
   useCanvasPainter(canvasRef, image, drawFracs, canvasSize);
+
+  // Published so useMcpBridge can capture this plane. It lives here rather
+  // than in the panel because the core owns the canvas, and exactly one core
+  // exists per plane — so an agent capture always gets the canvas the user is
+  // actually looking at, rail or fullscreen.
+  useEffect(() => {
+    setCanvasRef(plane, canvasRef.current);
+    return () => setCanvasRef(plane, null);
+  }, [plane, setCanvasRef]);
 
   const cross = useMemo(() => {
     if (!dims || !cursor) return null;

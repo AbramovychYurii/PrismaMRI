@@ -45,6 +45,13 @@ interface VolumeState {
   snapPlane: SlicePlane;
   /** Active tab on mobile layout. */
   mobileTab: MobileTab;
+  /**
+   * Plane currently shown fullscreen, or null. Lifted out of SlicePanel so the
+   * expanded view *replaces* its rail panel instead of mounting alongside it —
+   * otherwise the same plane runs two panel cores, two canvas painters and two
+   * annotation overlays at once.
+   */
+  expandedPlane: SlicePlane | null;
   /** Stable ID of the currently loaded volume (null when no volume is open). */
   activeVolumeId: string | null;
   /** AI annotation findings for the active volume only. */
@@ -101,6 +108,7 @@ interface VolumeActions {
   setSlabMm: (mm: number) => void;
   requestSnapToView: (plane: SlicePlane) => void;
   setMobileTab: (tab: MobileTab) => void;
+  setExpandedPlane: (plane: SlicePlane | null) => void;
   addAiAnnotation: (a: Omit<AiAnnotation, 'volumeId'>) => void;
   /** Atomically replace all annotations for the active volume (used by demo loader). */
   setAiAnnotations: (list: Omit<AiAnnotation, 'volumeId'>[]) => void;
@@ -155,6 +163,7 @@ const initialState: VolumeState = {
   snapSeq: 0,
   snapPlane: 'coronal',
   mobileTab: '3d',
+  expandedPlane: null,
   activeVolumeId: null,
   aiAnnotations: [],
   activeAnnotationId: null,
@@ -301,6 +310,14 @@ export const useVolumeStore = create<VolumeState & VolumeActions>()(
           mobileTab,
           // Sync activePlane when switching to a slice tab.
           activePlane: isSlicePlane(mobileTab) ? mobileTab : state.activePlane,
+        })),
+
+      setExpandedPlane: (expandedPlane) =>
+        set((state) => ({
+          expandedPlane,
+          // Expanding focuses the plane, so the first click moves the crosshair
+          // rather than only selecting the panel.
+          activePlane: expandedPlane ?? state.activePlane,
         })),
 
       addAiAnnotation: (a) =>

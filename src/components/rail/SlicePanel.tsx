@@ -22,7 +22,7 @@ import { downloadBlob } from '@/lib/download';
 import { useVolumeStore } from '@/store/volumeStore';
 import type { SlicePlane } from '@/types';
 import { ChevronsUpDown, Download, Maximize2, Minimize2 } from 'lucide-react';
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ActiveBorder,
@@ -364,22 +364,19 @@ function useSliceSwipe(core: SlicePanelCore, plane: SlicePlane) {
   };
 }
 
-function ExpandedSlicePanel({ plane, onClose }: { plane: SlicePlane; onClose: () => void }) {
+function ExpandedSlicePanel({ plane }: { plane: SlicePlane }) {
   const slabMm = useVolumeStore((s) => s.slabMm);
   const halfSlabs = useHalfSlabs(plane, slabMm);
+  const setExpandedPlane = useVolumeStore((s) => s.setExpandedPlane);
   const core = useSlicePanelCore(plane, halfSlabs);
   const { idx, total, scrubVisible, setScrubVisible, onScrub } = core.slice;
-  const { isActive, setActivePlane, measure } = core;
+  const { isActive, measure } = core;
 
   const moveCrosshair = useCrosshairClick(core, plane);
   const dragHandlers = useShiftDragMeasurement(core, plane);
   const footer = PLANE_FOOTER[plane];
 
-  // Expanding auto-focuses the panel so the first click moves the crosshair.
-  useEffect(() => {
-    setActivePlane(plane);
-  }, [plane, setActivePlane]);
-
+  const onClose = useCallback(() => setExpandedPlane(null), [setExpandedPlane]);
   useEscapeKey(onClose);
 
   return createPortal(
@@ -452,12 +449,11 @@ function ExpandedSlicePanel({ plane, onClose }: { plane: SlicePlane; onClose: ()
   );
 }
 
-export function SlicePanel({ plane }: { plane: SlicePlane }) {
-  const [expanded, setExpanded] = useState(false);
+function RailSlicePanel({ plane }: { plane: SlicePlane }) {
   const isMobile = useIsMobile();
   const slabMm = useVolumeStore((s) => s.slabMm);
   const halfSlabs = useHalfSlabs(plane, slabMm);
-  const setCanvasRef = useVolumeStore((s) => s.setCanvasRef);
+  const setExpandedPlane = useVolumeStore((s) => s.setExpandedPlane);
 
   const core = useSlicePanelCore(plane, halfSlabs);
   const { canvasRef } = core.frame;
@@ -466,12 +462,6 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
 
   const moveCrosshair = useCrosshairClick(core, plane);
   const swipeHandlers = useSliceSwipe(core, plane);
-
-  // Registered so useMcpBridge can capture this canvas.
-  useEffect(() => {
-    setCanvasRef(plane, canvasRef.current);
-    return () => setCanvasRef(plane, null);
-  }, [plane, setCanvasRef, canvasRef]);
 
   // The scrubber is always on mobile — there is no toggle there.
   const scrubberVisible = isMobile || scrubVisible;
@@ -520,7 +510,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
       ) : (
         <>
           <ButtonTray>
-            <TrayButton label="Expand panel" onClick={() => setExpanded(true)}>
+            <TrayButton label="Expand panel" onClick={() => setExpandedPlane(plane)}>
               <Maximize2 size={11} />
             </TrayButton>
             {total > 0 && (
@@ -557,8 +547,23 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
       <MeasureContextMenu measure={measure} onSnapToView={core.onSnapToView} />
 
       <AnnotationOverlay plane={plane} halfSlabs={halfSlabs} />
-
-      {expanded && <ExpandedSlicePanel plane={plane} onClose={() => setExpanded(false)} />}
     </PanelWrap>
+  );
+}
+
+/**
+ * A plane is either in the rail or fullscreen, never both.
+ *
+ * The expanded view used to be rendered *inside* the rail panel, so while it
+ * was open the same plane ran two panel cores: two slice extractions, two
+ * canvas painters, two annotation overlays and a doubled set of store
+ * subscriptions. Switching on the store means only the visible one exists.
+ */
+export function SlicePanel({ plane }: { plane: SlicePlane }) {
+  const expandedPlane = useVolumeStore((s) => s.expandedPlane);
+  return expandedPlane === plane ? (
+    <ExpandedSlicePanel plane={plane} />
+  ) : (
+    <RailSlicePanel plane={plane} />
   );
 }
