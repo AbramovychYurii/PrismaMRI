@@ -82,6 +82,17 @@ export const PLANE_ACCENT: Record<SlicePlane, string> = {
   axial: ACCENT_VAR[PLANE_ACCENT_KEY.axial],
 };
 
+/**
+ * Which axis colours each crosshair line on a panel. Deliberately independent
+ * of the slice geometry in `plane.ts` — this is the panel's visual key, not a
+ * statement about how voxels are laid out.
+ */
+export const PLANE_CROSSHAIR_AXES: Record<SlicePlane, { v: Axis; h: Axis }> = {
+  coronal: { v: 'y', h: 'z' },
+  sagittal: { v: 'x', h: 'z' },
+  axial: { v: 'y', h: 'x' },
+};
+
 /** Italic glyph rendered in slice panel headers. */
 export const PLANE_GLYPH: Record<SlicePlane, string> = {
   coronal: 'C',

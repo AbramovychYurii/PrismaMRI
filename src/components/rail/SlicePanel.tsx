@@ -2,7 +2,13 @@ import { AnnotationOverlay } from '@/components/mcp/AnnotationOverlay';
 import { MeasureMenu } from '@/components/rail/MeasureMenu';
 import { SliceScrubber } from '@/components/rail/SliceScrubber';
 import { Tooltip } from '@/components/ui/Tooltip';
-import { PLANE_FOOTER, PLANE_GLYPH } from '@/constants';
+import {
+  PLANE_ACCENT,
+  PLANE_CROSSHAIR_AXES,
+  PLANE_FOOTER,
+  PLANE_GLYPH,
+  PLANE_LABEL,
+} from '@/constants';
 import { useHalfSlabs } from '@/hooks/useHalfSlabs';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import {
@@ -89,30 +95,38 @@ const TrayButton = memo(function TrayButton({
   );
 });
 
-function ExportSliceButton({ core, plane, large }: PanelPartProps & { large?: boolean }) {
+function ExportSliceButton({
+  canvasRef,
+  plane,
+  idx,
+  large,
+}: {
+  canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  plane: SlicePlane;
+  idx: number;
+  large?: boolean;
+}) {
   return (
     <TrayButton
       large={large}
       label="Export slice as PNG"
-      onClick={() => downloadSlice(core.canvasRef.current, plane, core.idx)}
+      onClick={() => downloadSlice(canvasRef.current, plane, idx)}
     >
       <Download size={large ? 13 : 11} />
     </TrayButton>
   );
 }
 
-interface PanelPartProps {
-  core: SlicePanelCore;
-  plane: SlicePlane;
-}
-
-function PlaneHeading({ core, plane }: PanelPartProps) {
+/** Everything here is a lookup on `plane` — no panel state involved. */
+function PlaneHeading({ plane }: { plane: SlicePlane }) {
+  const accent = PLANE_ACCENT[plane];
+  const label = PLANE_LABEL[plane];
   return (
     <PanelHeader>
-      <PlaneGlyph $color={core.accentColor}>{PLANE_GLYPH[plane]}</PlaneGlyph>
+      <PlaneGlyph $color={accent}>{PLANE_GLYPH[plane]}</PlaneGlyph>
       <PlaneLabel>
-        <PlaneLabelAccent $color={core.accentColor}>{core.planeLabel.primary}</PlaneLabelAccent>
-        {` · ${core.planeLabel.secondary}`}
+        <PlaneLabelAccent $color={accent}>{label.primary}</PlaneLabelAccent>
+        {` · ${label.secondary}`}
       </PlaneLabel>
     </PanelHeader>
   );
@@ -127,34 +141,41 @@ function SliceCount({ idx, total }: { idx: number; total: number }) {
   );
 }
 
-function MeasureContextMenu({ core }: { core: SlicePanelCore }) {
-  if (!core.menu) return null;
+function MeasureContextMenu({
+  measure,
+  onSnapToView,
+}: {
+  measure: SlicePanelCore['measure'];
+  onSnapToView: () => void;
+}) {
+  if (!measure.menu) return null;
   return (
     <MeasureMenu
-      x={core.menu.screenX}
-      y={core.menu.screenY}
-      hasMeasurementFrom={core.measurement !== null}
-      onMeasureFrom={core.onMeasureFrom}
-      onMeasureTo={core.onMeasureTo}
-      onSnapToView={core.onSnapToView}
-      onClear={core.onClear}
-      onClose={core.closeMenu}
+      x={measure.menu.screenX}
+      y={measure.menu.screenY}
+      hasMeasurementFrom={measure.measurement !== null}
+      onMeasureFrom={measure.onMeasureFrom}
+      onMeasureTo={measure.onMeasureTo}
+      onSnapToView={onSnapToView}
+      onClear={measure.onClear}
+      onClose={measure.closeMenu}
     />
   );
 }
 
 const CrosshairAndDots = memo(function CrosshairAndDots({
+  plane,
   cross,
-  axes,
-  adjustedDots,
+  dots,
   distanceMm,
 }: {
+  plane: SlicePlane;
   cross: { fx: number; fy: number } | null;
-  axes: { v: 'x' | 'y' | 'z'; h: 'x' | 'y' | 'z' };
-  adjustedDots: Array<{ fx: number; fy: number }>;
+  dots: Array<{ fx: number; fy: number }>;
   distanceMm?: number | null;
 }) {
-  const hasLine = adjustedDots.length === 2;
+  const axes = PLANE_CROSSHAIR_AXES[plane];
+  const hasLine = dots.length === 2;
   return (
     <>
       {cross && (
@@ -177,10 +198,10 @@ const CrosshairAndDots = memo(function CrosshairAndDots({
       {hasLine && (
         <MeasureLine aria-hidden="true">
           <line
-            x1={`${adjustedDots[0].fx * 100}%`}
-            y1={`${adjustedDots[0].fy * 100}%`}
-            x2={`${adjustedDots[1].fx * 100}%`}
-            y2={`${adjustedDots[1].fy * 100}%`}
+            x1={`${dots[0].fx * 100}%`}
+            y1={`${dots[0].fy * 100}%`}
+            x2={`${dots[1].fx * 100}%`}
+            y2={`${dots[1].fy * 100}%`}
             style={MEASURE_LINE_STROKE_STYLE}
             strokeWidth="1.5"
             strokeDasharray="5 4"
@@ -189,7 +210,7 @@ const CrosshairAndDots = memo(function CrosshairAndDots({
           />
         </MeasureLine>
       )}
-      {adjustedDots.map((dot, i) => (
+      {dots.map((dot, i) => (
         // Keyed by role (0 = from, 1 = to): coordinates collide when both
         // points coincide, which breaks reconciliation and leaks DOM nodes.
         <MeasureDot
@@ -207,8 +228,8 @@ const CrosshairAndDots = memo(function CrosshairAndDots({
       {hasLine && distanceMm !== null && distanceMm !== undefined && (
         <MeasureLabel
           style={{
-            left: `${((adjustedDots[0].fx + adjustedDots[1].fx) / 2) * 100}%`,
-            top: `${((adjustedDots[0].fy + adjustedDots[1].fy) / 2) * 100}%`,
+            left: `${((dots[0].fx + dots[1].fx) / 2) * 100}%`,
+            top: `${((dots[0].fy + dots[1].fy) / 2) * 100}%`,
           }}
         >
           {distanceMm.toFixed(1)} mm
@@ -224,7 +245,8 @@ const CrosshairAndDots = memo(function CrosshairAndDots({
  * menu's "View from this side".
  */
 function useCrosshairClick(core: SlicePanelCore, plane: SlicePlane) {
-  const { canvasRef, dims, cursor, drawFracs, isActive, setActivePlane, setCursor } = core;
+  const { canvasRef, dims, cursor, drawFracs } = core.frame;
+  const { isActive, setActivePlane, setCursor } = core;
   return useCallback(
     (e: React.MouseEvent) => {
       if (!isActive) {
@@ -256,7 +278,8 @@ const NO_DRAG: DragState = { pointerId: null, startX: 0, startY: 0, started: fal
  */
 function useShiftDragMeasurement(core: SlicePanelCore, plane: SlicePlane) {
   const drag = useRef<DragState>(NO_DRAG);
-  const { canvasRef, dims, cursor, drawFracs, isActive, setActivePlane } = core;
+  const { canvasRef, dims, cursor, drawFracs } = core.frame;
+  const { isActive, setActivePlane, measure } = core;
 
   const onPointerDown = (e: React.PointerEvent) => {
     e.stopPropagation();
@@ -279,14 +302,14 @@ function useShiftDragMeasurement(core: SlicePanelCore, plane: SlicePlane) {
       const dy = e.clientY - state.startY;
       if (dx * dx + dy * dy < DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) return;
       // Anchor to where the press landed, not to the already-displaced pointer.
-      core.beginDragMeasurement(
+      measure.beginDrag(
         { clientX: state.startX, clientY: state.startY },
         canvasRef.current,
         drawFracs,
       );
       state.started = true;
     }
-    core.updateDragMeasurement(e, canvasRef.current, drawFracs);
+    measure.updateDrag(e, canvasRef.current, drawFracs);
   };
 
   const onPointerUp = (e: React.PointerEvent) => {
@@ -318,7 +341,8 @@ const TOUCH_SWIPE_FULL_RANGE_PX = 300;
 
 function useSliceSwipe(core: SlicePanelCore, plane: SlicePlane) {
   const gesture = useRef<{ startY: number; startIdx: number } | null>(null);
-  const { idx, total, isActive, setActivePlane, handleScrub } = core;
+  const { idx, total, onScrub } = core.slice;
+  const { isActive, setActivePlane } = core;
 
   return {
     onTouchStart: (e: React.TouchEvent) => {
@@ -331,7 +355,7 @@ function useSliceSwipe(core: SlicePanelCore, plane: SlicePlane) {
       const step = Math.round((travelled / TOUCH_SWIPE_FULL_RANGE_PX) * total);
       if (step === 0) return;
       const nextIdx = Math.max(1, Math.min(total, gesture.current.startIdx + step));
-      handleScrub(nextIdx);
+      onScrub(nextIdx);
       gesture.current = { startY: e.touches[0].clientY, startIdx: nextIdx };
     },
     onTouchEnd: () => {
@@ -344,7 +368,8 @@ function ExpandedSlicePanel({ plane, onClose }: { plane: SlicePlane; onClose: ()
   const slabMm = useVolumeStore((s) => s.slabMm);
   const halfSlabs = useHalfSlabs(plane, slabMm);
   const core = useSlicePanelCore(plane, halfSlabs);
-  const { idx, total, isActive, scrubVisible, setScrubVisible, setActivePlane } = core;
+  const { idx, total, scrubVisible, setScrubVisible, onScrub } = core.slice;
+  const { isActive, setActivePlane, measure } = core;
 
   const moveCrosshair = useCrosshairClick(core, plane);
   const dragHandlers = useShiftDragMeasurement(core, plane);
@@ -364,28 +389,28 @@ function ExpandedSlicePanel({ plane, onClose }: { plane: SlicePlane; onClose: ()
         e.stopPropagation();
         if (!e.shiftKey) moveCrosshair(e);
       }}
-      onContextMenu={core.handleContextMenu}
+      onContextMenu={measure.onContextMenu}
       onWheel={(e) => {
         e.stopPropagation();
-        core.onWheel(e);
+        core.slice.onWheel(e);
       }}
       {...dragHandlers}
     >
-      <StyledCanvas ref={core.canvasRef as React.Ref<HTMLCanvasElement>} />
+      <StyledCanvas ref={core.frame.canvasRef as React.Ref<HTMLCanvasElement>} />
 
       <CrosshairAndDots
+        plane={plane}
         cross={core.cross}
-        axes={core.axes}
-        adjustedDots={core.adjustedDots}
-        distanceMm={core.measurement?.distanceMm ?? null}
+        dots={measure.dots}
+        distanceMm={measure.measurement?.distanceMm ?? null}
       />
 
       <AnnotationOverlay plane={plane} halfSlabs={halfSlabs} />
 
-      <PlaneHeading core={core} plane={plane} />
+      <PlaneHeading plane={plane} />
 
       <ButtonTray>
-        <ExportSliceButton core={core} plane={plane} large />
+        <ExportSliceButton canvasRef={core.frame.canvasRef} plane={plane} idx={idx} large />
         <TrayButton large label="Collapse panel" onClick={onClose}>
           <Minimize2 size={13} />
         </TrayButton>
@@ -408,7 +433,7 @@ function ExpandedSlicePanel({ plane, onClose }: { plane: SlicePlane; onClose: ()
           slice={idx}
           total={total}
           visible={scrubVisible}
-          onChange={core.handleScrub}
+          onChange={onScrub}
         />
       )}
 
@@ -421,7 +446,7 @@ function ExpandedSlicePanel({ plane, onClose }: { plane: SlicePlane; onClose: ()
 
       {isActive && <ActiveBorder />}
 
-      <MeasureContextMenu core={core} />
+      <MeasureContextMenu measure={measure} onSnapToView={core.onSnapToView} />
     </FullscreenOverlay>,
     document.body,
   );
@@ -435,7 +460,9 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
   const setCanvasRef = useVolumeStore((s) => s.setCanvasRef);
 
   const core = useSlicePanelCore(plane, halfSlabs);
-  const { canvasRef, idx, total, isActive, scrubVisible, setScrubVisible } = core;
+  const { canvasRef } = core.frame;
+  const { idx, total, scrubVisible, setScrubVisible, onScrub } = core.slice;
+  const { isActive, measure } = core;
 
   const moveCrosshair = useCrosshairClick(core, plane);
   const swipeHandlers = useSliceSwipe(core, plane);
@@ -453,8 +480,8 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
     <PanelWrap
       data-testid={`slice-panel-${plane}`}
       onClick={moveCrosshair}
-      onContextMenu={core.handleContextMenu}
-      onWheel={core.onWheel}
+      onContextMenu={measure.onContextMenu}
+      onWheel={core.slice.onWheel}
       {...swipeHandlers}
       $isLast={plane === 'axial'}
       $isActive={isActive}
@@ -462,13 +489,13 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
       <StyledCanvas ref={canvasRef as React.Ref<HTMLCanvasElement>} />
 
       <CrosshairAndDots
+        plane={plane}
         cross={core.cross}
-        axes={core.axes}
-        adjustedDots={core.adjustedDots}
-        distanceMm={core.measurement?.distanceMm ?? null}
+        dots={measure.dots}
+        distanceMm={measure.measurement?.distanceMm ?? null}
       />
 
-      <PlaneHeading core={core} plane={plane} />
+      <PlaneHeading plane={plane} />
 
       {isMobile ? (
         <MobileRightCol>
@@ -479,10 +506,10 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
               total={total}
               visible
               inline
-              onChange={core.handleScrub}
+              onChange={onScrub}
             />
           )}
-          <ExportSliceButton core={core} plane={plane} />
+          <ExportSliceButton canvasRef={canvasRef} plane={plane} idx={idx} />
           {total > 0 && (
             <MobileCounter>
               {idx}
@@ -512,7 +539,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
               slice={idx}
               total={total}
               visible={scrubVisible}
-              onChange={core.handleScrub}
+              onChange={onScrub}
             />
           )}
         </>
@@ -527,7 +554,7 @@ export function SlicePanel({ plane }: { plane: SlicePlane }) {
 
       {isActive && <ActiveBorder />}
 
-      <MeasureContextMenu core={core} />
+      <MeasureContextMenu measure={measure} onSnapToView={core.onSnapToView} />
 
       <AnnotationOverlay plane={plane} halfSlabs={halfSlabs} />
 

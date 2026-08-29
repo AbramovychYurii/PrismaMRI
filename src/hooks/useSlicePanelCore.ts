@@ -1,12 +1,4 @@
-import {
-  ACCENT_VAR,
-  AXIS_ACCENT,
-  type Axis,
-  CANVAS_BG,
-  PLANE_ACCENT,
-  PLANE_LABEL,
-  accentRgba,
-} from '@/constants';
+import { ACCENT_VAR, AXIS_ACCENT, type Axis, CANVAS_BG, accentRgba } from '@/constants';
 import { useMeasurementInteraction } from '@/hooks/useMeasurementInteraction';
 import { useSliceImage } from '@/hooks/useSliceImage';
 import { useSliceScroll } from '@/hooks/useSliceScroll';
@@ -27,16 +19,6 @@ import {
 import { useVolumeStore } from '@/store';
 import type { SliceImage, SlicePlane, Vec3, VolumeCursor } from '@/types';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
-/**
- * Which axis colours each crosshair line. Independent of the geometry in
- * `plane.ts` — this is purely the panel's visual key.
- */
-const CROSSHAIR_AXES: Record<SlicePlane, { v: Axis; h: Axis }> = {
-  coronal: { v: 'y', h: 'z' },
-  sagittal: { v: 'x', h: 'z' },
-  axial: { v: 'y', h: 'x' },
-};
 
 export const axisColor = (axis: Axis) => ACCENT_VAR[AXIS_ACCENT[axis]];
 export const axisGlow = (axis: Axis) => accentRgba(AXIS_ACCENT[axis], 0.45);
@@ -203,35 +185,32 @@ export function useSlicePanelCore(plane: SlicePlane, halfSlabs = 0) {
       : { idx: 0, total: 0 };
 
   return {
-    canvasRef,
-    drawFracs,
-    idx,
-    total,
+    /**
+     * The canvas and everything needed to convert a pointer position into a
+     * voxel. Travels as a unit — no caller needs one of these without the rest.
+     */
+    frame: { canvasRef, drawFracs, dims, cursor },
+    /** Where we are in the stack, plus every control that moves us. */
+    slice: { idx, total, scrubVisible, setScrubVisible, onScrub: handleScrub, onWheel },
+    /** Measurement state, its context menu and the shift-drag handlers. */
+    measure: {
+      measurement: measureInteraction.measurement,
+      dots: adjustedDots,
+      menu: measureInteraction.menu,
+      closeMenu: measureInteraction.closeMenu,
+      onContextMenu: handleContextMenu,
+      onMeasureFrom: measureInteraction.onMeasureFrom,
+      onMeasureTo: measureInteraction.onMeasureTo,
+      onClear: measureInteraction.onClear,
+      beginDrag: measureInteraction.beginDrag,
+      updateDrag: measureInteraction.updateDrag,
+    },
+    /** Crosshair position in panel space, or null before a volume is open. */
     cross,
-    adjustedDots,
-    axes: CROSSHAIR_AXES[plane],
-    accentColor: PLANE_ACCENT[plane],
-    planeLabel: PLANE_LABEL[plane],
     isActive: activePlane === plane,
-    cursor,
-    dims,
-    scrubVisible,
     setCursor,
     setActivePlane,
-    setScrubVisible,
-    requestSnapToView,
-    onWheel,
-    handleScrub,
-    handleContextMenu,
     onSnapToView,
-    measurement: measureInteraction.measurement,
-    menu: measureInteraction.menu,
-    closeMenu: measureInteraction.closeMenu,
-    onMeasureFrom: measureInteraction.onMeasureFrom,
-    onMeasureTo: measureInteraction.onMeasureTo,
-    onClear: measureInteraction.onClear,
-    beginDragMeasurement: measureInteraction.beginDrag,
-    updateDragMeasurement: measureInteraction.updateDrag,
   };
 }
 
