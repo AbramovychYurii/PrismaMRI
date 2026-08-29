@@ -95,9 +95,10 @@ export class ThreePreview {
       antialias: true,
       alpha: true,
       powerPreference: 'high-performance',
-      // Required so ctx.drawImage / toDataURL can read the WebGL buffer
-      // after renderer.render() without the content being swapped away.
-      preserveDrawingBuffer: true,
+      // No preserveDrawingBuffer: it forces the driver to keep a second copy of
+      // the buffer and blocks swap optimisations on *every* frame. Both export
+      // paths render offscreen instead (see renderToPixels), so nothing ever
+      // needs to read the visible buffer back after a swap.
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.sortObjects = false;
@@ -456,12 +457,36 @@ export class ThreePreview {
   };
 
   /**
-   * Capture the current 3-D view as a PNG Blob.
-   * Forces one synchronous render so the WebGL buffer is guaranteed fresh,
-   * then composites the result over the Stage background gradient so the
-   * exported image is fully opaque and matches exactly what the user sees
-   * (cursor planes, clip mode, colour LUT — everything included).
+   * Render the scene into an offscreen target and return its pixels as a
+   * top-down RGBA buffer (WebGL's origin is bottom-left, so rows are flipped).
+   *
+   * Rendering offscreen rather than reading back the visible canvas is what
+   * lets the renderer run without `preserveDrawingBuffer` — the visible view is
+   * never touched, so there is also no flash and no dependency on when the
+   * browser swaps buffers.
    */
+  private renderToPixels(width: number, height: number): Uint8ClampedArray<ArrayBuffer> {
+    const target = new THREE.WebGLRenderTarget(width, height);
+    this.renderer.setRenderTarget(target);
+    this.updateCameraUniform();
+    this.renderer.render(this.scene, this.camera);
+    this.renderer.setRenderTarget(null);
+
+    const pixels = new Uint8Array(width * height * 4);
+    this.renderer.readRenderTargetPixels(target, 0, 0, width, height, pixels);
+    target.dispose();
+
+    const flipped = new Uint8ClampedArray(width * height * 4);
+    const rowBytes = width * 4;
+    for (let y = 0; y < height; y++) {
+      flipped.set(
+        pixels.subarray((height - 1 - y) * rowBytes, (height - y) * rowBytes),
+        y * rowBytes,
+      );
+    }
+    return flipped;
+  }
+
   /**
    * Synchronous JPEG export for MCP captures.
    *
@@ -500,28 +525,11 @@ export class ThreePreview {
       m.uniforms.u_shading.value = 0;
     }
 
-    // Render to an offscreen WebGLRenderTarget — the main canvas is never touched
-    // so the 3-D view in the browser is not affected.
-    const target = new THREE.WebGLRenderTarget(capW, capH);
-    this.renderer.setRenderTarget(target);
-    this.updateCameraUniform();
-    this.renderer.render(this.scene, this.camera);
-    this.renderer.setRenderTarget(null);
-
-    // Read pixels (WebGL origin is bottom-left → flip vertically).
-    const pixels = new Uint8Array(capW * capH * 4);
-    this.renderer.readRenderTargetPixels(target, 0, 0, capW, capH, pixels);
-    target.dispose();
-
-    const flipped = new Uint8ClampedArray(capW * capH * 4);
-    const rowBytes = capW * 4;
-    for (let y = 0; y < capH; y++) {
-      flipped.set(pixels.subarray((capH - 1 - y) * rowBytes, (capH - y) * rowBytes), y * rowBytes);
-    }
+    const flipped = this.renderToPixels(capW, capH);
 
     // Restore shader state.
     if (m) {
-      m.uniforms.u_steps.value = origSteps ?? 256;
+      m.uniforms.u_steps.value = origSteps ?? RAY_STEPS;
       m.uniforms.u_shading.value = origShading ?? 1;
     }
 
@@ -535,20 +543,28 @@ export class ThreePreview {
     return off.toDataURL('image/jpeg', quality).replace(/^data:[^;]+;base64,/, '');
   }
 
+  /**
+   * Capture the 3-D view as an opaque PNG Blob, at the same resolution and
+   * full quality the user is looking at.
+   */
   exportPNG(): Promise<Blob> {
-    // Force one synchronous render so the WebGL buffer is current.
-    this.updateCameraUniform();
-    this.renderer.render(this.scene, this.camera);
+    const el = this.renderer.domElement;
+    const width = el.width;
+    const height = el.height;
+    const flipped = this.renderToPixels(width, height);
 
-    const src = this.renderer.domElement;
+    // Flatten onto black, matching the Stage background. Empty rays are
+    // `discard`ed so they keep the transparent clear, and the volume writes
+    // premultiplied colour (front-to-back accumulation) — so compositing over
+    // black is exactly: keep RGB, make every pixel opaque.
+    for (let i = 3; i < flipped.length; i += 4) flipped[i] = 255;
+
     const off = document.createElement('canvas');
-    off.width = src.width;
-    off.height = src.height;
+    off.width = width;
+    off.height = height;
     const ctx = off.getContext('2d');
     if (!ctx) throw new Error('exportPNG: failed to acquire 2D context');
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(0, 0, off.width, off.height);
-    ctx.drawImage(src, 0, 0);
+    ctx.putImageData(new ImageData(flipped, width, height), 0, 0);
 
     return new Promise((resolve, reject) => {
       off.toBlob(
