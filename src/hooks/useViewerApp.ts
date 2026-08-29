@@ -145,9 +145,21 @@ export function useViewerApp() {
           clearSeriesContext();
         }
 
-        volumeDb.saveVolume(volume, prepared3D, histogram).catch(() => {
-          /* storage full or unavailable — the volume still loaded */
-        });
+        volumeDb
+          .saveVolume(volume, prepared3D, histogram)
+          .then((outcome) => {
+            // Skipping the cache is not a user-facing failure — the volume is
+            // already open, only the next reload will be slower. Worth a line
+            // in the console though, or a silently uncached tab looks like a bug.
+            if (!outcome.stored) {
+              console.debug(
+                `[volume-cache] skipped (${outcome.reason}) — ${Math.round(outcome.bytes / 1e6)} MB`,
+              );
+            }
+          })
+          .catch(() => {
+            /* unexpected storage failure — the volume still loaded */
+          });
       } catch (err) {
         failLoad(err, 'Failed to load volume.');
       } finally {

@@ -101,52 +101,132 @@ function copyBuffer(ta: {
   return ta.buffer.slice(ta.byteOffset, ta.byteOffset + ta.byteLength) as ArrayBuffer;
 }
 
+/**
+ * Share of the origin's remaining quota this cache is willing to occupy.
+ *
+ * The cache only saves a page reload — the app works identically without it.
+ * So it must never be the reason the browser starts evicting, which is why it
+ * claims a fraction of what is free rather than whatever it can get.
+ */
+export const QUOTA_SHARE = 0.5;
+
+/** Bytes the three big buffers will occupy. The metadata around them is noise. */
+export function recordBytes(
+  volume: LoadedVolume,
+  prepared3D: PreparedVolumeFor3D,
+  histogram: VolumeHistogram,
+): number {
+  return volume.voxels.byteLength + prepared3D.data.byteLength + histogram.bins.byteLength;
+}
+
+/**
+ * Whether a record of `bytes` is worth attempting, given a StorageEstimate.
+ *
+ * Deliberately pure — the policy is the part worth testing, and it should not
+ * need a browser to exercise. A missing or incomplete estimate returns true:
+ * this is a cheap pre-flight, not the guarantee. The write itself is still
+ * guarded by the QuotaExceededError path.
+ */
+export function fitsInQuota(bytes: number, estimate: StorageEstimate | null): boolean {
+  if (!estimate || estimate.quota === undefined || estimate.usage === undefined) return true;
+  return bytes <= Math.max(0, estimate.quota - estimate.usage) * QUOTA_SHARE;
+}
+
+async function readEstimate(): Promise<StorageEstimate | null> {
+  if (typeof navigator === 'undefined' || !navigator.storage?.estimate) return null;
+  try {
+    return await navigator.storage.estimate();
+  } catch {
+    return null;
+  }
+}
+
+function isQuotaError(err: unknown): boolean {
+  return err instanceof DOMException && (err.name === 'QuotaExceededError' || err.code === 22);
+}
+
+/**
+ * Why a volume did or did not reach the cache. Reported rather than thrown:
+ * running out of room is an ordinary outcome here, not a failure of the app.
+ */
+export type SaveOutcome =
+  | { stored: true; bytes: number }
+  | { stored: false; bytes: number; reason: 'too-large' | 'quota-exceeded' | 'unavailable' };
+
 export async function saveVolume(
   volume: LoadedVolume,
   prepared3D: PreparedVolumeFor3D,
   histogram: VolumeHistogram,
-): Promise<void> {
-  const db = await openDb();
-  const tabKey = getTabKey();
-  const record: StoredRecord = {
-    id: tabKey,
-    timestamp: Date.now(),
-    formatId: volume.formatId,
-    voxelType: volume.voxels instanceof Float32Array ? 'float32' : 'int16',
-    voxels: copyBuffer(volume.voxels),
-    scalarMin: volume.scalarMin,
-    scalarMax: volume.scalarMax,
-    windowLevel: volume.windowLevel,
-    meta: volume.meta,
-    histBins: copyBuffer(histogram.bins),
-    histMin: histogram.min,
-    histMax: histogram.max,
-    histCount: histogram.count,
-    p3dData: copyBuffer(prepared3D.data),
-    p3dDims: prepared3D.dims,
-    p3dSpacing: prepared3D.spacing,
-    p3dClim: prepared3D.clim,
-    p3dThreshold: prepared3D.threshold,
-    p3dSourceRange: prepared3D.sourceRange,
-    p3dSourceDims: prepared3D.sourceDims,
-  };
+): Promise<SaveOutcome> {
+  const bytes = recordBytes(volume, prepared3D, histogram);
 
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-    tx.objectStore(STORE_NAME).put(record);
-  });
-
-  // Best-effort prune of orphan records left by closed tabs.  Failure is
-  // non-fatal — the next save will retry, and old records never resurrect
-  // (they have stale, unique IDs that no live tab knows).
+  let db: IDBDatabase;
   try {
-    await pruneOldRecords(db, tabKey);
+    db = await openDb();
   } catch {
-    /* ignore */
+    // Private mode, disabled storage, corrupt database — all the same to us.
+    return { stored: false, bytes, reason: 'unavailable' };
   }
-  db.close();
+
+  const tabKey = getTabKey();
+
+  try {
+    // Prune before measuring, not after. Records abandoned by closed tabs are
+    // the likeliest reason we are short on room, so freeing them first can be
+    // the difference between caching this volume and skipping it.
+    try {
+      await pruneOldRecords(db, tabKey);
+    } catch {
+      /* non-fatal — the estimate below simply sees less free space */
+    }
+
+    if (!fitsInQuota(bytes, await readEstimate())) {
+      return { stored: false, bytes, reason: 'too-large' };
+    }
+
+    // Only now copy the buffers. At full-body size these duplicate ~500 MB, so
+    // paying for them before knowing there is room would be the worst of both
+    // worlds: a memory spike *and* a write that fails anyway.
+    const record: StoredRecord = {
+      id: tabKey,
+      timestamp: Date.now(),
+      formatId: volume.formatId,
+      voxelType: volume.voxels instanceof Float32Array ? 'float32' : 'int16',
+      voxels: copyBuffer(volume.voxels),
+      scalarMin: volume.scalarMin,
+      scalarMax: volume.scalarMax,
+      windowLevel: volume.windowLevel,
+      meta: volume.meta,
+      histBins: copyBuffer(histogram.bins),
+      histMin: histogram.min,
+      histMax: histogram.max,
+      histCount: histogram.count,
+      p3dData: copyBuffer(prepared3D.data),
+      p3dDims: prepared3D.dims,
+      p3dSpacing: prepared3D.spacing,
+      p3dClim: prepared3D.clim,
+      p3dThreshold: prepared3D.threshold,
+      p3dSourceRange: prepared3D.sourceRange,
+      p3dSourceDims: prepared3D.sourceDims,
+    };
+
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      // A quota failure aborts the transaction rather than surfacing on the
+      // request, so this is the branch that actually fires when the disk is full.
+      tx.onabort = () => reject(tx.error);
+      tx.objectStore(STORE_NAME).put(record);
+    });
+
+    return { stored: true, bytes };
+  } catch (err) {
+    if (isQuotaError(err)) return { stored: false, bytes, reason: 'quota-exceeded' };
+    throw err;
+  } finally {
+    db.close();
+  }
 }
 
 export async function loadVolume(): Promise<{
