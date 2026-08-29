@@ -10,6 +10,11 @@
  *   PRISMAMRI_SESSION   – UUID shown in the app's "AI Agent" panel
  *   PRISMAMRI_RELAY_URL – https://prismamri-relay.<account>.workers.dev
  *
+ * Optional env vars:
+ *   PRISMAMRI_ALLOWED_ORIGINS – comma-separated extra origins allowed to open
+ *                               the local WebSocket (forks / self-hosting).
+ *                               See the origin allowlist below.
+ *
  * ── Tools ────────────────────────────────────────────────────────────────────
  *  Overview / state
  *    get_viewer_state      current cursor, dims, W/L, preset
@@ -77,6 +82,45 @@ if (!WS_URL) {
 
 // Ports tried in order when starting the local WS server.
 const LOCAL_PORTS = [7389, 7390, 7391, 7392, 7393];
+
+// ── Local WebSocket origin allowlist ─────────────────────────────────────────
+// Binding to 127.0.0.1 is not an access control.  A WebSocket handshake is not
+// subject to the same-origin policy and CORS headers do not constrain it, so
+// without an Origin check *any* page the user happens to have open could reach
+// this port and drive the viewer — including the capture_* tools, which read
+// back the scan currently on screen.
+//
+// Browsers always attach an accurate `Origin` to a WS handshake and page JS
+// cannot forge it, so an allowlist here is what actually keeps other sites out.
+// Forks and self-hosted deployments add their own origin via
+// PRISMAMRI_ALLOWED_ORIGINS (comma-separated) instead of editing this file.
+const DEFAULT_ALLOWED_ORIGINS = ['https://abramovychyurii.github.io'];
+
+const EXTRA_ALLOWED_ORIGINS = (process.env.PRISMAMRI_ALLOWED_ORIGINS ?? '')
+  .split(',')
+  .map((o) => o.trim().replace(/\/$/, ''))
+  .filter((o) => o.length > 0);
+
+const ALLOWED_ORIGINS = new Set([...DEFAULT_ALLOWED_ORIGINS, ...EXTRA_ALLOWED_ORIGINS]);
+
+/** Dev and preview servers on loopback, any port (vite 5173, preview 4173, …). */
+const LOOPBACK_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
+
+/**
+ * Whether `origin` is allowed to open the local WebSocket.
+ *
+ * A missing Origin is rejected as well: every browser sets one, so a caller
+ * without it is not a browser page, and the PWA is the only legitimate client.
+ *
+ * Loopback origins are allowed on any port because serving a page from
+ * localhost already requires code execution on this machine — an attacker who
+ * has that does not need this socket.
+ */
+function isAllowedOrigin(origin: string | undefined): boolean {
+  if (!origin) return false;
+  const normalised = origin.replace(/\/$/, '');
+  return ALLOWED_ORIGINS.has(normalised) || LOOPBACK_ORIGIN.test(normalised);
+}
 
 if (SKILL_INSTRUCTIONS && SKILL_INSTRUCTIONS.length > 0) {
   process.stderr.write(`[prismamri] Embedded radiology skill ready (${SKILL_INSTRUCTIONS.length} chars).\n`);
@@ -216,19 +260,41 @@ function startLocalServer(): void {
     // WebSocketServer never answers those HTTP requests, so Chrome blocks
     // the upgrade — causing findLocalServer() to time-out and fall back to
     // the Cloudflare relay even when the local MCP server is running.
-    const httpServer = http.createServer((_req, res) => {
-      // Respond to all HTTP (non-upgrade) requests with the PNA header so
-      // the preflight succeeds.  The only callers are the same-machine PWA.
+    const httpServer = http.createServer((req, res) => {
+      // Answer the PNA preflight so an allowed origin can upgrade, but only for
+      // origins on the allowlist — echoing back `*` here would advertise this
+      // port to every site the user has open.
+      const origin = req.headers.origin;
+      if (!isAllowedOrigin(origin)) {
+        res.writeHead(403, { 'Content-Type': 'text/plain', Vary: 'Origin' });
+        res.end('Forbidden origin');
+        return;
+      }
       res.writeHead(200, {
-        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Origin': origin,
         'Access-Control-Allow-Private-Network': 'true',
         'Access-Control-Allow-Headers': '*',
         'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        Vary: 'Origin',
       });
       res.end();
     });
 
-    const srv = new WebSocketServer({ server: httpServer });
+    const srv = new WebSocketServer({
+      server: httpServer,
+      // Rejected before the socket exists, so a disallowed page never gets a
+      // connection it could send commands on.
+      verifyClient: ({ origin }, cb) => {
+        if (isAllowedOrigin(origin)) {
+          cb(true);
+          return;
+        }
+        process.stderr.write(
+          `[prismamri] Rejected WS upgrade from origin: ${origin ?? '(none)'}\n`,
+        );
+        cb(false, 403, 'Forbidden origin');
+      },
+    });
 
     httpServer.once('error', (e: NodeJS.ErrnoException) => {
       if (e.code === 'EADDRINUSE') {
