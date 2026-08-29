@@ -1,0 +1,73 @@
+name: CI
+
+# Pull requests only. Pushes to main are already covered end-to-end by
+# deploy.yml, which runs the same tests before it builds and publishes — so
+# splitting by event keeps every commit tested without ever running the suite
+# twice for the same one.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+# Per-branch, so pushing another commit to a PR supersedes its own in-flight
+# run and nothing else. Deliberately not the `pages` group deploy.yml uses:
+# sharing it would let PR runs cancel a deploy, and vice versa.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test
+
+  e2e:
+    name: E2E tests
+    # Gated on the fast suite: a broken invariant should not cost a Chromium
+    # download and a production build before it reports.
+    needs: unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Build app
+        run: npm run build
+        env:
+          GITHUB_PAGES: 'false'
+          VITE_RELAY_URL: ${{ vars.VITE_RELAY_URL }}
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
