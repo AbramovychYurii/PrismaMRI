@@ -12,6 +12,7 @@ import {
   cursorFromClick,
   useSlicePanelCore,
 } from '@/hooks/useSlicePanelCore';
+import { downloadBlob } from '@/lib/download';
 import { useVolumeStore } from '@/store/volumeStore';
 import type { SlicePlane } from '@/types';
 import { ChevronsUpDown, Download, Maximize2, Minimize2 } from 'lucide-react';
@@ -51,12 +52,7 @@ function downloadSlice(canvas: HTMLCanvasElement | null, plane: SlicePlane, idx:
   if (!canvas) return;
   canvas.toBlob((blob) => {
     if (!blob) return;
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `prismamri-${plane}-${idx}.png`;
-    link.click();
-    URL.revokeObjectURL(url);
+    downloadBlob(blob, `prismamri-${plane}-${idx}.png`);
   }, 'image/png');
 }
 

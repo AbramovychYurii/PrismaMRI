@@ -11,6 +11,7 @@
 import { AuroraSparkles } from '@/components/ui/AuroraSparkles';
 import { PLANE_LABEL, SEVERITY_HEX, SEVERITY_LABEL } from '@/constants';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { downloadBlob } from '@/lib/download';
 import { waitForPaint } from '@/lib/mcp/canvas-utils';
 import { generateReport } from '@/lib/reportPdf';
 import { sliceNumber } from '@/lib/volume/plane';
@@ -241,14 +242,7 @@ export function ReportModal({ finding, findingIndex, allFindings, onClose }: Pro
         .slice(0, 30)
         .toLowerCase();
 
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `prismamri-${today}-${volSlug}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      downloadBlob(blob, `prismamri-${today}-${volSlug}.pdf`);
     } finally {
       setDownloading(false);
     }

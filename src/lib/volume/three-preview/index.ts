@@ -66,6 +66,10 @@ export class ThreePreview {
   private lastRenderAt = 0;
   /** Interval between keepalive renders when the scene is otherwise idle (ms). */
   private static readonly KEEPALIVE_MS = 8_000;
+  /** 1x1 target the keepalive renders into. Allocated once — creating and
+   *  disposing a GPU resource every 8 s was the most expensive part of what is
+   *  meant to be the cheapest path in the loop. */
+  private readonly warmTarget = new THREE.WebGLRenderTarget(1, 1);
   /** Native device pixel ratio (capped at 2). Used to restore after interaction. */
   private readonly nativeDpr = Math.min(window.devicePixelRatio, 2);
 
@@ -441,11 +445,9 @@ export class ThreePreview {
       // and compiled shaders warm. Uses WebGLRenderTarget so the main canvas
       // is never touched — no visible flash in the browser.
       if (this.volume && ts - this.lastRenderAt > ThreePreview.KEEPALIVE_MS) {
-        const warm = new THREE.WebGLRenderTarget(1, 1);
-        this.renderer.setRenderTarget(warm);
+        this.renderer.setRenderTarget(this.warmTarget);
         this.renderer.render(this.scene, this.camera);
         this.renderer.setRenderTarget(null);
-        warm.dispose();
         this.lastRenderAt = ts;
       }
       return;
@@ -511,9 +513,12 @@ export class ThreePreview {
     const capW = Math.max(1, Math.round(cssW * scale));
     const capH = Math.max(1, Math.round(cssH * scale));
 
-    // Save shader state.
-    const origSteps = m?.uniforms.u_steps.value as number | undefined;
-    const origShading = m?.uniforms.u_shading.value as number | undefined;
+    // Shader state to restore afterwards. Read together with the material so
+    // the pair is either both present or both absent — no fallback constants,
+    // which could silently drift from the real defaults.
+    const saved = m
+      ? { steps: m.uniforms.u_steps.value, shading: m.uniforms.u_shading.value }
+      : null;
 
     // Reduce raycast cost for capture:
     //  • 64 steps (vs 256) — 4× fewer per-fragment iterations; negligible quality
@@ -528,9 +533,9 @@ export class ThreePreview {
     const flipped = this.renderToPixels(capW, capH);
 
     // Restore shader state.
-    if (m) {
-      m.uniforms.u_steps.value = origSteps ?? RAY_STEPS;
-      m.uniforms.u_shading.value = origShading ?? 1;
+    if (m && saved) {
+      m.uniforms.u_steps.value = saved.steps;
+      m.uniforms.u_shading.value = saved.shading;
     }
 
     // Encode to JPEG via a temp 2D canvas.
@@ -689,6 +694,7 @@ export class ThreePreview {
     this.cursorPlanes.dispose();
     this.measurementLine.dispose();
     this.annotationMarkers.dispose();
+    this.warmTarget.dispose();
     this.renderer.dispose();
   }
 }

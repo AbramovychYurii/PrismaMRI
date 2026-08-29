@@ -15,6 +15,7 @@
  * (ports, severities, action labels, W/L presets) live in `lib/mcp/constants.ts`.
  */
 
+import { downloadBlob } from '@/lib/download';
 import { LOCAL_PORTS } from '@/lib/mcp/constants';
 import { EXAMPLE_PROMPT } from '@/lib/mcp/example-prompt';
 import { getSampleReport } from '@/lib/sampleReports';
@@ -168,12 +169,7 @@ async function downloadDxt(): Promise<void> {
   }
 
   const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'prismamri.dxt';
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadBlob(blob, 'prismamri.dxt');
 }
 
 function InfoTip({ text }: { text: string }) {

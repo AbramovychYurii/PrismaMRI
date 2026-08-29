@@ -1,4 +1,5 @@
 import { useHover } from '@/hooks/useHover';
+import { downloadBlob } from '@/lib/download';
 import { ThreePreview } from '@/lib/volume/three-preview';
 import { Loader, Share2 } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
@@ -208,20 +209,11 @@ export function StageMenu({ previewRef }: Props) {
     return () => document.removeEventListener('keydown', onKey);
   }, [open]);
 
-  function triggerDownload(blob: Blob, filename: string) {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
   function handleExport3D() {
     setOpen(false);
     previewRef.current
       ?.exportPNG()
-      .then((blob) => triggerDownload(blob, 'prismamri-3d.png'))
+      .then((blob) => downloadBlob(blob, 'prismamri-3d.png'))
       .catch(console.error);
   }
 
@@ -234,7 +226,7 @@ export function StageMenu({ previewRef }: Props) {
       const { blob, ext } = await preview.exportRotationVideo({
         onProgress: (t) => setRecordPct(t),
       });
-      triggerDownload(blob, `prismamri-3d-spin.${ext}`);
+      downloadBlob(blob, `prismamri-3d-spin.${ext}`);
     } catch (err) {
       console.error(err);
     } finally {
@@ -260,7 +252,7 @@ export function StageMenu({ previewRef }: Props) {
         // Activation lost / share unavailable — fall through to download.
       }
     }
-    triggerDownload(blob, filename);
+    downloadBlob(blob, filename);
   }
 
   function handleShare3D() {
