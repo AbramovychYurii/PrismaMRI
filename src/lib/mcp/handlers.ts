@@ -13,7 +13,6 @@ import { extractSliceGrayImage } from '@/lib/volume/slices';
 import { useVolumeStore } from '@/store/volumeStore';
 import type {
   AiAnnotation,
-  AnnotationSeverity,
   LoadedVolume,
   MeasurementPoint,
   SlicePlane,
@@ -21,7 +20,17 @@ import type {
 } from '@/types';
 
 import { captureCanvas, renderSliceForMcp, waitForPaint } from './canvas-utils';
-import { MCP_JPEG_QUALITY, MCP_MAX_EDGE, SEVERITIES, WL_PRESETS } from './constants';
+import { MCP_JPEG_QUALITY, MCP_MAX_EDGE, WL_PRESETS } from './constants';
+import {
+  optionalNumber,
+  optionalSeverity,
+  optionalString,
+  requireFraction,
+  requireNumber,
+  requireOneOf,
+  requirePlane,
+  requireString,
+} from './validate';
 import { snapToAnatomy } from './voxel-utils';
 
 /** Free-form message body — handlers narrow individual fields as needed. */
@@ -118,8 +127,8 @@ const handleOverview: Handler = ({ ok, fail }) => {
 const handleNavigate: Handler = ({ msg, ok, fail }) => {
   const state = requireLoaded(fail);
   if (!state) return;
-  const plane = msg.plane as SlicePlane;
-  const slice = msg.slice as number;
+  const plane = requirePlane(msg);
+  const slice = requireNumber(msg, 'slice');
   const dims = state.volume.meta.dims;
   state.setCursor(clampToDims({ ...state.cursor, [sliceAxis(plane)]: slice - 1 }, dims));
   ok();
@@ -128,8 +137,8 @@ const handleNavigate: Handler = ({ msg, ok, fail }) => {
 const handleStep: Handler = ({ msg, ok, fail }) => {
   const state = requireLoaded(fail);
   if (!state) return;
-  const plane = msg.plane as SlicePlane;
-  const steps = msg.steps as number;
+  const plane = requirePlane(msg);
+  const steps = requireNumber(msg, 'steps');
   const dims = state.volume.meta.dims;
   const next = clampToDims(
     { ...state.cursor, [sliceAxis(plane)]: sliceIndex(state.cursor, plane) + steps },
@@ -148,7 +157,7 @@ const handleNavigateCenter: Handler = ({ ok, fail }) => {
 };
 
 const handleSetWl: Handler = ({ msg, ok }) => {
-  const wl = { window: msg.window as number, level: msg.level as number };
+  const wl = { window: requireNumber(msg, 'window'), level: requireNumber(msg, 'level') };
   const { setWL, setWLDraft } = useVolumeStore.getState();
   setWL(wl);
   setWLDraft(wl);
@@ -158,7 +167,10 @@ const handleSetWl: Handler = ({ msg, ok }) => {
 const handleApplyWlPreset: Handler = ({ msg, ok, fail }) => {
   const state = requireLoaded(fail);
   if (!state) return;
-  const [windowFrac, levelFrac] = WL_PRESETS[msg.preset as string] ?? WL_PRESETS.full_range;
+  // Named rather than defaulted: silently applying full_range for a typo left
+  // the agent reasoning about contrast it never asked for.
+  const preset = requireOneOf(msg, 'preset', Object.keys(WL_PRESETS));
+  const [windowFrac, levelFrac] = WL_PRESETS[preset];
   const range = state.volume.scalarMax - state.volume.scalarMin;
   const wl = { window: range * windowFrac, level: state.volume.scalarMin + range * levelFrac };
   state.setWL(wl);
@@ -167,8 +179,7 @@ const handleApplyWlPreset: Handler = ({ msg, ok, fail }) => {
 };
 
 const handleSetPreset: Handler = ({ msg, ok, fail }) => {
-  const preset = msg.preset as string;
-  if (preset === 'tissue') {
+  if (msg.preset === 'tissue') {
     fail(
       '"tissue" preset is not available via MCP — ' +
         'it requires full per-voxel compositing which exceeds the capture time budget. ' +
@@ -176,7 +187,7 @@ const handleSetPreset: Handler = ({ msg, ok, fail }) => {
     );
     return;
   }
-  useVolumeStore.getState().setRenderPreset(preset as 'mip' | 'bone');
+  useVolumeStore.getState().setRenderPreset(requireOneOf(msg, 'preset', ['mip', 'bone'] as const));
   ok();
 };
 
@@ -194,8 +205,8 @@ const handleSetSlabMm: Handler = ({ msg, ok, fail }) => {
 };
 
 const handleCaptureSlice: Handler = async ({ msg, ok, fail }) => {
-  const plane = msg.plane as SlicePlane;
-  const slabMm = (msg.slab_mm as number | undefined) ?? 0;
+  const plane = requirePlane(msg);
+  const slabMm = optionalNumber(msg, 'slab_mm', 0);
 
   // A slab renders straight from the voxel buffer: sharper than a canvas grab
   // and independent of the panel's own slab setting.
@@ -240,8 +251,8 @@ const OVERVIEW_GRID_SLAB_MM = 3;
 const handleOverviewGrid: Handler = ({ msg, ok, fail }) => {
   const state = requireLoaded(fail);
   if (!state) return;
-  const plane = msg.plane as SlicePlane;
-  const count = clamp((msg.count as number) ?? 4, 2, 4);
+  const plane = requirePlane(msg);
+  const count = clamp(optionalNumber(msg, 'count', 4), 2, 4);
   const { volume, wl } = state;
   const total = sliceCount(volume.meta.dims, plane);
   const half = slabHalfSlices(plane, OVERVIEW_GRID_SLAB_MM, volume.meta.spacing);
@@ -260,10 +271,10 @@ const handleAddAnnotation: Handler = ({ msg, ok, fail }) => {
   const state = requireLoaded(fail);
   if (!state) return;
 
-  const plane = msg.plane as SlicePlane;
-  const fx = msg.fx as number;
-  const fy = msg.fy as number;
-  const rawConfidence = msg.confidence as number | undefined;
+  const plane = requirePlane(msg);
+  const fx = requireFraction(msg, 'fx');
+  const fy = requireFraction(msg, 'fy');
+  const rawConfidence = msg.confidence == null ? undefined : requireNumber(msg, 'confidence');
 
   const annotation: Omit<AiAnnotation, 'volumeId'> = {
     id: crypto.randomUUID(),
@@ -275,11 +286,9 @@ const handleAddAnnotation: Handler = ({ msg, ok, fail }) => {
       plane,
       state.volume,
     ),
-    label: msg.label as string,
-    summary: msg.summary as string | undefined,
-    severity: SEVERITIES.includes(msg.severity as AnnotationSeverity)
-      ? (msg.severity as AnnotationSeverity)
-      : 'serious',
+    label: requireString(msg, 'label'),
+    summary: optionalString(msg, 'summary'),
+    severity: optionalSeverity(msg),
     confidence: rawConfidence != null ? clamp(Math.round(rawConfidence), 0, 100) : undefined,
     sizeMm: msg.size_mm != null ? Number(msg.size_mm) : undefined,
   };
@@ -290,7 +299,7 @@ const handleAddAnnotation: Handler = ({ msg, ok, fail }) => {
 };
 
 const handleRemoveAnnotation: Handler = ({ msg, ok, fail }) => {
-  const removeId = msg.id as string;
+  const removeId = requireString(msg, 'id');
   const state = useVolumeStore.getState();
   if (!state.aiAnnotations.some((a) => a.id === removeId)) {
     fail(`Annotation ${removeId} not found`);
@@ -326,11 +335,9 @@ const handleSetMeasurement: Handler = ({ msg, ok, fail }) => {
     const point = msg[key] as Partial<MeasurementPoint> | undefined;
     if (!point || typeof point !== 'object') return null;
     const { x, y, z } = point;
+    if (typeof x !== 'number' || typeof y !== 'number' || typeof z !== 'number') return null;
     if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return null;
-    return clampToDims(
-      { x: Math.round(x as number), y: Math.round(y as number), z: Math.round(z as number) },
-      dims,
-    );
+    return clampToDims({ x: Math.round(x), y: Math.round(y), z: Math.round(z) }, dims);
   };
 
   const from = parsePoint('from');
