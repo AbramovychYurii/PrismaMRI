@@ -18,10 +18,25 @@ function stepSlice(plane: SlicePlane, steps: number): boolean {
 /** Pixels of wheel delta per slice — roughly one mouse-wheel notch. */
 const WHEEL_PX_PER_STEP = 28;
 
-/** Caps the work a fast flick or high-DPI wheel can queue into a single frame. */
-const MAX_STEPS_PER_FRAME = 3;
-
 const DELTA_MODE_SCALE = [1, 16, 100];
+
+/**
+ * Whole slice steps contained in `delta`, plus the sub-step remainder to carry
+ * into the next frame.
+ *
+ * Deliberately uncapped. Moving three slices and moving thirty cost exactly the
+ * same — one cursor update, one extraction, one repaint — because the slices in
+ * between are never drawn. Capping bought no time; it only made a deep study
+ * crawl (a 996-slice scan took ~5 s of solid scrolling to cross) and left the
+ * unspent remainder creeping onward after the wheel had stopped.
+ */
+export function stepsFromWheelDelta(
+  delta: number,
+  pxPerStep: number = WHEEL_PX_PER_STEP,
+): { steps: number; remainder: number } {
+  const steps = Math.trunc(delta / pxPerStep);
+  return { steps, remainder: delta - steps * pxPerStep };
+}
 
 /**
  * Wheel handler for slice navigation. Trackpads emit ~120 events/s, far more
@@ -48,12 +63,11 @@ export function useSliceScroll(plane: SlicePlane) {
 
       rafId.current = requestAnimationFrame(() => {
         rafId.current = null;
-        const delta = accumulated.current;
-        const wholeSteps = Math.trunc(delta / WHEEL_PX_PER_STEP);
-        if (wholeSteps === 0) return;
+        const { steps, remainder } = stepsFromWheelDelta(accumulated.current);
+        if (steps === 0) return;
 
-        const steps = clamp(wholeSteps, -MAX_STEPS_PER_FRAME, MAX_STEPS_PER_FRAME);
-        accumulated.current = delta - steps * WHEEL_PX_PER_STEP;
+        // Keep only the sub-step remainder, so movement ends when the wheel does.
+        accumulated.current = remainder;
         if (!stepSlice(plane, steps)) accumulated.current = 0;
       });
     },

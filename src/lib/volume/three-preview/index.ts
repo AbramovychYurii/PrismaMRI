@@ -221,11 +221,19 @@ export class ThreePreview {
   setCursor(cursor: VolumeCursor): void {
     // Sync shader plane position (texture voxel space)
     const m = this.volume?.material;
-    if (m) {
-      const [px, py, pz] = cursorToTextureVoxel(cursor, this.textureDims, this.sourceDims);
-      m.uniforms.u_planePos.value.set(px, py, pz);
-    }
-    this.dirty = true;
+    if (!m) return;
+    const [px, py, pz] = cursorToTextureVoxel(cursor, this.textureDims, this.sourceDims);
+    m.uniforms.u_planePos.value.set(px, py, pz);
+
+    // The uniform is read only where a slice plane is drawn or the volume is
+    // clipped against it. With both off — the default — the cursor cannot
+    // change a single pixel of this view, so repainting would ray-march the
+    // whole texture to produce the identical frame. On a full-body study that
+    // is what made scrubbing feel stuck: every slice step queued a full
+    // volumetric render nobody could see.
+    const planesVisible = (m.uniforms.u_planeMode.value as number) !== 0;
+    const clipping = (m.uniforms.u_clipMode.value as number) === 1;
+    if (planesVisible || clipping) this.dirty = true;
   }
 
   /**
