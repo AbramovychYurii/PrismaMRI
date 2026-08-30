@@ -2,11 +2,24 @@ import { buildInt16WLLut, grayToRgba, mapIntensityToGray } from '@/lib/volume/ma
 import { sliceCount } from '@/lib/volume/plane';
 import type { LoadedVolume, SliceImage, SlicePlane, SliceWindowLevel } from '@/types';
 
-const MAX_CACHE = 64;
+/**
+ * Byte budget for cached slice images, per volume.
+ *
+ * Counting entries made the cache's cost depend on the study rather than on
+ * the budget: 64 slices of a 256³ volume is 16 MB, but 64 coronal slices of a
+ * 512×512×996 study is ~130 MB — on top of ~500 MB of voxels and a 3-D texture
+ * that can itself reach 134 MB.
+ *
+ * Budgeting bytes cuts both ways, which is the point: it caps the large study
+ * and, for a small one, caches several times more slices than 64 ever did.
+ */
+export const MAX_CACHE_BYTES = 48 * 1024 * 1024;
 
 interface CacheEntry {
   order: string[];
   map: Map<string, SliceImage>;
+  /** Sum of `data.byteLength` over `map`, tracked so eviction needs no scan. */
+  bytes: number;
   lut: Uint8Array | null;
   lutWindow: number;
   lutLevel: number;
@@ -21,7 +34,14 @@ function cacheKey(plane: SlicePlane, index: number, wl: SliceWindowLevel, halfSl
 function getEntry(volume: LoadedVolume): CacheEntry {
   let entry = cache.get(volume);
   if (!entry) {
-    entry = { order: [], map: new Map(), lut: null, lutWindow: Number.NaN, lutLevel: Number.NaN };
+    entry = {
+      order: [],
+      map: new Map(),
+      bytes: 0,
+      lut: null,
+      lutWindow: Number.NaN,
+      lutLevel: Number.NaN,
+    };
     cache.set(volume, entry);
   }
   return entry;
@@ -42,9 +62,16 @@ function store(volume: LoadedVolume, key: string, image: SliceImage): SliceImage
   const entry = getEntry(volume);
   entry.map.set(key, image);
   entry.order.push(key);
-  if (entry.order.length > MAX_CACHE) {
-    const evicted = entry.order.shift();
-    if (evicted) entry.map.delete(evicted);
+  entry.bytes += image.data.byteLength;
+
+  // The image just stored is the one on screen, so it is never the one evicted
+  // — even for a study whose single slice is larger than the whole budget.
+  while (entry.bytes > MAX_CACHE_BYTES && entry.order.length > 1) {
+    const oldest = entry.order.shift();
+    if (oldest === undefined) break;
+    const dropped = entry.map.get(oldest);
+    if (dropped) entry.bytes -= dropped.data.byteLength;
+    entry.map.delete(oldest);
   }
   return image;
 }

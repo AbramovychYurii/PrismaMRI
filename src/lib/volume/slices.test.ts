@@ -1,4 +1,4 @@
-import { extractSliceGrayImage } from '@/lib/volume/slices';
+import { MAX_CACHE_BYTES, extractSliceGrayImage } from '@/lib/volume/slices';
 import type { LoadedVolume, SliceImage, SlicePlane, Vec3, VoxelArray } from '@/types';
 import { describe, expect, it } from 'vitest';
 
@@ -169,5 +169,54 @@ describe('cache', () => {
     const axial1 = extractSliceGrayImage(volume, 'axial', 1, IDENTITY_WL);
     expect(axial0).not.toBe(axial1);
     expect(extractSliceGrayImage(volume, 'coronal', 0, IDENTITY_WL)).not.toBe(axial0);
+  });
+});
+
+describe('cache byte budget', () => {
+  /**
+   * Every distinct window/level is its own cache key, so varying W/L fills the
+   * cache with many large images while the source volume stays tiny.
+   */
+  const fill = (volume: LoadedVolume, n: number) =>
+    Array.from({ length: n }, (_, i) =>
+      extractSliceGrayImage(volume, 'axial', 0, { window: 255, level: i }),
+    );
+  const refetch = (volume: LoadedVolume, i: number) =>
+    extractSliceGrayImage(volume, 'axial', 0, { window: 255, level: i });
+
+  it('keeps what fits, then evicts the oldest first', () => {
+    // 512×512 axial slice = 1 MiB each. Filling to capacity and overflowing in
+    // one test rather than two: the setup is the expensive part, and doing it
+    // twice doubled the whole suite's runtime for no extra coverage.
+    const volume = makeVolume('f32', [512, 512, 2]);
+    const capacity = Math.floor(MAX_CACHE_BYTES / (512 * 512 * 4));
+    const stored = fill(volume, capacity);
+
+    // Everything inside the budget is still the identical object, i.e. cached.
+    for (let i = 0; i < capacity; i++) expect(refetch(volume, i)).toBe(stored[i]);
+
+    // Four more push past the budget; the oldest go, the newest stay.
+    const extra = Array.from({ length: 4 }, (_, i) => refetch(volume, capacity + i));
+    expect(refetch(volume, capacity + 3)).toBe(extra[3]);
+    expect(refetch(volume, 0)).not.toBe(stored[0]);
+  });
+
+  it('caches far more than 64 slices when they are small', () => {
+    // The old entry count capped this at 64 regardless of size. A 16×16 slice
+    // is 1 KiB, so hundreds of them belong in the same budget.
+    const volume = makeVolume('f32', [16, 16, 2]);
+    const stored = fill(volume, 300);
+    expect(refetch(volume, 0)).toBe(stored[0]);
+    expect(refetch(volume, 299)).toBe(stored[299]);
+  });
+
+  it('keeps a single slice that is larger than the whole budget', () => {
+    // It is the image on screen — evicting it on insert would make the cache
+    // useless for exactly the studies that need it most.
+    const wide = Math.ceil(Math.sqrt(MAX_CACHE_BYTES / 4)) + 8;
+    const volume = makeVolume('i16', [wide, wide, 1]); // i16 halves the source buffer
+    const first = extractSliceGrayImage(volume, 'axial', 0, { window: 255, level: 0 });
+    expect(first.data.byteLength).toBeGreaterThan(MAX_CACHE_BYTES);
+    expect(extractSliceGrayImage(volume, 'axial', 0, { window: 255, level: 0 })).toBe(first);
   });
 });
