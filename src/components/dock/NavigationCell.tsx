@@ -86,7 +86,8 @@ export function NavigationCell() {
           <TipKey>Drag</TipKey> any plane to scrub linked slices.
         </TipRow>
         <TipRow>
-          <TipKey>Wheel</TipKey> to zoom · <TipKey>Shift+drag</TipKey> to pan.
+          <TipKey>Wheel</TipKey> to step slices · <TipKey>Shift+drag</TipKey> to measure
+          (fullscreen).
         </TipRow>
         <TipRow>
           <TipKey>↑ ↓</TipKey> step the active plane by 1 slice.
