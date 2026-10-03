@@ -7,10 +7,14 @@ import { unzipSync } from 'fflate';
  * Result of {@link loadVolumeFromSource}: either the parsed volume, or — when
  * the source holds several series and the caller has not picked one — the list
  * of choices to present, after which the caller re-runs with a `seriesKey`.
+ *
+ * The choice carries the source with any archives already expanded, so the
+ * re-run (and later series switches) start from the extracted files instead
+ * of unzipping the whole archive again.
  */
 export type LoadOutcome =
   | { kind: 'volume'; volume: LoadedVolume }
-  | { kind: 'series-choice'; series: SeriesChoice[] };
+  | { kind: 'series-choice'; series: SeriesChoice[]; source: ImportSource };
 
 async function expandZips(source: ImportSource, onProgress: ProgressFn): Promise<ImportSource> {
   const zips = source.files.filter((f) => f.name.endsWith('.zip'));
@@ -27,7 +31,9 @@ async function expandZips(source: ImportSource, onProgress: ProgressFn): Promise
       // `pop()` is safe: an entry path is never an empty string. Fall back to
       // the full path for the (impossible) empty case rather than asserting.
       const name = (path.split('/').pop() ?? path).toLowerCase();
-      const file = new File([new Uint8Array(bytes)], name);
+      // File copies the bytes itself; an extra Uint8Array copy only added a
+      // second transient copy of every entry.
+      const file = new File([bytes as Uint8Array<ArrayBuffer>], name);
       expanded.push({ path, name, file });
     }
   }
@@ -63,7 +69,7 @@ export async function loadVolumeFromSource(
   if (!seriesKey && adapter.listSeries) {
     const series = await adapter.listSeries(source);
     if (series.length > 1) {
-      return { kind: 'series-choice', series };
+      return { kind: 'series-choice', series, source };
     }
   }
 

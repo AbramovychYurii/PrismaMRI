@@ -102,7 +102,7 @@ A consistent coordinate frame is the most error-prone part of any imaging API. P
 | `sagittal` | `x` (cursor.x → slice index = `x + 1`) | y → right, z → down |
 | `axial`    | `z` (cursor.z → slice index = `z + 1`) | x → right, y → down |
 
-To place a pin from a captured image, measure the pixel coordinates in the returned PNG, divide by image width/height to get `fx`/`fy`, and send `add_annotation` with the same `plane`. The server will compute the corresponding voxel using the cursor's value on the constant axis.
+To place a pin from a captured image, measure the pixel coordinates in the returned image, divide by image width/height to get `fx`/`fy`, and send `add_annotation` with the same `plane`. The server will compute the corresponding voxel using the cursor's value on the constant axis.
 
 ### Spacing
 
@@ -151,12 +151,12 @@ Centre the cursor at `dims / 2` and return volume metadata plus a centre-slice c
     protocol?: string,
     scalarMin: number,
     scalarMax: number,
-    formatId:  "dicom" | "nifti" | "metaimage" | "nrrd"
+    formatId:  "dicom" | "nifti" | "mha" | "nrrd"
   },
   cursor: { x: number, y: number, z: number },
   sliceIndices: { coronal: number, sagittal: number, axial: number },
   images: {
-    coronal:  string,  // base64 PNG
+    coronal:  string,  // base64 JPEG
     sagittal: string,
     axial:    string
   }
@@ -273,7 +273,7 @@ Set the slab-MIP thickness applied to **all three** 2-D panels. `0` = single sli
 
 ### Capture
 
-All capture commands return base64-encoded image data with **no `data:` URI prefix**. PNG for slice captures (lossless, sharp at native resolution), JPEG for 3-D (smaller payload). Long-edge cap: 512 px. JPEG quality: 0.92.
+All capture commands return base64-encoded image data with **no `data:` URI prefix**. Every image is a JPEG (quality 0.92), long edge capped at 512 px.
 
 #### `capture_slice`
 
@@ -291,7 +291,7 @@ When `slab_mm > 0`, the image is rendered directly from the voxel buffer at nati
 
 **Returns:**
 ```ts
-{ imageData: string, slabMm?: number }  // base64 PNG
+{ imageData: string, slabMm?: number }  // base64 JPEG
 ```
 
 #### `capture_3d`
@@ -313,7 +313,7 @@ Capture coronal + sagittal + axial at the current cursor in one round trip. Chea
 
 **Returns:**
 ```ts
-{ coronal: string, sagittal: string, axial: string }  // base64 PNGs
+{ coronal: string, sagittal: string, axial: string }  // base64 JPEGs
 ```
 
 #### `overview_grid`
@@ -324,7 +324,7 @@ Capture N evenly-spaced slices across one plane — a "contact sheet" for survey
 ```ts
 {
   plane: "coronal" | "sagittal" | "axial",
-  count?: number  // 2–4 (default 4). Note: the MCP server advertises 2–8 but the browser clamps to 4.
+  count?: number  // 2–8 (default 5)
 }
 ```
 
@@ -483,9 +483,9 @@ ws.on('open', async () => {
   const state = await cmd('get_state');
   if (!state.volumeLoaded) { console.error('Open a volume first.'); process.exit(1); }
   const captures = await cmd('capture_all');
-  // captures.coronal / .sagittal / .axial are base64 PNGs
+  // captures.coronal / .sagittal / .axial are base64 JPEGs
   await import('node:fs').then(fs =>
-    fs.writeFileSync('axial.png', Buffer.from(captures.axial, 'base64'))
+    fs.writeFileSync('axial.jpg', Buffer.from(captures.axial, 'base64'))
   );
   ws.close();
 });

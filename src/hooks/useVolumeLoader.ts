@@ -1,0 +1,215 @@
+import { fetchBlobWithProgress } from '@/lib/fetch-with-progress';
+import { describeLoadError } from '@/lib/import/load-error';
+import { fromFileList } from '@/lib/import/scan-folder';
+import type { ImportSource, SeriesChoice } from '@/lib/import/types';
+import { loadVolumeInWorker } from '@/lib/import/volume-client';
+import * as volumeDb from '@/lib/volumeDb';
+import { useVolumeStore } from '@/store';
+import { useCallback, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
+
+const IDLE_LOADING = { active: false, percent: 0, stage: 'idle' as const, message: '' };
+
+export const isAbort = (err: unknown) => err instanceof DOMException && err.name === 'AbortError';
+
+/**
+ * Worker-backed volume loading: one load in flight at a time (a new one aborts
+ * the old), the series-picker round-trip for multi-series sources, in-place
+ * series switching, loading examples by URL, and the IndexedDB cache write.
+ */
+export function useVolumeLoader() {
+  const setLoading = useVolumeStore((s) => s.setLoading);
+  const setError = useVolumeStore((s) => s.setError);
+  const setVolume = useVolumeStore((s) => s.setVolume);
+  const setSeriesContext = useVolumeStore((s) => s.setSeriesContext);
+  const clearSeriesContext = useVolumeStore((s) => s.clearSeriesContext);
+  const navigate = useNavigate();
+
+  const abortRef = useRef<AbortController | null>(null);
+
+  /** Series list shown by the picker, plus the resolver its buttons call. */
+  const [pendingSeries, setPendingSeries] = useState<SeriesChoice[] | null>(null);
+  const seriesResolveRef = useRef<((key: string | null) => void) | null>(null);
+
+  /** Cancels any load in flight and arms a fresh abort controller. */
+  const beginLoad = useCallback(
+    (message: string) => {
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setError(null);
+      setLoading({ active: true, percent: 0, stage: 'scanning', message });
+      return controller;
+    },
+    [setError, setLoading],
+  );
+
+  const failLoad = useCallback(
+    (err: unknown, fallbackMessage: string) => {
+      if (isAbort(err)) {
+        setLoading(IDLE_LOADING);
+        return;
+      }
+      const message = describeLoadError(err, fallbackMessage);
+      setError(message);
+      setLoading({ ...IDLE_LOADING, stage: 'error', message });
+    },
+    [setError, setLoading],
+  );
+
+  /** Suspends the load while the user picks a series; null means they cancelled. */
+  const askForSeries = useCallback(async (series: SeriesChoice[]) => {
+    const chosen = await new Promise<string | null>((resolve) => {
+      seriesResolveRef.current = resolve;
+      setPendingSeries(series);
+    });
+    seriesResolveRef.current = null;
+    setPendingSeries(null);
+    return chosen;
+  }, []);
+
+  const loadFromSource = useCallback(
+    async (
+      source: ImportSource,
+      seriesKey?: string,
+      // Threaded through the picker round-trip so the stage switcher can offer
+      // the other series after the chosen one loads.
+      seriesList?: SeriesChoice[],
+    ): Promise<void> => {
+      const controller = beginLoad('Reading…');
+      try {
+        const out = await loadVolumeInWorker(
+          source,
+          (p, percent) => {
+            setLoading({
+              active: true,
+              percent,
+              stage: p.stage,
+              current: p.current,
+              total: p.total,
+              message: p.message,
+            });
+          },
+          controller.signal,
+          seriesKey,
+        );
+
+        if (out.kind === 'series-choice') {
+          abortRef.current = null;
+          setLoading(IDLE_LOADING);
+          const chosen = await askForSeries(out.series);
+          if (chosen === null) return;
+          await loadFromSource(out.source, chosen, out.series);
+          return;
+        }
+
+        const { volume, prepared3D, histogram } = out.result;
+        // Synchronous so ImportOverlay starts unmounting before anything else
+        // runs. `loading.active` deliberately stays true: the route swap alone
+        // doesn't guarantee the example cards have left the DOM, and clearing
+        // it mid-transition would briefly un-dim them. ViewerPage clears it
+        // from a mount effect instead.
+        flushSync(() => {
+          setVolume(volume, prepared3D, histogram);
+          navigate('/viewer');
+        });
+
+        if (seriesList && seriesList.length > 1) {
+          setSeriesContext(source, seriesList, seriesKey ?? null);
+        } else {
+          clearSeriesContext();
+        }
+
+        volumeDb
+          .saveVolume(volume, prepared3D, histogram)
+          .then((outcome) => {
+            // Skipping the cache is not a user-facing failure — the volume is
+            // already open, only the next reload will be slower. Worth a line
+            // in the console though, or a silently uncached tab looks like a bug.
+            if (!outcome.stored) {
+              console.debug(
+                `[volume-cache] skipped (${outcome.reason}) — ${Math.round(outcome.bytes / 1e6)} MB`,
+              );
+            }
+          })
+          .catch(() => {
+            /* unexpected storage failure — the volume still loaded */
+          });
+      } catch (err) {
+        failLoad(err, 'Failed to load volume.');
+      } finally {
+        if (abortRef.current === controller) abortRef.current = null;
+      }
+    },
+    [
+      beginLoad,
+      failLoad,
+      askForSeries,
+      setLoading,
+      setVolume,
+      setSeriesContext,
+      clearSeriesContext,
+      navigate,
+    ],
+  );
+
+  /** Resolve the open series picker with a chosen key, or null to cancel. */
+  const resolveSeriesChoice = useCallback((key: string | null) => {
+    seriesResolveRef.current?.(key);
+  }, []);
+
+  /**
+   * Switch the displayed series in place (stage series-switcher). Re-assembles
+   * the chosen series from the retained source; no-op if it's already active.
+   */
+  const switchSeries = useCallback(
+    (key: string) => {
+      const { seriesSource, seriesList, activeSeriesKey } = useVolumeStore.getState();
+      if (!seriesSource || !seriesList || key === activeSeriesKey) return;
+      void loadFromSource(seriesSource, key, seriesList);
+    },
+    [loadFromSource],
+  );
+
+  /** Cancels the series picker if it is open, otherwise aborts the worker. */
+  const cancelLoad = useCallback(() => {
+    if (seriesResolveRef.current) {
+      seriesResolveRef.current(null);
+      return;
+    }
+    abortRef.current?.abort();
+    abortRef.current = null;
+  }, []);
+
+  const loadFromUrl = useCallback(
+    async (url: string, filename: string) => {
+      const controller = beginLoad('Fetching…');
+      try {
+        const blob = await fetchBlobWithProgress(
+          url,
+          (loaded, total) => {
+            const percent = total > 0 ? Math.min(99, Math.round((loaded / total) * 100)) : 0;
+            setLoading({ active: true, percent, stage: 'scanning', message: 'Fetching…' });
+          },
+          controller.signal,
+        );
+        void loadFromSource(fromFileList([new File([blob], filename)]));
+      } catch (err) {
+        failLoad(err, 'Failed to fetch example.');
+      } finally {
+        if (abortRef.current === controller) abortRef.current = null;
+      }
+    },
+    [loadFromSource, beginLoad, failLoad, setLoading],
+  );
+
+  return {
+    loadFromSource,
+    loadFromUrl,
+    cancelLoad,
+    pendingSeries,
+    resolveSeriesChoice,
+    switchSeries,
+  };
+}

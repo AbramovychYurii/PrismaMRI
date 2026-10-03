@@ -104,6 +104,9 @@ export function usePlaneFocusKeys(): void {
   }, []);
 }
 
+const CONTROLS_WITH_ARROWS =
+  'input, textarea, select, [role="slider"], [role="menu"], [role="tablist"], [role="listbox"]';
+
 /** Global ↑/↓ stepping of the active plane by ±1 slice. */
 export function useActivePlaneKeys(): void {
   const activePlane = useVolumeStore((s) => s.activePlane);
@@ -112,6 +115,11 @@ export function useActivePlaneKeys(): void {
     if (!activePlane) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      // Modified arrows belong to others (Shift moves the crosshair in a
+      // focused slice panel), and so do arrows a control already handles or
+      // that have a meaning of their own there — a range input, a menu, tabs.
+      if (e.shiftKey || e.altKey || e.metaKey || e.ctrlKey || e.defaultPrevented) return;
+      if (e.target instanceof Element && e.target.closest(CONTROLS_WITH_ARROWS)) return;
       const { volume, cursor } = useVolumeStore.getState();
       if (!volume || !cursor) return;
       e.preventDefault();

@@ -15,12 +15,10 @@
  * (ports, severities, action labels, W/L presets) live in `lib/mcp/constants.ts`.
  */
 
-import { downloadBlob } from '@/lib/download';
 import { LOCAL_PORTS } from '@/lib/mcp/constants';
 import { EXAMPLE_PROMPT } from '@/lib/mcp/example-prompt';
 import { getSampleReport } from '@/lib/sampleReports';
 import { useVolumeStore } from '@/store/volumeStore';
-import JSZip from 'jszip';
 import {
   Bot,
   Check,
@@ -70,9 +68,6 @@ import {
   Value,
 } from './SessionPanel.styles';
 
-const SERVER_BUNDLE_URL = `${import.meta.env.BASE_URL}dxt-server/index.js`;
-const WS_LIB_URL = `${import.meta.env.BASE_URL}dxt-server/ws/`;
-
 /**
  * True only when the app is running as an *installed* PWA (standalone window).
  * Regular browser tabs — including localhost dev — show the Remote panel.
@@ -84,92 +79,6 @@ function isLocalMode(): boolean {
     window.matchMedia('(display-mode: standalone)').matches ||
     (navigator as { standalone?: boolean }).standalone === true
   );
-}
-
-/**
- * The .dxt file is a ZIP of `manifest.json` + a server bundle (Node + ws lib),
- * dropped into Claude Desktop via Settings → Extensions → Install Extension.
- */
-async function downloadDxt(): Promise<void> {
-  const [serverJs, wsIndex, wsLib] = await Promise.all([
-    fetch(SERVER_BUNDLE_URL).then((r) => r.arrayBuffer()),
-    fetch(`${WS_LIB_URL}index.js`).then((r) => r.text()),
-    Promise.all(
-      [
-        'constants.js',
-        'event-target.js',
-        'buffer-util.js',
-        'extension.js',
-        'limiter.js',
-        'permessage-deflate.js',
-        'receiver.js',
-        'sender.js',
-        'stream.js',
-        'subprotocol.js',
-        'validation.js',
-        'websocket.js',
-        'websocket-server.js',
-      ].map((f) =>
-        fetch(`${WS_LIB_URL}lib/${f}`)
-          .then((r) => r.text())
-          .then((t) => ({ name: f, text: t })),
-      ),
-    ),
-  ]);
-
-  const manifest = {
-    dxt_version: '0.1',
-    name: 'prismamri',
-    display_name: 'PrismaMRI AI Agent',
-    version: '2.1.0',
-    description:
-      'Navigate MRI slices, analyze findings, place annotations and capture images — all controlled by Claude.',
-    author: { name: 'PrismaMRI' },
-    license: 'MIT',
-    server: {
-      type: 'node',
-      entry_point: 'server/index.js',
-      mcp_config: {
-        command: 'node',
-        args: ['${__dirname}/server/index.js'],
-        env: {},
-      },
-    },
-    tools: [
-      'get_viewer_state',
-      'get_volume_overview',
-      'navigate_to_slice',
-      'step_slice',
-      'navigate_to_center',
-      'set_window_level',
-      'apply_wl_preset',
-      'set_render_preset',
-      'set_slab_mm',
-      'capture_slice',
-      'capture_all_planes',
-      'capture_overview_grid',
-      'capture_3d',
-      'add_annotation',
-      'remove_annotation',
-      'list_annotations',
-      'clear_annotations',
-      'set_measurement',
-      'get_measurement',
-      'clear_measurement',
-    ].map((name) => ({ name })),
-    compatibility: { claude_desktop: '>=0.10.0', platforms: ['darwin', 'win32', 'linux'] },
-  };
-
-  const zip = new JSZip();
-  zip.file('manifest.json', JSON.stringify(manifest, null, 2));
-  zip.file('server/index.js', serverJs);
-  zip.file('server/node_modules/ws/index.js', wsIndex);
-  for (const { name, text } of wsLib) {
-    zip.file(`server/node_modules/ws/lib/${name}`, text);
-  }
-
-  const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
-  downloadBlob(blob, 'prismamri.dxt');
 }
 
 function InfoTip({ text }: { text: string }) {
@@ -308,6 +217,7 @@ export function SessionPanel() {
   const handleDownloadDxt = useCallback(async () => {
     setDxtState('idle');
     try {
+      const { downloadDxt } = await import('@/lib/mcp/dxt');
       await downloadDxt();
       setDxtState('ok');
       setTimeout(() => setDxtState('idle'), 3000);

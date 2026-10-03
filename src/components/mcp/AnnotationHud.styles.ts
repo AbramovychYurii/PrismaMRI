@@ -239,7 +239,7 @@ export const Tag = styled.span`
 `;
 
 export const TagKey = styled.span`
-  color: var(--ink-4, var(--ink-3));
+  color: var(--ink-3);
   font-size: 9px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -293,7 +293,7 @@ export const HintText = styled.p`
   margin: 0;
   font-family: var(--mono);
   font-size: 10px;
-  color: var(--ink-4, var(--ink-3));
+  color: var(--ink-3);
   letter-spacing: 0.06em;
   pointer-events: none;
   white-space: nowrap;

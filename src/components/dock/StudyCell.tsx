@@ -1,3 +1,4 @@
+import { intensityUnit } from '@/lib/volume/units';
 import { useVolumeStore } from '@/store';
 import styled from 'styled-components';
 
@@ -54,6 +55,7 @@ function Row({ k, v, dim }: { k: string; v: string; dim?: string }) {
 
 export function StudyCell() {
   const volume = useVolumeStore((s) => s.volume);
+  const unit = intensityUnit(volume?.meta.modality);
   const meta = volume?.meta;
 
   const voxelCount = meta?.dims ? meta.dims[0] * meta.dims[1] * meta.dims[2] : 0;
@@ -72,7 +74,11 @@ export function StudyCell() {
       />
       <Row
         k="Range"
-        v={volume ? `${Math.round(volume.scalarMin)} → ${Math.round(volume.scalarMax)} HU` : '—'}
+        v={
+          volume
+            ? `${Math.round(volume.scalarMin)} → ${Math.round(volume.scalarMax)}${unit ? ` ${unit}` : ''}`
+            : '—'
+        }
       />
       <Row k="Source" v={volume ? 'Local · in-memory' : '—'} />
     </StudyGrid>

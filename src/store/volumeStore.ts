@@ -58,9 +58,9 @@ interface VolumeState {
   aiAnnotations: AiAnnotation[];
   /** Currently focused finding — drives the summary card + marker emphasis. */
   activeAnnotationId: string | null;
-  /** True while the MCP server is connected via the relay. */
+  /** True while the local MCP server is connected over the loopback WebSocket. */
   mcpConnected: boolean;
-  /** Port used for the active local direct connection, or null when using relay. */
+  /** Loopback port of the active MCP connection, or null when disconnected. */
   localPort: number | null;
   /** Set while the agent is executing a command — drives the activity indicator. */
   agentActivity: { active: boolean; action: string | null };

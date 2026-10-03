@@ -17,12 +17,14 @@
     "prepare": "husky",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:update": "playwright test --update-snapshots"
+    "test:e2e:update": "playwright test --update-snapshots",
+    "ref:capture": "vite build && playwright test -c e2e/reference/playwright.config.ts render --update-snapshots=all",
+    "ref:check": "vite build && playwright test -c e2e/reference/playwright.config.ts render",
+    "ref:perf": "vite build && playwright test -c e2e/reference/playwright.config.ts perf"
   },
   "dependencies": {
     "fflate": "^0.8.2",
     "jspdf": "^4.2.1",
-    "jszip": "^3.10.1",
     "lucide-react": "^0.460.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

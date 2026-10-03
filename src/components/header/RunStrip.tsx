@@ -1,3 +1,4 @@
+import { intensityUnit } from '@/lib/volume/units';
 import { useVolumeStore } from '@/store';
 import styled from 'styled-components';
 
@@ -102,7 +103,13 @@ export function RunStrip() {
       <RunCell
         k="Modality"
         v={meta?.modality ?? '—'}
-        dim={meta?.bitsAllocated ? `· ${meta.bitsAllocated}-bit · HU` : undefined}
+        dim={
+          meta?.bitsAllocated
+            ? [`· ${meta.bitsAllocated}-bit`, intensityUnit(meta.modality)]
+                .filter(Boolean)
+                .join(' · ')
+            : undefined
+        }
       />
       <RunCellWrap $last>
         <RunKey>Measure</RunKey>

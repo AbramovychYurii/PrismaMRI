@@ -1,4 +1,4 @@
-import { PLANE_ACCENT } from '@/constants';
+import { PLANE_ACCENT, PLANE_LABEL } from '@/constants';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import type { SlicePlane } from '@/types';
 import { ChevronDown, ChevronUp } from 'lucide-react';
@@ -11,12 +11,6 @@ import {
   useState,
 } from 'react';
 import styled from 'styled-components';
-
-const PLANE_NAME: Record<SlicePlane, string> = {
-  coronal: 'Coronal',
-  sagittal: 'Sagittal',
-  axial: 'Axial',
-};
 
 const HOLD_DELAY_MS = 350;
 const HOLD_REPEAT_MS = 50;
@@ -321,8 +315,10 @@ export function SliceScrubber({
     else if (e.key === 'ArrowDown') next = slice - 1;
     else if (e.key === 'PageUp') next = slice + 10;
     else if (e.key === 'PageDown') next = slice - 10;
-    else if (e.key === 'Home') next = total;
-    else if (e.key === 'End') next = 1;
+    // As a slider defines them (and the shortcut sheet says): Home is the
+    // first slice, End the last.
+    else if (e.key === 'Home') next = 1;
+    else if (e.key === 'End') next = total;
     if (next !== null) {
       e.preventDefault();
       e.stopPropagation();
@@ -357,7 +353,7 @@ export function SliceScrubber({
         ref={trackRef}
         role="slider"
         tabIndex={0}
-        aria-label={`${PLANE_NAME[axis]} slice`}
+        aria-label={`${PLANE_LABEL[axis].primary} slice`}
         aria-orientation="vertical"
         aria-valuemin={1}
         aria-valuemax={total}
@@ -373,7 +369,6 @@ export function SliceScrubber({
           position: 'relative',
           cursor: 'ns-resize',
           padding: `${INSET}px 0`,
-          outline: 'none',
           touchAction: 'none',
         }}
       >

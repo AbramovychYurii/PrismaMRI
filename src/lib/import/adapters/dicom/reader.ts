@@ -36,6 +36,10 @@ export interface DicomTags {
   numberOfFrames: number;
   pixelDataOffset: number;
   pixelDataLength: number;
+  /** Transfer Syntax UID from the file meta group; '' when the file has none. */
+  transferSyntax: string;
+  /** PixelData of undefined length — fragments of a compressed stream. */
+  pixelDataEncapsulated: boolean;
 }
 
 type Tag = number; // (group << 16) | element
@@ -103,13 +107,11 @@ export function resolveDicomHeaderReadLength(fileSize: number): number {
 }
 
 /**
- * Parse a DICOM byte buffer. If `headerOnly`, pixel data is located but not
- * required to be present in the buffer (used for fast folder scans).
+ * Parse a DICOM byte buffer up to and including the PixelData element, whose
+ * offset and length are recorded but not read. The buffer may end anywhere
+ * after the header, so the same call serves header-only folder scans.
  */
-export function parseImplicitLittleEndianDicom(
-  buffer: ArrayBuffer,
-  headerOnly = false,
-): DicomTags | null {
+export function parseImplicitLittleEndianDicom(buffer: ArrayBuffer): DicomTags | null {
   const view = new DataView(buffer);
   if (view.byteLength < 8) return null;
 
@@ -146,6 +148,7 @@ export function parseImplicitLittleEndianDicom(
     rescaleIntercept: 0,
     samplesPerPixel: 1,
     numberOfFrames: 1,
+    transferSyntax,
   };
 
   while (offset + 8 <= view.byteLength) {
@@ -228,10 +231,8 @@ export function parseImplicitLittleEndianDicom(
         break;
       case T.PixelData:
         tags.pixelDataOffset = r.valueOffset;
+        tags.pixelDataEncapsulated = r.length === 0xffffffff;
         tags.pixelDataLength = r.length === 0xffffffff ? view.byteLength - r.valueOffset : r.length;
-        if (headerOnly) {
-          return finalize(tags);
-        }
         return finalize(tags);
     }
     offset = r.next;
@@ -314,6 +315,8 @@ function finalize(t: Partial<DicomTags>): DicomTags | null {
     numberOfFrames: t.numberOfFrames ?? 1,
     pixelDataOffset: t.pixelDataOffset ?? -1,
     pixelDataLength: t.pixelDataLength ?? 0,
+    transferSyntax: t.transferSyntax ?? '',
+    pixelDataEncapsulated: t.pixelDataEncapsulated ?? false,
   };
 }
 

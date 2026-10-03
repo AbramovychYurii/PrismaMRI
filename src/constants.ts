@@ -12,12 +12,6 @@ export const WL_DEBOUNCE_MS = 96;
  */
 export const CANVAS_BG = '#080604';
 
-export const ONEVOLUME_MARKER = 'JmVolumeVersion=1';
-export const ONEVOLUME_WINDOW_SCALE = 100;
-export const CT_VOL_NAME = 'CT_0.vol';
-export const DICOM_HEADER_SCAN_BYTES = 8192;
-export const OUTSIDE_SCAN_SENTINEL = -32768;
-
 /**
  * Single source of truth for the accent palette. CSS keeps its own copies in
  * globals.css (for `var(--x)`), this mirrors them for contexts that need a

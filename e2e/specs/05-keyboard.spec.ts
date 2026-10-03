@@ -143,4 +143,74 @@ test.describe('Keyboard shortcuts', () => {
     await page.keyboard.press('Control+o');
     await expect(page.getByTestId('stage-canvas')).toBeVisible();
   });
+
+  // ── Slice panels without a mouse ────────────────────────────────────────
+
+  test.describe('Slice panel keyboard access', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto('/');
+      await loadVolume(page);
+    });
+
+    test('Shift+arrows move the crosshair within the focused plane', async ({ page }) => {
+      const sagittalSlice = page.getByRole('slider', { name: /sagittal slice/i }).first();
+      const before = Number(await sagittalSlice.getAttribute('aria-valuenow'));
+
+      // Axial is drawn x → right, so Shift+→ steps x — the sagittal slice index.
+      await page.getByRole('group', { name: /^axial slice/i }).focus();
+      await page.keyboard.press('Shift+ArrowRight');
+      await expect(sagittalSlice).toHaveAttribute('aria-valuenow', String(before + 1));
+    });
+
+    test('Shift+F10 opens the measure menu at the crosshair', async ({ page }) => {
+      await page.getByRole('group', { name: /^coronal slice/i }).focus();
+      await page.keyboard.press('Shift+F10');
+      const menu = page.getByRole('menu', { name: 'Slice actions' });
+      await expect(menu).toBeVisible();
+      await expect(menu.getByRole('menuitem', { name: /measure from here/i })).toBeFocused();
+      await page.keyboard.press('Escape');
+      await expect(menu).not.toBeVisible();
+    });
+  });
+
+  // ── Arrow keys that belong to a control ─────────────────────────────────
+
+  test.describe('Arrow keys inside controls', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto('/');
+      await loadVolume(page);
+    });
+
+    test('↑/↓ in a menu move through it without stepping the slice', async ({ page }) => {
+      const coronal = page.getByRole('slider', { name: /coronal slice/i }).first();
+      const before = await coronal.getAttribute('aria-valuenow');
+      await page.getByRole('button', { name: 'Stage options' }).focus();
+      await page.keyboard.press('Enter');
+      await page.keyboard.press('ArrowDown');
+      await page.keyboard.press('ArrowUp');
+      await expect(coronal).toHaveAttribute('aria-valuenow', String(before));
+    });
+
+    test('↑/↓ on the Window slider change W/L, not the slice', async ({ page }) => {
+      const coronal = page.getByRole('slider', { name: /coronal slice/i }).first();
+      const before = await coronal.getAttribute('aria-valuenow');
+      await page.getByRole('slider', { name: 'Window' }).focus();
+      await page.keyboard.press('ArrowUp');
+      await expect(coronal).toHaveAttribute('aria-valuenow', String(before));
+    });
+  });
+
+  test.describe('Slice scrubber', () => {
+    test('Home and End jump to the first and last slice', async ({ page }) => {
+      await page.goto('/');
+      await loadVolume(page);
+      const scrubber = page.getByRole('slider', { name: /coronal slice/i }).first();
+      const last = await scrubber.getAttribute('aria-valuemax');
+      await scrubber.focus();
+      await page.keyboard.press('Home');
+      await expect(scrubber).toHaveAttribute('aria-valuenow', '1');
+      await page.keyboard.press('End');
+      await expect(scrubber).toHaveAttribute('aria-valuenow', String(last));
+    });
+  });
 });

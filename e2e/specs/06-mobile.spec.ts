@@ -57,14 +57,12 @@ test.describe('Mobile layout', () => {
     test('mobile tab bar is visible after loading volume', async ({ page }) => {
       // MobileTabBar renders tab buttons: 3D, Cor, Sag, Ax, Controls.
       // It only shows when view === 'viewer'.
-      const tabBar = page.getByRole('tablist').first();
-      if (await tabBar.count() > 0) {
-        await expect(tabBar).toBeVisible();
-      } else {
-        // If tablist role is not used, look for nav buttons at the bottom.
-        const tabs = page.locator('nav button, [role="navigation"] button').first();
-        await expect(tabs).toBeVisible();
-      }
+      const tabBar = page.getByRole('tablist', { name: 'Views' });
+      await expect(tabBar).toBeVisible();
+      await expect(tabBar.getByRole('tab', { name: '3D view' })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      );
     });
 
     test('3D tab is shown by default', async ({ page }) => {
@@ -72,44 +70,42 @@ test.describe('Mobile layout', () => {
       await expect(page.getByTestId('stage-canvas')).toBeVisible();
     });
 
-    // Tab buttons live in the bottom <nav>. PlaneGlyph tabs have an italic
-    // letter span + a label span (e.g. "C" + "COR") — use hasText on the nav.
+    // The bottom bar is a tablist; each tab is named in full ("Coronal"), while
+    // it shows an abbreviation ("COR").
     const tabBtn = (page: import('@playwright/test').Page, label: string) =>
-      page.locator('nav').getByRole('button').filter({ hasText: label });
+      page.getByRole('tab', { name: label, exact: true });
 
     test('switching to Coronal tab shows the coronal slice panel', async ({ page }) => {
-      await tabBtn(page, 'COR').click();
+      await tabBtn(page, 'Coronal').click();
       await expect(page.getByTestId('slice-panel-coronal')).toBeVisible({ timeout: 5_000 });
     });
 
     test('switching to Sagittal tab shows the sagittal slice panel', async ({ page }) => {
-      await tabBtn(page, 'SAG').click();
+      await tabBtn(page, 'Sagittal').click();
       await expect(page.getByTestId('slice-panel-sagittal')).toBeVisible({ timeout: 5_000 });
     });
 
     test('switching to Axial tab shows the axial slice panel', async ({ page }) => {
-      await tabBtn(page, 'AXI').click();
+      await tabBtn(page, 'Axial').click();
       await expect(page.getByTestId('slice-panel-axial')).toBeVisible({ timeout: 5_000 });
     });
 
-    test('switching to Controls tab shows the CTRL button as active', async ({ page }) => {
-      // MobileControlsView has no data-testid — just verify no crash and tab is
-      // reachable (StageWrap uses visibility:hidden in non-3d mode).
-      await tabBtn(page, 'CTRL').click();
-      await page.waitForTimeout(300);
-      await expect(tabBtn(page, 'CTRL')).toBeVisible();
+    test('switching to Controls tab marks it selected', async ({ page }) => {
+      await tabBtn(page, 'Controls (CTRL)').click();
+      await expect(tabBtn(page, 'Controls (CTRL)')).toHaveAttribute('aria-selected', 'true');
+      await expect(tabBtn(page, '3D view')).toHaveAttribute('aria-selected', 'false');
     });
 
     test('switching back to 3D tab re-shows the stage', async ({ page }) => {
-      await tabBtn(page, 'COR').click();
+      await tabBtn(page, 'Coronal').click();
       await expect(page.getByTestId('slice-panel-coronal')).toBeVisible();
-      await tabBtn(page, '3D').click();
+      await tabBtn(page, '3D view').click();
       await expect(page.getByTestId('stage-canvas')).toBeVisible({ timeout: 5_000 });
     });
 
     test('mobile slice panel has larger touch scrubber thumb', async ({ page }) => {
       // Navigate to coronal tab.
-      await page.locator('nav').getByRole('button').filter({ hasText: 'COR' }).click();
+      await page.getByRole('tab', { name: 'Coronal', exact: true }).click();
 
       const panel = page.getByTestId('slice-panel-coronal');
       await expect(panel).toBeVisible({ timeout: 5_000 });
@@ -121,7 +117,7 @@ test.describe('Mobile layout', () => {
     });
 
     test('mobile slice swipe changes the slice', async ({ page }) => {
-      await page.locator('nav').getByRole('button').filter({ hasText: 'COR' }).click();
+      await page.getByRole('tab', { name: 'Coronal', exact: true }).click();
 
       const panel = page.getByTestId('slice-panel-coronal');
       await expect(panel).toBeVisible({ timeout: 5_000 });

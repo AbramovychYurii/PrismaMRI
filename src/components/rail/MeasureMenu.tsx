@@ -1,4 +1,5 @@
 import { accentRgba } from '@/constants';
+import { useMenuKeyboard } from '@/hooks/useMenuKeyboard';
 import { Eye, MapPin, Ruler, Trash2 } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -90,16 +91,10 @@ export function MeasureMenu({
     function onMouseDown(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
-    }
     document.addEventListener('mousedown', onMouseDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onMouseDown);
-      document.removeEventListener('keydown', onKey);
-    };
+    return () => document.removeEventListener('mousedown', onMouseDown);
   }, [onClose]);
+  useMenuKeyboard(ref, onClose);
 
   function wrap(fn: () => void) {
     return () => {
@@ -109,26 +104,32 @@ export function MeasureMenu({
   }
 
   return createPortal(
-    <Menu ref={ref} style={{ left: safeX, top: safeY }} onClick={(e) => e.stopPropagation()}>
-      <Item type="button" onClick={wrap(onMeasureFrom)}>
+    <Menu
+      ref={ref}
+      role="menu"
+      aria-label="Slice actions"
+      style={{ left: safeX, top: safeY }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <Item type="button" role="menuitem" tabIndex={-1} onClick={wrap(onMeasureFrom)}>
         <MapPin size={12} />
         Measure from here
       </Item>
       {hasMeasurementFrom && (
-        <Item type="button" onClick={wrap(onMeasureTo)}>
+        <Item type="button" role="menuitem" tabIndex={-1} onClick={wrap(onMeasureTo)}>
           <Ruler size={12} />
           Measure to here
         </Item>
       )}
-      <Divider />
-      <Item type="button" onClick={wrap(onSnapToView)}>
+      <Divider aria-hidden />
+      <Item type="button" role="menuitem" tabIndex={-1} onClick={wrap(onSnapToView)}>
         <Eye size={12} />
         View from this side
       </Item>
       {hasMeasurementFrom && (
         <>
-          <Divider />
-          <DangerItem type="button" onClick={wrap(onClear)}>
+          <Divider aria-hidden />
+          <DangerItem type="button" role="menuitem" tabIndex={-1} onClick={wrap(onClear)}>
             <Trash2 size={12} />
             Clear measurement
           </DangerItem>

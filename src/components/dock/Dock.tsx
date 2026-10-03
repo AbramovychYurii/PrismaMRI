@@ -127,7 +127,7 @@ function PanelsToggle({
 }) {
   const [hover, setHover] = useState(false);
   const reduced = usePrefersReducedMotion();
-  const tip = useTooltip(open ? 'Hide controls' : 'Show controls', true);
+  const tip = useTooltip(open ? 'Hide control panels' : 'Show control panels', true);
 
   const handleMouseEnter = (e: React.MouseEvent<HTMLButtonElement>) => {
     setHover(true);
@@ -147,6 +147,8 @@ function PanelsToggle({
         onClick={onToggle}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
+        onFocus={tip.onFocus}
+        onBlur={tip.onBlur}
         $open={open}
         $hover={hover}
         $reduced={reduced}

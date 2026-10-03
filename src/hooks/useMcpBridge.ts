@@ -1,15 +1,10 @@
-import {
-  ACTION_LABELS,
-  LAST_LOCAL_PORT_KEY,
-  LOCAL_PORTS,
-  LOCAL_PROBE_TIMEOUT_MS,
-  SESSION_IDLE_MS,
-} from '@/lib/mcp/constants';
+import { useBridgeLeadership } from '@/hooks/useBridgeLeadership';
+import { ACTION_LABELS, LAST_LOCAL_PORT_KEY, SESSION_IDLE_MS } from '@/lib/mcp/constants';
 import { MCP_HANDLERS } from '@/lib/mcp/handlers';
+import { findLocalServer } from '@/lib/mcp/local-server';
+import type { IncomingMessage, OutgoingResult } from '@/lib/mcp/protocol';
 import { useVolumeStore } from '@/store/volumeStore';
-import { useCallback, useEffect, useRef, useState } from 'react';
-
-const BRIDGE_LOCK = 'prismamri-mcp-bridge';
+import { useCallback, useEffect, useRef } from 'react';
 
 /**
  * Server pings every 15 s; two missed intervals plus buffer means the socket is
@@ -23,109 +18,6 @@ const RECONNECT_DELAY_MS = 1_000;
 const COMPETING_CLIENT_CODES = [1001, 1008];
 const COMPETING_BACKOFF_MS = 2_000;
 const COMPETING_JITTER_MS = 3_000;
-
-function openSocket(port: number, timeoutMs: number): Promise<WebSocket> {
-  return new Promise((resolve, reject) => {
-    const ws = new WebSocket(`ws://127.0.0.1:${port}`);
-    const timer = setTimeout(() => {
-      ws.close();
-      reject(new Error('timeout'));
-    }, timeoutMs);
-    ws.addEventListener('open', () => {
-      clearTimeout(timer);
-      resolve(ws);
-    });
-    ws.addEventListener('error', () => {
-      clearTimeout(timer);
-      reject(new Error('error'));
-    });
-  });
-}
-
-/** Probes every port at once, so the wait is one timeout rather than N. */
-function scanAllLocalPorts(): Promise<WebSocket | null> {
-  return new Promise((resolve) => {
-    let settled = false;
-    let pending = LOCAL_PORTS.length;
-
-    for (const port of LOCAL_PORTS) {
-      openSocket(port, LOCAL_PROBE_TIMEOUT_MS)
-        .then((ws) => {
-          if (settled) {
-            ws.close();
-            return;
-          }
-          settled = true;
-          resolve(ws);
-        })
-        .catch(() => {
-          pending--;
-          if (!settled && pending === 0) resolve(null);
-        });
-    }
-  });
-}
-
-/** Retries the last known port first, which keeps reloads free of failed-socket noise. */
-async function findLocalServer(): Promise<WebSocket | null> {
-  const cached = Number(localStorage.getItem(LAST_LOCAL_PORT_KEY));
-  if ((LOCAL_PORTS as readonly number[]).includes(cached)) {
-    try {
-      return await openSocket(cached, LOCAL_PROBE_TIMEOUT_MS);
-    } catch {
-      /* stale port — fall through to the full scan */
-    }
-  }
-  return scanAllLocalPorts();
-}
-
-type IncomingMessage =
-  | { type: 'pong' }
-  | { type: 'ping' }
-  | { type: 'mcp_connecting' }
-  | { type: 'mcp_disconnected' }
-  | { type: 'cmd'; id: string; action: string; [key: string]: unknown };
-
-type OutgoingResult =
-  | { type: 'result'; id: string; ok: true; data?: unknown }
-  | { type: 'result'; id: string; ok: false; error: string };
-
-/**
- * Elects a single tab to own the bridge. The lock is held for the tab's whole
- * lifetime; when the leader closes, the next tab in the queue takes over.
- */
-function useBridgeLeadership(): boolean {
-  const [isLeader, setIsLeader] = useState(false);
-
-  useEffect(() => {
-    const abort = new AbortController();
-    let releaseLock: (() => void) | null = null;
-    const heldUntilUnmount = new Promise<void>((resolve) => {
-      releaseLock = resolve;
-    });
-
-    if (!('locks' in navigator)) {
-      setIsLeader(true);
-    } else {
-      navigator.locks
-        .request(BRIDGE_LOCK, { signal: abort.signal }, async () => {
-          setIsLeader(true);
-          await heldUntilUnmount;
-          setIsLeader(false);
-        })
-        .catch(() => {
-          /* AbortError — unmounted before the lock was granted */
-        });
-    }
-
-    return () => {
-      abort.abort();
-      releaseLock?.();
-    };
-  }, []);
-
-  return isLeader;
-}
 
 /**
  * WebSocket bridge to the local MCP server (the Claude Desktop extension on

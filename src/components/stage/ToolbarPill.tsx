@@ -229,22 +229,30 @@ function ToolButton({ btn }: { btn: ToolbarButton }) {
 
 interface ToolbarPillProps {
   previewRef: React.MutableRefObject<ThreePreview | null>;
+  /**
+   * False when the browser cannot run the 3-D view: the controls that only
+   * act on it (planes, clip, stage focus, export) are left out rather than
+   * left to do nothing; the rail toggle stays.
+   */
+  has3D?: boolean;
 }
 
-export function ToolbarPill({ previewRef }: ToolbarPillProps) {
+export function ToolbarPill({ previewRef, has3D = true }: ToolbarPillProps) {
   const isMobile = useIsMobile();
-  const visible = BUTTONS.filter((b) => !(isMobile && b.mobileHidden));
+  const visible = BUTTONS.filter(
+    (b) => !(isMobile && b.mobileHidden) && (has3D || b.id === 'rail'),
+  );
   // Rail is always the last button — StageMenu sits just before it.
   const beforeMenu = visible.filter((b) => b.id !== 'rail');
   const afterMenu = visible.filter((b) => b.id === 'rail');
   return (
     <PillWrap>
-      <PlanesButton />
-      <ClipButton />
+      {has3D && <PlanesButton />}
+      {has3D && <ClipButton />}
       {beforeMenu.map((b) => (
         <ToolButton key={b.id} btn={b} />
       ))}
-      <StageMenu previewRef={previewRef} />
+      {has3D && <StageMenu previewRef={previewRef} />}
       {afterMenu.map((b) => (
         <ToolButton key={b.id} btn={b} />
       ))}

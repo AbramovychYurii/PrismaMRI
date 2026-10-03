@@ -1,8 +1,9 @@
 import { useHover } from '@/hooks/useHover';
-import { downloadBlob } from '@/lib/download';
+import { useMenuKeyboard } from '@/hooks/useMenuKeyboard';
+import { useStageExport } from '@/hooks/useStageExport';
 import { ThreePreview } from '@/lib/volume/three-preview';
 import { Loader, Share2 } from 'lucide-react';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 
 const Wrap = styled.div`
@@ -142,6 +143,8 @@ function MenuItem({
   return (
     <ItemBtn
       type="button"
+      role="menuitem"
+      tabIndex={-1}
       $hover={hover}
       onClick={onClick}
       onMouseEnter={onMouseEnter}
@@ -182,10 +185,12 @@ const CAN_SHARE_FILES = (() => {
 
 export function StageMenu({ previewRef }: Props) {
   const [open, setOpen] = useState(false);
-  // Recording progress 0..1 while a turntable video renders, else null.
-  const [recordPct, setRecordPct] = useState<number | null>(null);
+  const { recordPct, exportImage, exportVideo } = useStageExport(previewRef);
   const { hover, onMouseEnter, onMouseLeave } = useHover();
   const wrapRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  useMenuKeyboard(menuRef, close, open);
 
   // Close on outside click
   useEffect(() => {
@@ -199,85 +204,24 @@ export function StageMenu({ previewRef }: Props) {
     return () => document.removeEventListener('mousedown', onDown);
   }, [open]);
 
-  // Close on Escape
-  useEffect(() => {
-    if (!open) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false);
-    }
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [open]);
-
   function handleExport3D() {
     setOpen(false);
-    previewRef.current
-      ?.exportPNG()
-      .then((blob) => downloadBlob(blob, 'prismamri-3d.png'))
-      .catch(console.error);
+    exportImage('download');
   }
 
-  async function handleExportVideo() {
+  function handleExportVideo() {
     setOpen(false);
-    const preview = previewRef.current;
-    if (!preview || recordPct !== null) return;
-    setRecordPct(0);
-    try {
-      const { blob, ext } = await preview.exportRotationVideo({
-        onProgress: (t) => setRecordPct(t),
-      });
-      downloadBlob(blob, `prismamri-3d-spin.${ext}`);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setRecordPct(null);
-    }
-  }
-
-  /**
-   * Share a file via the Web Share API, falling back to a plain download.
-   * The fallback also covers the case where the OS share sheet rejects after a
-   * long async encode (the page's transient activation can expire) — the user
-   * still gets the file rather than nothing. A user-cancelled share (AbortError)
-   * is silent and does NOT fall back.
-   */
-  async function shareOrDownload(blob: Blob, filename: string, title: string) {
-    const file = new File([blob], filename, { type: blob.type });
-    if (navigator.canShare?.({ files: [file] })) {
-      try {
-        await navigator.share({ files: [file], title });
-        return;
-      } catch (err) {
-        if ((err as Error).name === 'AbortError') return;
-        // Activation lost / share unavailable — fall through to download.
-      }
-    }
-    downloadBlob(blob, filename);
+    void exportVideo('download');
   }
 
   function handleShare3D() {
     setOpen(false);
-    previewRef.current
-      ?.exportPNG()
-      .then((blob) => shareOrDownload(blob, 'prismamri-3d.png', 'PrismaMRI — 3D view'))
-      .catch(console.error);
+    exportImage('share');
   }
 
-  async function handleShareVideo() {
+  function handleShareVideo() {
     setOpen(false);
-    const preview = previewRef.current;
-    if (!preview || recordPct !== null) return;
-    setRecordPct(0);
-    try {
-      const { blob, ext } = await preview.exportRotationVideo({
-        onProgress: (t) => setRecordPct(t),
-      });
-      await shareOrDownload(blob, `prismamri-3d-spin.${ext}`, 'PrismaMRI — 3D spin');
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setRecordPct(null);
-    }
+    void exportVideo('share');
   }
 
   const recording = recordPct !== null;
@@ -289,6 +233,7 @@ export function StageMenu({ previewRef }: Props) {
         aria-label={
           recording ? `Recording 3D spin — ${Math.round((recordPct ?? 0) * 100)}%` : 'Stage options'
         }
+        aria-haspopup="menu"
         aria-expanded={open}
         disabled={recording}
         $on={open || recording}
@@ -301,7 +246,7 @@ export function StageMenu({ previewRef }: Props) {
       </TriggerBtn>
 
       {open && (
-        <Dropdown>
+        <Dropdown ref={menuRef} role="menu" aria-label="Stage options">
           <MenuItem
             icon={<IconDownload />}
             label="Export 3D view (.png)"

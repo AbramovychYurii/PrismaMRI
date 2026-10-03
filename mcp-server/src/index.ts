@@ -722,7 +722,8 @@ type ContentBlock =
   | { type: 'text'; text: string }
   | { type: 'image'; data: string; mimeType: string };
 
-const img = (data: string): ContentBlock => ({ type: 'image', data, mimeType: 'image/png' });
+// Every capture the app returns is JPEG (canvas-utils / ThreePreview.captureJpeg).
+const img = (data: string): ContentBlock => ({ type: 'image', data, mimeType: 'image/jpeg' });
 const txt = (text: string): ContentBlock => ({ type: 'text', text });
 
 // ── Types returned by the app ─────────────────────────────────────────────────

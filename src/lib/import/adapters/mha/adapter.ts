@@ -1,4 +1,5 @@
-import { gunzipBytes, readBlobBytes } from '@/lib/import/read-file';
+import { SCALAR_BYTES, type ScalarKind, decodeScalars, inflatedSize } from '@/lib/import/decode';
+import { inflateWithProgress, readWithProgress } from '@/lib/import/read-file';
 import type { ImportFormatAdapter, ImportSource, ProgressFn } from '@/lib/import/types';
 import { resolveWindowLevel } from '@/lib/volume/math';
 import type { LoadedVolume, Vec3 } from '@/types';
@@ -7,18 +8,16 @@ function isMhaName(name: string): boolean {
   return name.endsWith('.mha') || name.endsWith('.mhd');
 }
 
-const ELEMENT_TYPE: Record<
-  string,
-  { bytes: number; read: (dv: DataView, o: number, le: boolean) => number }
-> = {
-  MET_CHAR: { bytes: 1, read: (d, o) => d.getInt8(o) },
-  MET_UCHAR: { bytes: 1, read: (d, o) => d.getUint8(o) },
-  MET_SHORT: { bytes: 2, read: (d, o, le) => d.getInt16(o, le) },
-  MET_USHORT: { bytes: 2, read: (d, o, le) => d.getUint16(o, le) },
-  MET_INT: { bytes: 4, read: (d, o, le) => d.getInt32(o, le) },
-  MET_UINT: { bytes: 4, read: (d, o, le) => d.getUint32(o, le) },
-  MET_FLOAT: { bytes: 4, read: (d, o, le) => d.getFloat32(o, le) },
-  MET_DOUBLE: { bytes: 8, read: (d, o, le) => d.getFloat64(o, le) },
+/** MetaImage `ElementType` values the viewer decodes, and the scalar each one stores. */
+const ELEMENT_TYPE: Record<string, ScalarKind> = {
+  MET_CHAR: 'i8',
+  MET_UCHAR: 'u8',
+  MET_SHORT: 'i16',
+  MET_USHORT: 'u16',
+  MET_INT: 'i32',
+  MET_UINT: 'u32',
+  MET_FLOAT: 'f32',
+  MET_DOUBLE: 'f64',
 };
 
 export const mhaAdapter: ImportFormatAdapter = {
@@ -30,12 +29,7 @@ export const mhaAdapter: ImportFormatAdapter = {
   async parse(source: ImportSource, onProgress: ProgressFn): Promise<LoadedVolume> {
     const file = source.files.find((f) => isMhaName(f.name));
     if (!file) throw new Error('No MHA/MHD file found.');
-    // Reading-files budget split — see nrrd/adapter.ts for rationale.
-    const fsize = file.file.size;
-    onProgress({ stage: 'reading-files', current: 0, total: fsize * 2 });
-    const bytes = await readBlobBytes(file.file, (loaded, total) => {
-      onProgress({ stage: 'reading-files', current: loaded, total: total * 2 });
-    });
+    const bytes = await readWithProgress(file.file, onProgress);
 
     // Read ASCII header until ElementDataFile line.
     const fields = new Map<string, string>();
@@ -64,48 +58,53 @@ export const mhaAdapter: ImportFormatAdapter = {
     const [nx, ny, nz] = dims;
 
     const etype = fields.get('ElementType') ?? 'MET_SHORT';
-    const desc = ELEMENT_TYPE[etype];
-    if (!desc) throw new Error(`Unsupported MHA ElementType "${etype}".`);
+    const kind = ELEMENT_TYPE[etype];
+    if (!kind) throw new Error(`Unsupported MHA ElementType "${etype}".`);
 
     const le = (fields.get('BinaryDataByteOrderMSB') ?? 'False').toLowerCase() !== 'true';
     const compressed = (fields.get('CompressedData') ?? 'False').toLowerCase() === 'true';
     const elementDataFile = fields.get('ElementDataFile') ?? 'LOCAL';
 
     let payload: Uint8Array;
-    if (elementDataFile === 'LOCAL' || isMhaName(file.name.replace(/\.mhd$/, '.mha'))) {
+    let payloadFileSize = file.file.size;
+    if (elementDataFile === 'LOCAL') {
       if (dataStart < 0) throw new Error('MHA data segment not found.');
       payload = bytes.subarray(dataStart);
     } else {
-      // .mhd referencing an external .raw — look for it in the source set.
-      const rawName = elementDataFile.toLowerCase();
-      const rawFile = source.files.find((f) => f.name.endsWith(rawName));
-      if (!rawFile) throw new Error(`MHD references missing data file "${elementDataFile}".`);
-      payload = await readBlobBytes(rawFile.file);
+      // A .mhd header names its data file (.raw, or .zraw when compressed),
+      // relative to itself — match it by base name among the selected files.
+      if (elementDataFile === 'LIST' || elementDataFile.includes('%')) {
+        throw new Error(
+          `MHD data split across several files ("${elementDataFile}") is not supported.`,
+        );
+      }
+      const rawName = (elementDataFile.split(/[\\/]/).pop() ?? elementDataFile).toLowerCase();
+      const rawFile = source.files.find((f) => f.name === rawName);
+      if (!rawFile) {
+        throw new Error(
+          `${file.name} keeps its voxels in "${rawName}" — select both files (or their folder).`,
+        );
+      }
+      payloadFileSize = rawFile.file.size;
+      payload = await readWithProgress(rawFile.file, onProgress);
     }
     if (compressed) {
-      payload = gunzipBytes(payload, (loaded, total) => {
-        onProgress({ stage: 'reading-files', current: fsize + loaded, total: fsize + total });
-      });
+      payload = await inflateWithProgress(
+        payload,
+        payloadFileSize,
+        onProgress,
+        inflatedSize(nx * ny * nz, SCALAR_BYTES[kind]),
+      );
     }
 
-    const count = nx * ny * nz;
-    const dv = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
-    const out = new Float32Array(count);
-    // Chunked assembling — see nrrd/adapter.ts for rationale.
-    const CHUNK = 1 << 19;
-    onProgress({ stage: 'assembling', current: 0, total: count });
-    let scalarMin = Number.POSITIVE_INFINITY;
-    let scalarMax = Number.NEGATIVE_INFINITY;
-    for (let off = 0; off < count; off += CHUNK) {
-      const end = Math.min(off + CHUNK, count);
-      for (let i = off; i < end; i++) {
-        const v = desc.read(dv, i * desc.bytes, le);
-        out[i] = v;
-        if (v < scalarMin) scalarMin = v;
-        if (v > scalarMax) scalarMax = v;
-      }
-      onProgress({ stage: 'assembling', current: end, total: count });
-    }
+    const out = new Float32Array(nx * ny * nz);
+    const { min: scalarMin, max: scalarMax } = decodeScalars(
+      new DataView(payload.buffer, payload.byteOffset, payload.byteLength),
+      kind,
+      out,
+      { littleEndian: le },
+      onProgress,
+    );
 
     const es = (fields.get('ElementSpacing') ?? fields.get('ElementSize') ?? '1 1 1')
       .split(/\s+/)
@@ -120,7 +119,7 @@ export const mhaAdapter: ImportFormatAdapter = {
         spacing,
         origin: [0, 0, 0],
         dims: [nx, ny, nz],
-        bitsAllocated: desc.bytes * 8,
+        bitsAllocated: SCALAR_BYTES[kind] * 8,
         rescaleSlope: 1,
         rescaleIntercept: 0,
       },

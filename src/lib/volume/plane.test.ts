@@ -9,6 +9,7 @@ import {
   sliceCount,
   sliceIndex,
   sliceNumber,
+  stepInPlane,
   volumeCenter,
   voxelToFrac,
 } from '@/lib/volume/plane';
@@ -302,5 +303,29 @@ describe('cursorToTextureVoxel matches the class it replaced', () => {
         );
       }
     }
+  });
+});
+
+describe('stepInPlane', () => {
+  const dims = [10, 10, 10] as const;
+  const at = { x: 5, y: 5, z: 5 };
+
+  it('moves right / left along the horizontal axis', () => {
+    expect(stepInPlane('axial', at, dims, 'right')).toEqual({ x: 6, y: 5, z: 5 });
+    expect(stepInPlane('sagittal', at, dims, 'left')).toEqual({ x: 5, y: 4, z: 5 });
+  });
+
+  it('moves up towards the top of the image as drawn', () => {
+    // Coronal / sagittal are drawn head-up: up on screen is z increasing.
+    expect(stepInPlane('coronal', at, dims, 'up')).toEqual({ x: 5, y: 5, z: 6 });
+    // Axial is drawn top-down: up on screen is y decreasing.
+    expect(stepInPlane('axial', at, dims, 'up')).toEqual({ x: 5, y: 4, z: 5 });
+    expect(stepInPlane('axial', at, dims, 'down')).toEqual({ x: 5, y: 6, z: 5 });
+  });
+
+  it('agrees with the mapping clicks use, and stays inside the volume', () => {
+    const up = stepInPlane('coronal', at, dims, 'up');
+    expect(voxelToFrac('coronal', up, dims).fy).toBeLessThan(voxelToFrac('coronal', at, dims).fy);
+    expect(stepInPlane('axial', { x: 9, y: 0, z: 0 }, dims, 'right')).toEqual({ x: 9, y: 0, z: 0 });
   });
 });

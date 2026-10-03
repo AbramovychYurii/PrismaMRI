@@ -18,10 +18,11 @@ import {
   useShiftDragMeasurement,
   useSliceSwipe,
 } from '@/hooks/useSlicePanelGestures';
+import { useSlicePanelKeys } from '@/hooks/useSlicePanelKeys';
 import { useVolumeStore } from '@/store/volumeStore';
 import type { SlicePlane } from '@/types';
 import { ChevronsUpDown, Maximize2, Minimize2 } from 'lucide-react';
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ActiveBorder,
@@ -45,24 +46,43 @@ function ExpandedSlicePanel({ plane }: { plane: SlicePlane }) {
 
   const moveCrosshair = useCrosshairClick(core, plane);
   const dragHandlers = useShiftDragMeasurement(core, plane);
+  const panelKeys = useSlicePanelKeys(core, plane);
   const footer = PLANE_FOOTER[plane];
 
   const onClose = useCallback(() => setExpandedPlane(null), [setExpandedPlane]);
+
+  // Expanding replaces the rail panel (and the button that was pressed), so
+  // focus would drop to the page; it moves into the fullscreen panel instead,
+  // and back to the rail panel when this one goes away.
+  const overlayRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const overlay = overlayRef.current;
+    overlay?.focus();
+    return () => {
+      const active = document.activeElement;
+      if (active === document.body || overlay?.contains(active)) {
+        requestAnimationFrame(() =>
+          document.querySelector<HTMLElement>(`[data-slice-panel="${plane}"]`)?.focus(),
+        );
+      }
+    };
+  }, [plane]);
   useEscapeKey(onClose);
 
   return createPortal(
     <FullscreenOverlay
+      ref={overlayRef}
       $isActive={isActive}
       onClick={(e) => {
         e.stopPropagation();
         if (!e.shiftKey) moveCrosshair(e);
       }}
-      onContextMenu={measure.onContextMenu}
       onWheel={(e) => {
         e.stopPropagation();
         core.slice.onWheel(e);
       }}
       {...dragHandlers}
+      {...panelKeys}
     >
       <StyledCanvas ref={core.frame.canvasRef as React.Ref<HTMLCanvasElement>} />
 
@@ -133,6 +153,7 @@ function RailSlicePanel({ plane }: { plane: SlicePlane }) {
 
   const moveCrosshair = useCrosshairClick(core, plane);
   const swipeHandlers = useSliceSwipe(core, plane);
+  const panelKeys = useSlicePanelKeys(core, plane);
 
   // The scrubber is always on mobile — there is no toggle there.
   const scrubberVisible = isMobile || scrubVisible;
@@ -140,10 +161,11 @@ function RailSlicePanel({ plane }: { plane: SlicePlane }) {
   return (
     <PanelWrap
       data-testid={`slice-panel-${plane}`}
+      data-slice-panel={plane}
       onClick={moveCrosshair}
-      onContextMenu={measure.onContextMenu}
       onWheel={core.slice.onWheel}
       {...swipeHandlers}
+      {...panelKeys}
       $isLast={plane === 'axial'}
       $isActive={isActive}
     >
