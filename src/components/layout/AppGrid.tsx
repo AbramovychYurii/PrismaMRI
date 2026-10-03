@@ -119,7 +119,7 @@ const MobileControlsWrap = styled.div`
 `;
 
 function MobileHeader() {
-  const loading = useVolumeStore((s) => s.loading);
+  const loadingPercent = useVolumeStore((s) => (s.loading.active ? s.loading.percent : null));
   const { canInstall, install } = usePwaInstall();
   return (
     <MobileHeaderBar>
@@ -132,7 +132,7 @@ function MobileHeader() {
           </MobileInstallBtn>
         </Tooltip>
       )}
-      {loading.active && <MobileLoadingBar $width={loading.percent} />}
+      {loadingPercent !== null && <MobileLoadingBar $width={loadingPercent} />}
     </MobileHeaderBar>
   );
 }

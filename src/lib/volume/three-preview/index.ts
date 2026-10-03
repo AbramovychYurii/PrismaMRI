@@ -55,6 +55,8 @@ export class ThreePreview {
   /** Texture dims, and the full-resolution dims the cursor is expressed in.
    *  The two differ whenever prepareVolumeFor3D had to shrink an axis. */
   private textureDims: Vec3 = [1, 1, 1];
+  /** Preset the current transfer-function textures were built for. */
+  private colormapPreset: RenderPreset | null = null;
   private sourceDims: Vec3 = [1, 1, 1];
   /** Latest annotation list + active id, re-applied when a volume (re)loads. */
   private _annotations: AiAnnotation[] = [];
@@ -82,6 +84,14 @@ export class ThreePreview {
   private readonly _camVoxel = new THREE.Vector3();
   private readonly _fwdWorld = new THREE.Vector3();
   private readonly _fwdVoxel = new THREE.Vector3();
+
+  /**
+   * Told when the GPU drops the context (driver reset, GPU memory exhausted)
+   * and again if it comes back. three keeps every texture's source data and
+   * re-uploads on restore, so the view recovers by itself — this only lets
+   * the UI say why the stage is blank meanwhile.
+   */
+  onContextChange: ((lost: boolean) => void) | null = null;
 
   private _snapActive = false;
   private _snapStartTs = 0;
@@ -113,18 +123,37 @@ export class ThreePreview {
     this.scene.add(this.measurementLine.group);
     this.scene.add(this.annotationMarkers.group);
     this.camera = buildCamera(1, 256);
+    // three registered its own handlers first: it prevents the default on
+    // loss (so the browser may restore) and re-initialises on restore.
+    canvas.addEventListener('webglcontextlost', this.handleContextLost);
+    canvas.addEventListener('webglcontextrestored', this.handleContextRestored);
     this.resize();
     this.loop();
   }
 
-  setVolume(prepared: PreparedVolumeFor3D): void {
+  private handleContextLost = (): void => {
+    if (!this.disposed) this.onContextChange?.(true);
+  };
+
+  private handleContextRestored = (): void => {
+    this.dirty = true;
+    this.onContextChange?.(false);
+  };
+
+  /**
+   * Builds the mesh for a new volume. `preset` is the one about to be applied,
+   * so its transfer functions are built once here — setRenderPreset then finds
+   * them current instead of rebuilding the pair (~13 ms) straight away.
+   */
+  setVolume(prepared: PreparedVolumeFor3D, preset: RenderPreset = 'mip'): void {
     if (this.volume) {
       this.scene.remove(this.volume.mesh);
       disposeVolumeObject(this.volume);
       this.volume = null;
     }
-    const vol = buildVolumeMesh(prepared, 'mip');
+    const vol = buildVolumeMesh(prepared, preset);
     this.volume = vol;
+    this.colormapPreset = preset;
     this.scene.add(vol.mesh);
 
     const dims = prepared.dims;
@@ -190,22 +219,24 @@ export class ThreePreview {
   }
 
   setRenderPreset(preset: RenderPreset): void {
-    const m = this.volume?.material;
-    if (!m) return;
+    const vol = this.volume;
+    if (!vol) return;
+    const m = vol.material;
 
     // Swap both colormap textures: 1D (point-sample, MIP + cut-face) and
     // 2D pre-integrated (DVR segment compositing).  Both depend on the
     // preset and must stay in lock-step.
-    const oldColormap = this.volume!.colormap;
-    const oldColormapPre = this.volume!.colormapPre;
-    const newColormap = buildTransferFunction(preset);
-    const newColormapPre = buildPreIntegratedTF(preset);
-    m.uniforms.u_cmdata.value = newColormap;
-    m.uniforms.u_cmdataPre.value = newColormapPre;
-    this.volume!.colormap = newColormap;
-    this.volume!.colormapPre = newColormapPre;
-    oldColormap.dispose();
-    oldColormapPre.dispose();
+    if (preset !== this.colormapPreset) {
+      const oldColormap = vol.colormap;
+      const oldColormapPre = vol.colormapPre;
+      vol.colormap = buildTransferFunction(preset);
+      vol.colormapPre = buildPreIntegratedTF(preset);
+      m.uniforms.u_cmdata.value = vol.colormap;
+      m.uniforms.u_cmdataPre.value = vol.colormapPre;
+      oldColormap.dispose();
+      oldColormapPre.dispose();
+      this.colormapPreset = preset;
+    }
 
     // Mode: MIP vs DVR
     m.uniforms.u_mode.value = preset === 'mip' ? 1 : 0;
@@ -683,6 +714,11 @@ export class ThreePreview {
       });
     } finally {
       recorder.stop();
+      // The capture stream keeps a track pulling frames from the canvas until
+      // it is stopped; release it once the recorder has flushed its data.
+      void finished.then(() => {
+        for (const track of stream.getTracks()) track.stop();
+      });
       // Restore the camera and hand control back to the trackball.
       this.camera.position.copy(savedPos);
       this.camera.up.copy(savedUp);
@@ -699,6 +735,9 @@ export class ThreePreview {
 
   dispose(): void {
     this.disposed = true;
+    this.onContextChange = null;
+    this.canvas.removeEventListener('webglcontextlost', this.handleContextLost);
+    this.canvas.removeEventListener('webglcontextrestored', this.handleContextRestored);
     cancelAnimationFrame(this.raf);
     this.controls?.dispose();
     if (this.volume) disposeVolumeObject(this.volume);
@@ -706,5 +745,11 @@ export class ThreePreview {
     this.annotationMarkers.dispose();
     this.warmTarget.dispose();
     this.renderer.dispose();
+    // Give the context back now rather than at GC: it holds the GPU's copy of
+    // the volume, and browsers cap live contexts (~16) by evicting the oldest.
+    // Only once the canvas has left the page — React StrictMode re-runs the
+    // mount effect on the same, still-attached canvas, and a lost context
+    // cannot be re-acquired from it.
+    if (!this.canvas.isConnected) this.renderer.forceContextLoss();
   }
 }

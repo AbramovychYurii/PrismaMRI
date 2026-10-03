@@ -1,5 +1,5 @@
 import { AuroraSparkles } from '@/components/ui/AuroraSparkles';
-import { useViewerActions } from '@/hooks';
+import { useViewerActions } from '@/hooks/ViewerActionsContext';
 import { useHover } from '@/hooks/useHover';
 import { useVolumeStore } from '@/store';
 import { ChevronLeft, ChevronRight } from 'lucide-react';

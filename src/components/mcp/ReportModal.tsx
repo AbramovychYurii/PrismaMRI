@@ -4,8 +4,9 @@
  * Left panel: scope (this finding / all findings) + format toggles + download.
  * Right panel: live document preview.
  *
- * All visual styling lives in `ReportModal.styles.ts`. This file owns the
- * capture/encode logic, the PDF generation glue, and the preview JSX.
+ * All visual styling lives in `ReportModal.styles.ts`; canvas capture and
+ * marker drawing in `lib/report/capture.ts`. This file owns the PDF generation
+ * glue and the preview JSX.
  */
 
 import { AuroraSparkles } from '@/components/ui/AuroraSparkles';
@@ -13,8 +14,9 @@ import { PLANE_LABEL, SEVERITY_HEX, SEVERITY_LABEL } from '@/constants';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { downloadBlob } from '@/lib/download';
 import { waitForPaint } from '@/lib/mcp/canvas-utils';
-import { generateReport } from '@/lib/reportPdf';
+import { type Capture, annotateCanvas, captureRaw } from '@/lib/report/capture';
 import { sliceNumber } from '@/lib/volume/plane';
+import { intensityUnit } from '@/lib/volume/units';
 import { useVolumeStore } from '@/store/volumeStore';
 import type { AiAnnotation, SlicePlane } from '@/types';
 import { Download, FileText, X } from 'lucide-react';
@@ -77,60 +79,6 @@ const planeName = (plane: SlicePlane) => PLANE_LABEL[plane].primary;
 
 const sliceNum = (a: AiAnnotation) => sliceNumber(a.voxel, a.plane);
 
-type Capture = { data: string; ar: number };
-
-/** JPEG quality for embedded scan thumbnails — preserves fine anatomy without exploding PDF size. */
-const PREVIEW_JPEG_QUALITY = 0.88;
-
-/**
- * Draw the same circular pin the app uses on 2-D panels — ring only, no crosshair.
- * Returns JPEG data URL + aspect ratio (height/width) of the source canvas.
- */
-function annotateCanvas(src: HTMLCanvasElement, fx: number, fy: number, hexColor: string): Capture {
-  const off = document.createElement('canvas');
-  off.width = src.width;
-  off.height = src.height;
-  const ctx = off.getContext('2d');
-  if (!ctx) throw new Error('annotateCanvas: failed to acquire 2D context');
-  ctx.drawImage(src, 0, 0);
-
-  const px = fx * src.width;
-  const py = fy * src.height;
-  // Match the 24 px CSS ring scaled to canvas resolution
-  const r = Math.max(src.width, src.height) * 0.038;
-  const lw = Math.max(src.width, src.height) * 0.004;
-
-  // Dark outer halo — mirrors box-shadow: 0 0 0 1px rgba(0,0,0,0.55)
-  ctx.beginPath();
-  ctx.arc(px, py, r + lw, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-  ctx.lineWidth = lw;
-  ctx.stroke();
-
-  // Coloured glow (animated in the app; static here)
-  ctx.shadowColor = `${hexColor}bb`;
-  ctx.shadowBlur = r * 0.5;
-
-  // Main ring
-  ctx.beginPath();
-  ctx.arc(px, py, r, 0, Math.PI * 2);
-  ctx.strokeStyle = hexColor;
-  ctx.lineWidth = lw * 0.9;
-  ctx.stroke();
-
-  ctx.shadowBlur = 0;
-
-  return { data: off.toDataURL('image/jpeg', PREVIEW_JPEG_QUALITY), ar: src.height / src.width };
-}
-
-/** Capture a canvas as-is (no annotation). Returns data + aspect ratio. */
-function captureRaw(src: HTMLCanvasElement): Capture {
-  return {
-    data: src.toDataURL('image/jpeg', PREVIEW_JPEG_QUALITY),
-    ar: src.height / src.width,
-  };
-}
-
 /** Avoid allocating a fresh `style` object on every render of the disabled toggle. */
 const FORMAT_TOGGLE_DISABLED_STYLE: React.CSSProperties = { opacity: 0.4 };
 const FORMAT_TOGGLE_ENABLED_STYLE: React.CSSProperties = { opacity: 1 };
@@ -157,7 +105,9 @@ export function ReportModal({ finding, findingIndex, allFindings, onClose }: Pro
   const cursor = useVolumeStore((s) => s.cursor);
 
   const today = new Date().toISOString().slice(0, 10);
-  const modality = volume?.meta.modality ?? 'CT';
+  // The report says what the volume says: no modality, no invented CT or HU.
+  const modality = volume?.meta.modality ?? '—';
+  const unit = intensityUnit(volume?.meta.modality);
   const dims = volume?.meta.dims;
   const spacing = volume?.meta.spacing;
 
@@ -222,6 +172,8 @@ export function ReportModal({ finding, findingIndex, allFindings, onClose }: Pro
         await waitForPaint();
       }
 
+      // jsPDF (and the html2canvas / DOMPurify it pulls in) loads on demand.
+      const { generateReport } = await import('@/lib/reportPdf');
       const blob = generateReport({
         findings: scopeFindings,
         allFindings,
@@ -391,13 +343,17 @@ export function ReportModal({ finding, findingIndex, allFindings, onClose }: Pro
                   <DocMetaItem>
                     <DocMetaKey>Modality</DocMetaKey>
                     <DocMetaVal>
-                      {modality} · {volume.meta.bitsAllocated}-bit · HU
+                      {[`${modality} · ${volume.meta.bitsAllocated}-bit`, unit]
+                        .filter(Boolean)
+                        .join(' · ')}
                     </DocMetaVal>
                   </DocMetaItem>
                   <DocMetaItem>
-                    <DocMetaKey>HU range</DocMetaKey>
+                    <DocMetaKey>{unit ? `${unit} range` : 'Range'}</DocMetaKey>
                     <DocMetaVal>
-                      {Math.round(volume.scalarMin)} → {Math.round(volume.scalarMax)} HU
+                      {[`${Math.round(volume.scalarMin)} → ${Math.round(volume.scalarMax)}`, unit]
+                        .filter(Boolean)
+                        .join(' ')}
                     </DocMetaVal>
                   </DocMetaItem>
                   {dims && (

@@ -71,6 +71,14 @@ export function useMeasurementInteraction(
     [voxelAtPointer],
   );
 
+  /** Opens the menu for the crosshair voxel at a screen point — the keyboard path. */
+  const openMenuAtCursor = useCallback(
+    (screenX: number, screenY: number) => {
+      if (cursor) setMenu({ screenX, screenY, voxel: { ...cursor } });
+    },
+    [cursor],
+  );
+
   const closeMenu = useCallback(() => setMenu(null), []);
 
   const onMeasureFrom = useCallback(() => {
@@ -106,6 +114,7 @@ export function useMeasurementInteraction(
     measureDots,
     menu,
     openMenu,
+    openMenuAtCursor,
     closeMenu,
     onMeasureFrom,
     onMeasureTo,

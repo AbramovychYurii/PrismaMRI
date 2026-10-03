@@ -64,7 +64,7 @@ So I built a **simpler way to review results for personal use**: three orthogona
 - **Folder import / drag-and-drop** — drop a DICOM folder, a `.nii.gz`, a `.mha/.mhd`, a `.nrrd`, or a ZIP archive containing any of those.
 - **IndexedDB cache** — the last loaded volume is restored on reload so you don’t re-import on every refresh.
 - **Per-volume annotation persistence** — AI findings are stored per volume in `localStorage` and reattach automatically when the same volume is reopened.
-- **Keyboard shortcuts** — `?` opens a full shortcuts cheat-sheet; `⌘O` / `Ctrl+O` opens folder, `Esc` returns to import.
+- **Keyboard shortcuts** — `?` opens a full shortcuts cheat-sheet; `⌘O` / `Ctrl+O` opens a folder; `Esc` closes dialogs and cancels a load in progress (it never leaves a loaded volume — use **Back to import**).
 
 ## Supported formats
 
@@ -113,6 +113,9 @@ npm run preview    # preview production build
 npm run lint       # Biome check
 npm run typecheck
 npm run test:e2e   # Playwright end-to-end tests
+npm run ref:capture # write local pixel baselines for the renderers (before a change)
+npm run ref:check   # compare renders pixel-exact against them (after a change)
+npm run ref:perf    # load timings, memory and import-screen load → e2e/reference/out
 ```
 
 ## How to use
@@ -122,7 +125,7 @@ npm run test:e2e   # Playwright end-to-end tests
 3. Click a slice panel to set the active plane; scroll with the mouse wheel or `↑` / `↓` to step through slices.
 4. Adjust **Window** and **Level** in the Display panel; switch render mode (MIP / Tissue / Bone) in the Render panel.
 5. Right-click a slice panel for the measurement menu (`Set start` → `Set end`, or `View from this side` to align 3D).
-6. Press `?` for the full keyboard shortcut sheet; `Esc` returns to the import screen.
+6. Press `?` for the full keyboard shortcut sheet; **Back to import** in the dock returns to the import screen.
 
 ## AI-assisted analysis (optional)
 

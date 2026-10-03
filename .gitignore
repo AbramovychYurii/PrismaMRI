@@ -24,3 +24,7 @@ mcp-server/dist/
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# Reference harness (machine-specific baselines + perf output)
+e2e/reference/__baseline__/
+e2e/reference/out/

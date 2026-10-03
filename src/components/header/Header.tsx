@@ -94,7 +94,8 @@ const LoadingBar = styled.div<{ $width: number }>`
 `;
 
 export function Header() {
-  const loading = useVolumeStore((s) => s.loading);
+  // Only the bar width — progress messages also change current/total/message.
+  const loadingPercent = useVolumeStore((s) => (s.loading.active ? s.loading.percent : null));
   const { setShowShortcuts } = useViewerActions();
   const { canInstall, install } = usePwaInstall();
 
@@ -122,7 +123,7 @@ export function Header() {
           </HelpBtn>
         </Tooltip>
       </HeaderRight>
-      {loading.active && <LoadingBar $width={loading.percent} />}
+      {loadingPercent !== null && <LoadingBar $width={loadingPercent} />}
     </StyledHeader>
   );
 }

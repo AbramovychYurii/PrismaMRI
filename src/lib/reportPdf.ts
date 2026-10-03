@@ -7,6 +7,7 @@
 
 import { PLANE_LABEL } from '@/constants';
 import { sliceNumber } from '@/lib/volume/plane';
+import { intensityUnit } from '@/lib/volume/units';
 import type { AiAnnotation, AnnotationSeverity, ParsedVolumeMeta, SlicePlane } from '@/types';
 import jsPDF from 'jspdf';
 
@@ -281,20 +282,21 @@ export function generateReport(params: ReportParams): Blob {
   y += 7;
 
   if (volumeMeta) {
+    const unit = intensityUnit(volumeMeta.modality);
     const huRange =
       scalarMin != null && scalarMax != null
-        ? `${Math.round(scalarMin)} -> ${Math.round(scalarMax)} HU`
+        ? `${Math.round(scalarMin)} -> ${Math.round(scalarMax)}${unit ? ` ${unit}` : ''}`
         : '—';
 
     const meta: Array<[string, string]> = [
       ['PROTOCOL', (volumeMeta.protocol ?? formatId ?? '—').toLowerCase()],
       [
         'MODALITY',
-        [volumeMeta.modality ?? 'CT', bitsAllocated ? `${bitsAllocated}-bit` : '', 'HU']
+        [volumeMeta.modality ?? '—', bitsAllocated ? `${bitsAllocated}-bit` : '', unit]
           .filter(Boolean)
           .join(' · '),
       ],
-      ['HU RANGE', huRange],
+      [unit ? `${unit} RANGE` : 'RANGE', huRange],
       [
         'VOLUME',
         volumeMeta.dims

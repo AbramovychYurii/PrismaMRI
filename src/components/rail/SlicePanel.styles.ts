@@ -16,6 +16,11 @@ export const MEASURE_DOT_PX = 8;
 export const MEASURE_DOT_SHADOW = `0 0 ${MEASURE_DOT_PX * 0.7}px var(--measure), 0 0 ${MEASURE_DOT_PX * 1.6}px var(--measure-glow)`;
 
 export const PanelWrap = styled.div<{ $isLast: boolean; $isActive: boolean }>`
+  /* Focusable for keyboard use; the ring sits inside, where no neighbour or
+     clipping parent can cover it. */
+  &:focus-visible {
+    outline-offset: -3px;
+  }
   position: relative;
   flex: 1;
   min-height: 0;
@@ -270,6 +275,11 @@ export const TrayBtn = styled.button<{ $active?: boolean; $large?: boolean }>`
 `;
 
 export const FullscreenOverlay = styled.div<{ $isActive: boolean }>`
+  /* Focusable for keyboard use; the ring sits inside, where no neighbour or
+     clipping parent can cover it. */
+  &:focus-visible {
+    outline-offset: -3px;
+  }
   position: fixed;
   top: 56px;
   left: 0;

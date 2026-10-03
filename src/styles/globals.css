@@ -177,7 +177,6 @@ textarea {
     var(--rule) 100%
   );
   cursor: ew-resize;
-  outline: none;
 }
 .wl-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -197,9 +196,6 @@ textarea {
   background: var(--accent);
   border: 2px solid var(--panel);
   cursor: ew-resize;
-}
-.wl-slider:focus-visible {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
 /* ── Mobile overrides (≤ 767px) ────────────────────────────────────────────── */

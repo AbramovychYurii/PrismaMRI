@@ -1,4 +1,4 @@
-import { QUOTA_SHARE, fitsInQuota, recordBytes } from '@/lib/volumeDb';
+import { QUOTA_SHARE, fitsInQuota, recordBuffer, recordBytes } from '@/lib/volumeDb';
 import type { LoadedVolume, PreparedVolumeFor3D, VolumeHistogram } from '@/types';
 import { describe, expect, it } from 'vitest';
 
@@ -86,5 +86,20 @@ describe('fitsInQuota', () => {
     const bytes = recordBytes(volume, prepared3D, histogram);
     expect(fitsInQuota(bytes, estimate(0, GB))).toBe(false);
     expect(fitsInQuota(bytes, estimate(0, 50 * GB))).toBe(true);
+  });
+});
+
+describe('recordBuffer', () => {
+  it('hands over a buffer the view spans whole, without copying', () => {
+    const voxels = new Int16Array([1, 2, 3]);
+    expect(recordBuffer(voxels)).toBe(voxels.buffer);
+  });
+
+  it('slices out a partial view', () => {
+    const backing = new Uint8Array([9, 1, 2, 3, 9]);
+    const view = backing.subarray(1, 4);
+    const out = recordBuffer(view);
+    expect(out).not.toBe(backing.buffer);
+    expect(Array.from(new Uint8Array(out))).toEqual([1, 2, 3]);
   });
 });

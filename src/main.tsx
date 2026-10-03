@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { HashRouter } from 'react-router-dom';
 import '@/styles/globals.css';
 import { App } from '@/App';
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { useVolumeStore } from '@/store/volumeStore';
 
 if (import.meta.env.DEV) {
@@ -11,8 +12,10 @@ if (import.meta.env.DEV) {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <HashRouter>
-      <App />
-    </HashRouter>
+    <ErrorBoundary>
+      <HashRouter>
+        <App />
+      </HashRouter>
+    </ErrorBoundary>
   </StrictMode>,
 );

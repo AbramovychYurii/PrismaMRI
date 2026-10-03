@@ -49,7 +49,8 @@ async function looksLikeDicom(file: File): Promise<boolean> {
   return g === 0x0008 || g === 0x0002;
 }
 
-type Slice = { buffer: ArrayBuffer; tags: DicomTags };
+/** A read slice; `buffer` is dropped once its pixels are in the volume. */
+type Slice = { buffer: ArrayBuffer | null; tags: DicomTags };
 
 /** Group key for one series: prefer SeriesInstanceUID, else geometry. */
 function seriesKeyOf(t: DicomTags): string {
@@ -97,9 +98,48 @@ function orientationOf(t: DicomTags): SeriesChoice['orientation'] {
   return 'Coronal';
 }
 
-function readPixels(buffer: ArrayBuffer, t: DicomTags): Float32Array {
+/** Transfer syntaxes the reader decodes: Implicit and Explicit VR Little Endian. */
+const READABLE_SYNTAXES = new Set(['', '1.2.840.10008.1.2', '1.2.840.10008.1.2.1']);
+
+/** Names for the encodings a user is most likely to meet, for the error message. */
+const SYNTAX_NAMES: Record<string, string> = {
+  '1.2.840.10008.1.2.2': 'Explicit VR Big Endian',
+  '1.2.840.10008.1.2.1.99': 'Deflated Explicit VR',
+  '1.2.840.10008.1.2.4.50': 'JPEG Baseline',
+  '1.2.840.10008.1.2.4.51': 'JPEG Extended',
+  '1.2.840.10008.1.2.4.57': 'JPEG Lossless',
+  '1.2.840.10008.1.2.4.70': 'JPEG Lossless',
+  '1.2.840.10008.1.2.4.80': 'JPEG-LS Lossless',
+  '1.2.840.10008.1.2.4.81': 'JPEG-LS',
+  '1.2.840.10008.1.2.4.90': 'JPEG 2000 Lossless',
+  '1.2.840.10008.1.2.4.91': 'JPEG 2000',
+  '1.2.840.10008.1.2.5': 'RLE Lossless',
+};
+
+/**
+ * Why the reader cannot assemble this slice, or null if it can. Compressed
+ * pixel data would otherwise be read as raw samples and produce a plausible-
+ * looking volume of noise, with nothing to say it is wrong.
+ */
+export function unreadableReason(t: DicomTags): string | null {
+  if (t.pixelDataEncapsulated || !READABLE_SYNTAXES.has(t.transferSyntax)) {
+    const name = SYNTAX_NAMES[t.transferSyntax] ?? 'a compressed encoding';
+    const uid = t.transferSyntax ? ` (${t.transferSyntax})` : '';
+    const advice = 'Export it uncompressed (Explicit VR Little Endian) and open it again.';
+    return `This DICOM series is stored as ${name}${uid}, and PrismaMRI reads uncompressed DICOM only. ${advice}`;
+  }
+  if (t.samplesPerPixel !== 1) {
+    return `This DICOM series is in colour (${t.samplesPerPixel} samples per pixel); PrismaMRI reads greyscale only.`;
+  }
+  if (t.bitsAllocated !== 8 && t.bitsAllocated !== 16 && t.bitsAllocated !== 32) {
+    return `This DICOM series stores ${t.bitsAllocated}-bit pixels, which PrismaMRI does not read.`;
+  }
+  return null;
+}
+
+/** Decodes one slice's stored pixels, rescaled, into `out` (its run of the volume). */
+function readPixels(buffer: ArrayBuffer, t: DicomTags, out: Float32Array): void {
   const count = t.rows * t.columns * t.numberOfFrames;
-  const out = new Float32Array(count);
   const { rescaleSlope: m, rescaleIntercept: b } = t;
   const dv = new DataView(buffer, t.pixelDataOffset);
   if (t.bitsAllocated === 16) {
@@ -113,7 +153,6 @@ function readPixels(buffer: ArrayBuffer, t: DicomTags): Float32Array {
   } else if (t.bitsAllocated === 32) {
     for (let i = 0; i < count; i++) out[i] = dv.getFloat32(i * 4, true) * m + b;
   }
-  return out;
 }
 
 export const dicomAdapter: ImportFormatAdapter = {
@@ -137,7 +176,7 @@ export const dicomAdapter: ImportFormatAdapter = {
     for (const c of candidates) {
       const len = resolveDicomHeaderReadLength(c.file.size);
       const buffer = await c.file.slice(0, len).arrayBuffer();
-      const tags = parseImplicitLittleEndianDicom(buffer, true);
+      const tags = parseImplicitLittleEndianDicom(buffer);
       if (tags) headers.push({ tags });
     }
     const groups = groupBySeries(headers);
@@ -169,7 +208,7 @@ export const dicomAdapter: ImportFormatAdapter = {
     const slices: Slice[] = [];
     for (let i = 0; i < candidates.length; i++) {
       const buffer = await candidates[i].file.arrayBuffer();
-      const tags = parseImplicitLittleEndianDicom(buffer, false);
+      const tags = parseImplicitLittleEndianDicom(buffer);
       if (tags && tags.pixelDataOffset >= 0) slices.push({ buffer, tags });
       onProgress({ stage: 'reading-files', current: i + 1, total: candidates.length });
     }
@@ -183,10 +222,18 @@ export const dicomAdapter: ImportFormatAdapter = {
     const picked = seriesKey
       ? (groups.get(seriesKey) ?? largestGroup(groups))
       : largestGroup(groups);
-    const sorted = sortDicomSlices(picked);
-    const first = sorted[0].tags;
+    const ordered = sortDicomSlices(picked);
+    // Only the chosen series is assembled; let the others' buffers go now.
+    slices.length = 0;
+    groups.clear();
+    const first = ordered[0].tags;
+    const reason = unreadableReason(first);
+    if (reason) throw new Error(reason);
     const width = first.columns;
     const height = first.rows;
+    // A slice with another matrix (a localiser in the same series) cannot sit
+    // in this grid; leave it out entirely rather than reserve space for it.
+    const sorted = ordered.filter((s) => s.tags.columns === width && s.tags.rows === height);
     const depth = sorted.reduce((n, s) => n + s.tags.numberOfFrames, 0);
 
     onProgress({ stage: 'assembling', current: 0, total: depth });
@@ -196,10 +243,14 @@ export const dicomAdapter: ImportFormatAdapter = {
     let scalarMin = Number.POSITIVE_INFINITY;
     let scalarMax = Number.NEGATIVE_INFINITY;
     for (let s = 0; s < sorted.length; s++) {
-      const { buffer, tags } = sorted[s];
-      if (tags.columns !== width || tags.rows !== height) continue;
-      const px = readPixels(buffer, tags);
-      voxels.set(px, zOff * width * height);
+      const slice = sorted[s];
+      const { buffer, tags } = slice;
+      if (!buffer) continue;
+      const start = zOff * width * height;
+      const px = voxels.subarray(start, start + width * height * tags.numberOfFrames);
+      readPixels(buffer, tags, px);
+      // The raw file is no longer needed once its pixels are in the volume.
+      slice.buffer = null;
       for (let i = 0; i < px.length; i++) {
         const v = px[i];
         if (v < scalarMin) scalarMin = v;

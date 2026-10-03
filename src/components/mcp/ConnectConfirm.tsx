@@ -1,8 +1,8 @@
 /**
  * ConnectConfirm
  *
- * Modal confirmation dialog shown when an MCP agent connects to the relay
- * for the first time (triggered by the 'mcp_connecting' relay message).
+ * Modal confirmation dialog shown when an MCP agent connects for the first
+ * time (triggered by the bridge's 'mcp_connecting' message).
  *
  * The user acknowledges that an AI agent will be able to control the viewer.
  * Dismissing the dialog does NOT disconnect the agent — it simply closes the

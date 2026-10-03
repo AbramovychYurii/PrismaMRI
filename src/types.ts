@@ -38,7 +38,7 @@ export interface LoadedVolume {
   scalarMax: number;
   /** Default W/L resolved at parse time. */
   windowLevel: SliceWindowLevel;
-  formatId: 'dicom' | 'galileos' | 'onevolume' | 'nifti' | 'mha' | 'nrrd';
+  formatId: 'dicom' | 'nifti' | 'mha' | 'nrrd';
 }
 
 export interface PreparedVolumeFor3D {
@@ -55,6 +55,8 @@ export interface PreparedVolumeFor3D {
   sourceRange: [number, number];
   /** Original full-resolution dims before any downsample (for cursor mapping). */
   sourceDims: Vec3;
+  /** 32³ empty-space grid (255 = occupied), computed in the volume worker. */
+  occupancy?: Uint8Array;
 }
 
 export interface VolumeCursor {

@@ -76,7 +76,7 @@ for (const n of candidates) {
   const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
   const ts = transferSyntax(ab);
   tsCount.set(ts, (tsCount.get(ts) ?? 0) + 1);
-  const tags = parseImplicitLittleEndianDicom(ab, false);
+  const tags = parseImplicitLittleEndianDicom(ab);
   if (tags && tags.pixelDataOffset >= 0) slices.push({ buffer: ab, tags });
 }
 

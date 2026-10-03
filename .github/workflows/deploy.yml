@@ -32,6 +32,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Lint and format check
+        run: npm run lint
+
+      - name: Type check (app)
+        run: npm run typecheck
+
+      - name: Type check (MCP server)
+        run: npm ci --prefix mcp-server && npm run --prefix mcp-server typecheck
+
       # Fast and dependency-free — run before the browser download and the
       # build so a broken invariant fails in seconds, not minutes.
       - name: Run unit tests

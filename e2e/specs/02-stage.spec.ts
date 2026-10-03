@@ -110,22 +110,21 @@ test.describe('3D Stage', () => {
 
   // ── Stage menu ──────────────────────────────────────────────────────────
 
-  test('stage menu button opens a dropdown', async ({ page }) => {
-    // StageMenu button is in the toolbar pill — it's the one that's not focus/rail/planes/clip.
-    // It uses a custom SVG and has aria-label about export or render preset.
-    const menuBtn = page.getByRole('button', { name: /export|screenshot|render|stage menu/i }).first();
-    if (await menuBtn.count() === 0) {
-      // If we can't find by aria-label, skip this sub-test gracefully.
-      test.skip();
-      return;
-    }
-    await menuBtn.click();
-    // A dropdown should appear — verify some list item is visible.
-    const menuItem = page.getByRole('menuitem').first();
-    await expect(menuItem).toBeVisible();
-    // Close with Escape.
+  test('stage menu opens as a menu and is keyboard-operable', async ({ page }) => {
+    const menuBtn = page.getByRole('button', { name: 'Stage options' });
+    await expect(menuBtn).toHaveAttribute('aria-haspopup', 'menu');
+    await menuBtn.focus();
+    await page.keyboard.press('Enter');
+    const menu = page.getByRole('menu', { name: 'Stage options' });
+    await expect(menu).toBeVisible();
+    // Focus lands on the first item; arrows move through the items.
+    await expect(page.getByRole('menuitem').first()).toBeFocused();
+    await page.keyboard.press('End');
+    await expect(page.getByRole('menuitem').last()).toBeFocused();
+    // Escape closes it and gives focus back to the button.
     await page.keyboard.press('Escape');
-    await expect(menuItem).not.toBeVisible();
+    await expect(menu).not.toBeVisible();
+    await expect(menuBtn).toBeFocused();
   });
 
   // ── "No volume loaded" placeholder ─────────────────────────────────────

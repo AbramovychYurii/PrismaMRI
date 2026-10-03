@@ -1,4 +1,5 @@
-import { gunzipBytes, readBlobBytes } from '@/lib/import/read-file';
+import { SCALAR_BYTES, type ScalarKind, decodeScalars, inflatedSize } from '@/lib/import/decode';
+import { inflateWithProgress, readWithProgress } from '@/lib/import/read-file';
 import type { ImportFormatAdapter, ImportSource, ProgressFn } from '@/lib/import/types';
 import { resolveWindowLevel } from '@/lib/volume/math';
 import type { LoadedVolume, Vec3 } from '@/types';
@@ -7,26 +8,24 @@ function isNrrdName(name: string): boolean {
   return name.endsWith('.nrrd') || name.endsWith('.nhdr');
 }
 
-const TYPE_MAP: Record<
-  string,
-  { bytes: number; read: (dv: DataView, o: number, le: boolean) => number }
-> = {
-  'signed char': { bytes: 1, read: (d, o) => d.getInt8(o) },
-  int8: { bytes: 1, read: (d, o) => d.getInt8(o) },
-  'unsigned char': { bytes: 1, read: (d, o) => d.getUint8(o) },
-  uint8: { bytes: 1, read: (d, o) => d.getUint8(o) },
-  uchar: { bytes: 1, read: (d, o) => d.getUint8(o) },
-  short: { bytes: 2, read: (d, o, le) => d.getInt16(o, le) },
-  int16: { bytes: 2, read: (d, o, le) => d.getInt16(o, le) },
-  'unsigned short': { bytes: 2, read: (d, o, le) => d.getUint16(o, le) },
-  uint16: { bytes: 2, read: (d, o, le) => d.getUint16(o, le) },
-  ushort: { bytes: 2, read: (d, o, le) => d.getUint16(o, le) },
-  int: { bytes: 4, read: (d, o, le) => d.getInt32(o, le) },
-  int32: { bytes: 4, read: (d, o, le) => d.getInt32(o, le) },
-  'unsigned int': { bytes: 4, read: (d, o, le) => d.getUint32(o, le) },
-  uint32: { bytes: 4, read: (d, o, le) => d.getUint32(o, le) },
-  float: { bytes: 4, read: (d, o, le) => d.getFloat32(o, le) },
-  double: { bytes: 8, read: (d, o, le) => d.getFloat64(o, le) },
+/** NRRD `type` field values the viewer decodes, and the scalar each one stores. */
+const TYPE_MAP: Record<string, ScalarKind> = {
+  'signed char': 'i8',
+  int8: 'i8',
+  'unsigned char': 'u8',
+  uint8: 'u8',
+  uchar: 'u8',
+  short: 'i16',
+  int16: 'i16',
+  'unsigned short': 'u16',
+  uint16: 'u16',
+  ushort: 'u16',
+  int: 'i32',
+  int32: 'i32',
+  'unsigned int': 'u32',
+  uint32: 'u32',
+  float: 'f32',
+  double: 'f64',
 };
 
 export const nrrdAdapter: ImportFormatAdapter = {
@@ -38,15 +37,7 @@ export const nrrdAdapter: ImportFormatAdapter = {
   async parse(source: ImportSource, onProgress: ProgressFn): Promise<LoadedVolume> {
     const file = source.files.find((f) => isNrrdName(f.name));
     if (!file) throw new Error('No NRRD file found.');
-    // First half of the reading-files budget = disk read; second half (if
-    // applicable) = gunzip.  We don't know yet whether the payload is gzipped
-    // — assume it is to reserve headroom; uncompressed files just jump from
-    // 50% → 100% of the stage when assembling starts.
-    const fsize = file.file.size;
-    onProgress({ stage: 'reading-files', current: 0, total: fsize * 2 });
-    const bytes = await readBlobBytes(file.file, (loaded, total) => {
-      onProgress({ stage: 'reading-files', current: loaded, total: total * 2 });
-    });
+    const bytes = await readWithProgress(file.file, onProgress);
 
     // Header is ASCII, terminated by a blank line (\n\n).
     let headerEnd = -1;
@@ -66,7 +57,11 @@ export const nrrdAdapter: ImportFormatAdapter = {
         break;
       }
     }
-    if (headerEnd < 0) throw new Error('Malformed NRRD header.');
+    // A detached header (.nhdr) is the whole file; its blank line is optional.
+    if (headerEnd < 0) {
+      if (!file.name.endsWith('.nhdr')) throw new Error('Malformed NRRD header.');
+      headerEnd = bytes.length;
+    }
 
     const header = new TextDecoder('latin1').decode(bytes.subarray(0, headerEnd));
     const fields = new Map<string, string>();
@@ -76,8 +71,9 @@ export const nrrdAdapter: ImportFormatAdapter = {
     }
 
     const type = (fields.get('type') ?? '').toLowerCase();
-    const desc = TYPE_MAP[type];
-    if (!desc) throw new Error(`Unsupported NRRD type "${type}".`);
+    const kind = TYPE_MAP[type];
+    if (!kind) throw new Error(`Unsupported NRRD type "${type}".`);
+    const bytesPerVoxel = SCALAR_BYTES[kind];
 
     const sizes = (fields.get('sizes') ?? '').split(/\s+/).map(Number);
     if (sizes.length < 3) throw new Error('NRRD must be 3-dimensional.');
@@ -86,45 +82,67 @@ export const nrrdAdapter: ImportFormatAdapter = {
     const encoding = (fields.get('encoding') ?? 'raw').toLowerCase();
     const le = (fields.get('endian') ?? 'little').toLowerCase() === 'little';
 
-    let payload: Uint8Array = bytes.subarray(headerEnd);
-    if (encoding === 'gzip' || encoding === 'gz') {
-      payload = gunzipBytes(payload, (loaded, total) => {
-        // Second half of reading-files budget — `loaded` is bytes of
-        // compressed input consumed (monotonic, doesn't depend on the
-        // compression ratio).  Shift by fsize so we land in the upper half.
-        onProgress({ stage: 'reading-files', current: fsize + loaded, total: fsize + total });
-      });
-    } else if (encoding !== 'raw') {
+    const count = nx * ny * nz;
+    if (encoding !== 'raw' && encoding !== 'gzip' && encoding !== 'gz') {
       throw new Error(`Unsupported NRRD encoding "${encoding}".`);
     }
+    const compressed = encoding !== 'raw';
 
-    const count = nx * ny * nz;
-    const dv = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+    // Voxels follow the header, or live in the file a "data file" field names
+    // (the usual .nhdr layout), relative to the header.
+    let payload: Uint8Array;
+    let payloadFileSize = file.file.size;
+    const dataFile = fields.get('data file') ?? fields.get('datafile');
+    if (dataFile) {
+      if (dataFile.startsWith('LIST') || dataFile.includes('%') || /\s/.test(dataFile)) {
+        throw new Error(`NRRD data split across several files ("${dataFile}") is not supported.`);
+      }
+      const dataName = (dataFile.split(/[\\/]/).pop() ?? dataFile).toLowerCase();
+      const data = source.files.find((f) => f.name === dataName);
+      if (!data) {
+        throw new Error(
+          `${file.name} keeps its voxels in "${dataName}" — select both files (or their folder).`,
+        );
+      }
+      payloadFileSize = data.file.size;
+      payload = await readWithProgress(data.file, onProgress);
+    } else {
+      payload = bytes.subarray(headerEnd);
+    }
+
+    if (Number(fields.get('line skip') ?? 0) !== 0) {
+      throw new Error('NRRD "line skip" is not supported.');
+    }
+    if (compressed) {
+      payload = await inflateWithProgress(
+        payload,
+        payloadFileSize,
+        onProgress,
+        inflatedSize(count, bytesPerVoxel),
+      );
+    }
+    // "byte skip" counts bytes of the (decompressed) data; -1 means the voxels
+    // are the last bytes of a raw file.
+    const byteSkip = Number(fields.get('byte skip') ?? 0);
+    if (byteSkip === -1 && !compressed) {
+      payload = payload.subarray(Math.max(0, payload.length - count * bytesPerVoxel));
+    } else if (byteSkip > 0) {
+      payload = payload.subarray(byteSkip);
+    } else if (byteSkip !== 0) {
+      throw new Error(`Unsupported NRRD byte skip "${fields.get('byte skip')}".`);
+    }
+
     // Integer sources that fit Int16 stay Int16 (halves memory on big 16-bit
     // volumes); ushort/uint/float widen to Float32.
-    const fitsI16 =
-      desc.bytes === 1 || type === 'short' || type === 'int16' || type === 'signed short';
-    const out: Float32Array | Int16Array = fitsI16
-      ? new Int16Array(count)
-      : new Float32Array(count);
-    // Chunked assembling — emit progress every CHUNK voxels and compute
-    // scalarMin/Max inline so we don't need a second pass over `out`.
-    // 1<<19 = 512K → ~64 emits on a 32M-voxel volume; each emit is a cheap
-    // postMessage from the worker.
-    const CHUNK = 1 << 19;
-    onProgress({ stage: 'assembling', current: 0, total: count });
-    let scalarMin = Number.POSITIVE_INFINITY;
-    let scalarMax = Number.NEGATIVE_INFINITY;
-    for (let off = 0; off < count; off += CHUNK) {
-      const end = Math.min(off + CHUNK, count);
-      for (let i = off; i < end; i++) {
-        const v = desc.read(dv, i * desc.bytes, le);
-        out[i] = v;
-        if (v < scalarMin) scalarMin = v;
-        if (v > scalarMax) scalarMax = v;
-      }
-      onProgress({ stage: 'assembling', current: end, total: count });
-    }
+    const out =
+      bytesPerVoxel === 1 || kind === 'i16' ? new Int16Array(count) : new Float32Array(count);
+    const { min: scalarMin, max: scalarMax } = decodeScalars(
+      new DataView(payload.buffer, payload.byteOffset, payload.byteLength),
+      kind,
+      out,
+      { littleEndian: le },
+      onProgress,
+    );
 
     // spacing from "space directions" or "spacings"
     let spacing: Vec3 = [1, 1, 1];
@@ -154,7 +172,7 @@ export const nrrdAdapter: ImportFormatAdapter = {
         spacing,
         origin: [0, 0, 0],
         dims: [nx, ny, nz],
-        bitsAllocated: desc.bytes * 8,
+        bitsAllocated: bytesPerVoxel * 8,
         rescaleSlope: 1,
         rescaleIntercept: 0,
       },

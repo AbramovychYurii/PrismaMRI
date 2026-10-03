@@ -32,6 +32,9 @@ const SECTIONS: Array<{ label: string; rows: ShortcutRow[] }> = [
       { keys: ['1 / 2 / 3'], action: 'Focus coronal / sagittal / axial' },
       { keys: ['Shift', 'Drag'], action: 'Measure distance (fullscreen)' },
       { keys: ['Right-click'], altKeys: ['Long press'], action: 'Open measure menu' },
+      { keys: ['Tab'], action: 'Focus a panel (and its plane)' },
+      { keys: ['Shift', '← → ↑ ↓'], action: 'Move crosshair (panel focused)' },
+      { keys: ['Shift', 'F10'], altKeys: ['Menu'], action: 'Open measure menu (panel focused)' },
     ],
   },
   {
@@ -147,7 +150,7 @@ const Kbd = styled.kbd`
 const KeyDivider = styled.span`
   font-family: var(--mono);
   font-size: 10px;
-  color: var(--ink-4);
+  color: var(--ink-3);
   user-select: none;
 `;
 

@@ -1,4 +1,5 @@
 import { HistogramBar } from '@/components/dock/HistogramBar';
+import { intensityUnit } from '@/lib/volume/units';
 import { useVolumeStore } from '@/store';
 import styled from 'styled-components';
 
@@ -60,6 +61,8 @@ const SliderHint = styled.div`
 interface SliderRowProps {
   name: 'Window' | 'Level';
   value: number;
+  /** 'HU' for CT; empty where the scalar has no unit to name (MR). */
+  unit: string;
   min: number;
   max: number;
   accent: string;
@@ -67,7 +70,7 @@ interface SliderRowProps {
   onChange: (v: number) => void;
 }
 
-function SliderRow({ name, value, min, max, accent, hint, onChange }: SliderRowProps) {
+function SliderRow({ name, value, unit, min, max, accent, hint, onChange }: SliderRowProps) {
   const span = max - min || 1;
   const fill = `${Math.max(0, Math.min(100, ((value - min) / span) * 100))}%`;
 
@@ -79,12 +82,14 @@ function SliderRow({ name, value, min, max, accent, hint, onChange }: SliderRowP
         <SliderName>{name}</SliderName>
         <SliderValue>
           {Math.round(value)}
-          <HuLabel>HU</HuLabel>
+          {unit && <HuLabel>{unit}</HuLabel>}
         </SliderValue>
       </SliderLabelRow>
       <input
         type="range"
         className="wl-slider"
+        aria-label={name}
+        aria-valuetext={unit ? `${Math.round(value)} ${unit}` : String(Math.round(value))}
         min={min}
         max={max}
         step={Math.max(1, Math.round(span / 1000))}
@@ -111,6 +116,7 @@ export function DisplayCell() {
   const scalarMin = volume ? Math.floor(volume.scalarMin) : -1000;
   const scalarMax = volume ? Math.ceil(volume.scalarMax) : 3000;
   const fullSpan = Math.max(1, scalarMax - scalarMin);
+  const unit = intensityUnit(volume?.meta.modality);
 
   // Drafts drive the 3D contrast live (cheap uniform); the 2D slice recompute
   // is debounced off wlDraft by useWindowLevel (heavy for big volumes).
@@ -127,6 +133,7 @@ export function DisplayCell() {
       <SliderRow
         name="Window"
         value={wlDraft.window}
+        unit={unit}
         min={1}
         max={fullSpan}
         accent="var(--amber)"
@@ -136,6 +143,7 @@ export function DisplayCell() {
       <SliderRow
         name="Level"
         value={wlDraft.level}
+        unit={unit}
         min={scalarMin}
         max={scalarMax}
         accent="var(--teal)"

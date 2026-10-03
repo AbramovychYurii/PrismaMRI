@@ -137,3 +137,28 @@ export function fracToVoxel(
     [vertical]: toVoxel(verticalFlipped ? 1 - fy : fy, vertical),
   };
 }
+
+export type ScreenDirection = 'left' | 'right' | 'up' | 'down';
+
+/**
+ * The cursor one voxel along `direction` *as the plane is drawn*: right is the
+ * horizontal axis increasing, up is towards the top of the image — which is
+ * the vertical axis increasing on planes drawn bottom-up (head-up anatomy).
+ * The slice index is untouched; the result is clamped to the volume.
+ */
+export function stepInPlane(
+  plane: SlicePlane,
+  cursor: VolumeCursor,
+  dims: AxisTriple,
+  direction: ScreenDirection,
+): VolumeCursor {
+  const { horizontal, vertical, verticalFlipped } = PLANE_GEOMETRY[plane];
+  const next = { ...cursor };
+  if (direction === 'left' || direction === 'right') {
+    next[horizontal] += direction === 'right' ? 1 : -1;
+  } else {
+    const towardsTop = direction === 'up';
+    next[vertical] += towardsTop === verticalFlipped ? 1 : -1;
+  }
+  return clampToDims(next, dims);
+}

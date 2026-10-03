@@ -40,6 +40,7 @@ export interface WorkerDoneMsg {
     threshold: number;
     sourceRange: PreparedVolumeFor3D['sourceRange'];
     sourceDims: PreparedVolumeFor3D['sourceDims'];
+    occupancy: ArrayBuffer;
   };
   histogram: {
     bins: ArrayBuffer;
@@ -58,6 +59,8 @@ export interface WorkerErrorMsg {
 export interface WorkerSeriesMsg {
   type: 'series';
   series: SeriesChoice[];
+  /** The source with archives expanded — File handles, so posting it copies nothing. */
+  source: ImportSource;
 }
 
 export type WorkerResponse = WorkerProgressMsg | WorkerDoneMsg | WorkerErrorMsg | WorkerSeriesMsg;

@@ -10,8 +10,9 @@
 import { SeriesPickerModal } from '@/components/import/SeriesPickerModal';
 import { ExamplesSection } from '@/components/layout/ExamplesSection';
 import { APP_NAME } from '@/constants';
-import { useViewerActions } from '@/hooks';
+import { useViewerActions } from '@/hooks/ViewerActionsContext';
 import { type FsEntry, collectFilesFromEntry } from '@/lib/import/scan-folder';
+import { loadViewerPage } from '@/pages/loadViewerPage';
 import { useVolumeStore } from '@/store';
 import { FolderOpen, Github } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -94,6 +95,12 @@ export function ImportOverlay() {
   const loading = useVolumeStore((s) => s.loading);
   const { openFiles, openFolder, openFile, cancelLoad, pendingSeries, resolveSeriesChoice } =
     useViewerActions();
+
+  // Fetch the viewer chunk while the user picks a file, so the route swap
+  // after a load never waits on the network.
+  useEffect(() => {
+    void loadViewerPage();
+  }, []);
 
   // Esc cancels an in-progress load — mirrors the Cancel button.  Scoped to
   // while a load is active so it can't fire otherwise; the global Esc handler
@@ -201,9 +208,19 @@ export function ImportOverlay() {
                 {loading.active ? formatLoadingTitle(loading) : 'Drop MRI to begin'}
               </LoadingTitle>
 
-              <LoadingSubText aria-hidden="true">
-                {loading.active ? `${loading.percent}%` : 'DICOM · NIfTI · MHA · NRRD · ZIP'}
-              </LoadingSubText>
+              {loading.active ? (
+                <LoadingSubText
+                  role="progressbar"
+                  aria-label="Loading progress"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={loading.percent}
+                >
+                  {loading.percent}%
+                </LoadingSubText>
+              ) : (
+                <LoadingSubText aria-hidden="true">DICOM · NIfTI · MHA · NRRD · ZIP</LoadingSubText>
+              )}
 
               <ButtonsRow>
                 {loading.active ? (

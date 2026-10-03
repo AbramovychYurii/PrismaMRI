@@ -1,6 +1,6 @@
 import type { ImportSource, SeriesChoice } from '@/lib/import/types';
 import type { ImportProgress, LoadedVolume, PreparedVolumeFor3D, VolumeHistogram } from '@/types';
-import type { WorkerResponse } from '@/workers/volume/types';
+import type { WorkerDoneMsg, WorkerRequest, WorkerResponse } from '@/workers/volume/types';
 
 export interface LoadResult {
   volume: LoadedVolume;
@@ -14,7 +14,37 @@ export interface LoadResult {
  */
 export type LoadWorkerResult =
   | { kind: 'volume'; result: LoadResult }
-  | { kind: 'series-choice'; series: SeriesChoice[] };
+  | { kind: 'series-choice'; series: SeriesChoice[]; source: ImportSource };
+
+/** Re-wraps the transferred buffers of a `done` message in their typed arrays. */
+function resultFromDone(msg: WorkerDoneMsg): LoadResult {
+  return {
+    volume: {
+      voxels: msg.voxelKind === 'i16' ? new Int16Array(msg.voxels) : new Float32Array(msg.voxels),
+      meta: msg.meta,
+      scalarMin: msg.scalarMin,
+      scalarMax: msg.scalarMax,
+      windowLevel: msg.windowLevel,
+      formatId: msg.formatId,
+    },
+    prepared3D: {
+      data: new Uint8Array(msg.prepared.data),
+      dims: msg.prepared.dims,
+      spacing: msg.prepared.spacing,
+      clim: msg.prepared.clim,
+      threshold: msg.prepared.threshold,
+      sourceRange: msg.prepared.sourceRange,
+      sourceDims: msg.prepared.sourceDims,
+      occupancy: new Uint8Array(msg.prepared.occupancy),
+    },
+    histogram: {
+      bins: new Uint32Array(msg.histogram.bins),
+      min: msg.histogram.min,
+      max: msg.histogram.max,
+      count: msg.histogram.count,
+    },
+  };
+}
 
 /**
  * Run a folder/file selection through the volume worker. Heavy parsing and
@@ -48,63 +78,49 @@ export function loadVolumeInWorker(
     };
     signal?.addEventListener('abort', onAbort, { once: true });
 
-    worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
-      const msg = e.data;
-      if (msg.type === 'progress') {
-        onProgress(msg.progress, msg.percent);
-        return;
-      }
-      if (msg.type === 'error') {
-        cleanup();
-        worker.terminate();
-        reject(new Error(msg.message));
-        return;
-      }
-      if (msg.type === 'series') {
-        cleanup();
-        worker.terminate();
-        resolve({ kind: 'series-choice', series: msg.series });
-        return;
-      }
-      // done
-      const volume: LoadedVolume = {
-        voxels: msg.voxelKind === 'i16' ? new Int16Array(msg.voxels) : new Float32Array(msg.voxels),
-        meta: msg.meta,
-        scalarMin: msg.scalarMin,
-        scalarMax: msg.scalarMax,
-        windowLevel: msg.windowLevel,
-        formatId: msg.formatId,
-      };
-      const prepared3D: PreparedVolumeFor3D = {
-        data: new Uint8Array(msg.prepared.data),
-        dims: msg.prepared.dims,
-        spacing: msg.prepared.spacing,
-        clim: msg.prepared.clim,
-        threshold: msg.prepared.threshold,
-        sourceRange: msg.prepared.sourceRange,
-        sourceDims: msg.prepared.sourceDims,
-      };
-      const histogram: VolumeHistogram = {
-        bins: new Uint32Array(msg.histogram.bins),
-        min: msg.histogram.min,
-        max: msg.histogram.max,
-        count: msg.histogram.count,
-      };
+    const settle = () => {
       cleanup();
       worker.terminate();
-      resolve({ kind: 'volume', result: { volume, prepared3D, histogram } });
+    };
+
+    worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
+      const msg = e.data;
+      switch (msg.type) {
+        case 'progress':
+          onProgress(msg.progress, msg.percent);
+          return;
+        case 'error':
+          settle();
+          reject(new Error(msg.message));
+          return;
+        case 'series':
+          settle();
+          resolve({ kind: 'series-choice', series: msg.series, source: msg.source });
+          return;
+        case 'done':
+          settle();
+          resolve({ kind: 'volume', result: resultFromDone(msg) });
+          return;
+        default: {
+          const unexpected: never = msg;
+          settle();
+          reject(new Error(`Unexpected volume worker message: ${JSON.stringify(unexpected)}`));
+        }
+      }
     };
 
     worker.onerror = (e) => {
-      cleanup();
-      worker.terminate();
+      settle();
       reject(new Error(e.message || 'Volume worker crashed.'));
     };
 
-    worker.postMessage({ type: 'load', source, seriesKey } satisfies {
-      type: 'load';
-      source: ImportSource;
-      seriesKey?: string;
-    });
+    // A reply that cannot be deserialised would otherwise never settle the
+    // promise, leaving the import screen on its progress bar for good.
+    worker.onmessageerror = () => {
+      settle();
+      reject(new Error('Could not read the volume worker reply.'));
+    };
+
+    worker.postMessage({ type: 'load', source, seriesKey } satisfies WorkerRequest);
   });
 }

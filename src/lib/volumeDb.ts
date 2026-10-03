@@ -76,6 +76,8 @@ interface StoredRecord {
   p3dThreshold: number;
   p3dSourceRange: [number, number];
   p3dSourceDims: Vec3;
+  /** Absent in records written before the grid moved to the worker. */
+  p3dOccupancy?: ArrayBuffer;
 }
 
 function openDb(): Promise<IDBDatabase> {
@@ -92,12 +94,23 @@ function openDb(): Promise<IDBDatabase> {
   });
 }
 
-/** Copy a typed array's bytes to avoid detached-buffer issues. */
-function copyBuffer(ta: {
+/**
+ * The bytes of a typed array as an ArrayBuffer of their own, for the record.
+ *
+ * `put` structured-clones the record before it returns, so a view that spans
+ * its whole buffer can be handed over as is — later changes to the live volume
+ * cannot reach the stored copy. Slicing it first only doubled the transient
+ * memory of every save (~650 MB on a full-body CT). A partial view is sliced,
+ * so the record never carries bytes outside it.
+ */
+export function recordBuffer(ta: {
   buffer: ArrayBufferLike;
   byteOffset: number;
   byteLength: number;
 }): ArrayBuffer {
+  if (ta.byteOffset === 0 && ta.byteLength === ta.buffer.byteLength) {
+    return ta.buffer as ArrayBuffer;
+  }
   return ta.buffer.slice(ta.byteOffset, ta.byteOffset + ta.byteLength) as ArrayBuffer;
 }
 
@@ -184,30 +197,31 @@ export async function saveVolume(
       return { stored: false, bytes, reason: 'too-large' };
     }
 
-    // Only now copy the buffers. At full-body size these duplicate ~500 MB, so
-    // paying for them before knowing there is room would be the worst of both
-    // worlds: a memory spike *and* a write that fails anyway.
+    // Only now build the record: `put` clones it, which at full-body size is
+    // ~650 MB, so paying for that before knowing there is room would be the
+    // worst of both worlds — a memory spike *and* a write that fails anyway.
     const record: StoredRecord = {
       id: tabKey,
       timestamp: Date.now(),
       formatId: volume.formatId,
       voxelType: volume.voxels instanceof Float32Array ? 'float32' : 'int16',
-      voxels: copyBuffer(volume.voxels),
+      voxels: recordBuffer(volume.voxels),
       scalarMin: volume.scalarMin,
       scalarMax: volume.scalarMax,
       windowLevel: volume.windowLevel,
       meta: volume.meta,
-      histBins: copyBuffer(histogram.bins),
+      histBins: recordBuffer(histogram.bins),
       histMin: histogram.min,
       histMax: histogram.max,
       histCount: histogram.count,
-      p3dData: copyBuffer(prepared3D.data),
+      p3dData: recordBuffer(prepared3D.data),
       p3dDims: prepared3D.dims,
       p3dSpacing: prepared3D.spacing,
       p3dClim: prepared3D.clim,
       p3dThreshold: prepared3D.threshold,
       p3dSourceRange: prepared3D.sourceRange,
       p3dSourceDims: prepared3D.sourceDims,
+      p3dOccupancy: prepared3D.occupancy ? recordBuffer(prepared3D.occupancy) : undefined,
     };
 
     await new Promise<void>((resolve, reject) => {
@@ -264,6 +278,7 @@ export async function loadVolume(): Promise<{
           threshold: r.p3dThreshold,
           sourceRange: r.p3dSourceRange,
           sourceDims: r.p3dSourceDims,
+          occupancy: r.p3dOccupancy ? new Uint8Array(r.p3dOccupancy) : undefined,
         },
         histogram: {
           bins: new Uint32Array(r.histBins),

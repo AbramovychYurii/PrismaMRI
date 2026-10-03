@@ -5,7 +5,7 @@
  * Picking a series re-assembles it from the retained files via `switchSeries`.
  */
 
-import { useViewerActions } from '@/hooks';
+import { useViewerActions } from '@/hooks/ViewerActionsContext';
 import type { SeriesChoice } from '@/lib/import/types';
 import { useVolumeStore } from '@/store';
 import { ChevronDown, Layers } from 'lucide-react';

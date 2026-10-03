@@ -252,7 +252,8 @@ const handleOverviewGrid: Handler = ({ msg, ok, fail }) => {
   const state = requireLoaded(fail);
   if (!state) return;
   const plane = requirePlane(msg);
-  const count = clamp(optionalNumber(msg, 'count', 4), 2, 4);
+  // The range the MCP tool advertises (and the radiology skill asks for, 6).
+  const count = clamp(optionalNumber(msg, 'count', 5), 2, 8);
   const { volume, wl } = state;
   const total = sliceCount(volume.meta.dims, plane);
   const half = slabHalfSlices(plane, OVERVIEW_GRID_SLAB_MM, volume.meta.spacing);

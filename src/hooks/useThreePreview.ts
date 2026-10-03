@@ -1,12 +1,18 @@
 import { ThreePreview } from '@/lib/volume/three-preview';
 import { useVolumeStore } from '@/store';
 import type { SlicePlane } from '@/types';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 /** Fallback plane when no panel has been clicked yet. */
 const DEFAULT_PLANE: SlicePlane = 'coronal';
 
 type PreviewRef = React.MutableRefObject<ThreePreview | null>;
+
+/**
+ * What the stage can show: the 3-D view, nothing because this browser has no
+ * WebGL 2, or nothing for now because the GPU dropped the context.
+ */
+export type PreviewStatus = 'ready' | 'unavailable' | 'context-lost';
 
 /**
  * The store is declarative; ThreePreview is an imperative Three.js scene. Every
@@ -20,15 +26,29 @@ type PreviewRef = React.MutableRefObject<ThreePreview | null>;
  * subject, so a new field has an obvious home.
  */
 
-/** Owns the instance: builds it on mount, tears it down on unmount. */
-function usePreviewInstance(canvasRef: React.RefObject<HTMLCanvasElement | null>): PreviewRef {
+/**
+ * Owns the instance: builds it on mount, tears it down on unmount. Without
+ * WebGL 2 the renderer throws on construction; that is caught and reported as
+ * a status, since thrown from an effect it would unmount the whole app.
+ */
+function usePreviewInstance(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   const previewRef = useRef<ThreePreview | null>(null);
   const setPreviewInstance = useVolumeStore((s) => s.setPreviewInstance);
+  const [status, setStatus] = useState<PreviewStatus>('ready');
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const preview = new ThreePreview(canvas);
+    let preview: ThreePreview;
+    try {
+      preview = new ThreePreview(canvas);
+    } catch (err) {
+      console.warn('[3d] WebGL 2 is unavailable:', err);
+      setStatus('unavailable');
+      return;
+    }
+    preview.onContextChange = (lost) => setStatus(lost ? 'context-lost' : 'ready');
+    setStatus('ready');
     previewRef.current = preview;
     // Expose the instance so the MCP bridge can capture it + drive markers.
     setPreviewInstance(preview);
@@ -44,7 +64,7 @@ function usePreviewInstance(canvasRef: React.RefObject<HTMLCanvasElement | null>
     };
   }, [canvasRef, setPreviewInstance]);
 
-  return previewRef;
+  return { previewRef, status };
 }
 
 /** Everything that only means something once a volume is loaded. */
@@ -53,8 +73,12 @@ function useVolumeSync(previewRef: PreviewRef): void {
   const wlDraft = useVolumeStore((s) => s.wlDraft);
   const renderPreset = useVolumeStore((s) => s.renderPreset);
 
+  // Built with the preset the effect below is about to apply, read without
+  // subscribing: a preset change must swap colormaps, not rebuild the mesh.
   useEffect(() => {
-    if (prepared3D && previewRef.current) previewRef.current.setVolume(prepared3D);
+    if (prepared3D && previewRef.current) {
+      previewRef.current.setVolume(prepared3D, useVolumeStore.getState().renderPreset);
+    }
   }, [prepared3D, previewRef]);
 
   // Window/Level → 3-D contrast, live off the draft (cheap uniform update).
@@ -145,13 +169,17 @@ function useCameraCommands(previewRef: PreviewRef): void {
 /**
  * Binds a ThreePreview instance to a canvas and syncs it with the store.
  * Returns a stable ref to the live instance so callers can invoke imperative
- * methods (e.g. exportPNG) without routing through the store.
+ * methods (e.g. exportPNG) without routing through the store, and the status
+ * the stage shows when there is no 3-D view to draw.
  */
-export function useThreePreview(canvasRef: React.RefObject<HTMLCanvasElement | null>): PreviewRef {
-  const previewRef = usePreviewInstance(canvasRef);
+export function useThreePreview(canvasRef: React.RefObject<HTMLCanvasElement | null>): {
+  previewRef: PreviewRef;
+  status: PreviewStatus;
+} {
+  const { previewRef, status } = usePreviewInstance(canvasRef);
   useVolumeSync(previewRef);
   useSceneSync(previewRef);
   useAnnotationSync(previewRef);
   useCameraCommands(previewRef);
-  return previewRef;
+  return { previewRef, status };
 }

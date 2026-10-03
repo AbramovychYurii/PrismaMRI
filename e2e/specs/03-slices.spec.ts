@@ -206,10 +206,9 @@ test.describe('Slice panels', () => {
     // Right-click triggers the context menu.
     await panel.click({ button: 'right', position: { x: 80, y: 80 } });
 
-    // MeasureMenu renders <button>s (not role=menuitem). The first item is
-    // "Measure from here".
+    // MeasureMenu is a role=menu of menuitems; the first is "Measure from here".
     await expect(
-      page.getByRole('button', { name: /measure from here/i }),
+      page.getByRole('menuitem', { name: /measure from here/i }),
     ).toBeVisible({ timeout: 5_000 });
   });
 
@@ -220,13 +219,13 @@ test.describe('Slice panels', () => {
     await panel.click({ button: 'right', position: { x: 80, y: 80 } });
 
     await expect(
-      page.getByRole('button', { name: /measure from here/i }),
+      page.getByRole('menuitem', { name: /measure from here/i }),
     ).toBeVisible({ timeout: 5_000 });
 
     await page.keyboard.press('Escape');
 
     await expect(
-      page.getByRole('button', { name: /measure from here/i }),
+      page.getByRole('menuitem', { name: /measure from here/i }),
     ).not.toBeVisible({ timeout: 3_000 });
   });
 });

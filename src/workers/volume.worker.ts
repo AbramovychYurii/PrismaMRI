@@ -1,4 +1,5 @@
 import { loadVolumeFromSource } from '@/lib/import/load-volume';
+import { computeOccupancy } from '@/lib/volume/occupancy';
 import { prepareVolumeFor3D } from '@/lib/volume/preview-3d';
 /// <reference lib="webworker" />
 import type { ImportProgress } from '@/types';
@@ -29,7 +30,7 @@ ctx.onmessage = async (e: MessageEvent<WorkerRequest>) => {
   try {
     const outcome = await loadVolumeFromSource(req.source, emit, req.seriesKey);
     if (outcome.kind === 'series-choice') {
-      post({ type: 'series', series: outcome.series });
+      post({ type: 'series', series: outcome.series, source: outcome.source });
       return;
     }
     const volume = outcome.volume;
@@ -57,6 +58,9 @@ ctx.onmessage = async (e: MessageEvent<WorkerRequest>) => {
         message: 'Building 3D texture…',
       });
     });
+    // Empty-space grid for the ray marcher: a full scan of the texture, so it
+    // runs here rather than on the main thread while the viewer mounts.
+    const occupancy = computeOccupancy(prepared.data, prepared.dims);
     emit({ stage: 'preparing-3d', current: 100, total: 100, message: 'Building 3D texture…' });
 
     const voxelsBuf = volume.voxels.buffer;
@@ -81,6 +85,7 @@ ctx.onmessage = async (e: MessageEvent<WorkerRequest>) => {
           threshold: prepared.threshold,
           sourceRange: prepared.sourceRange,
           sourceDims: prepared.sourceDims,
+          occupancy: occupancy.buffer as ArrayBuffer,
         },
         histogram: {
           bins: histBuf as ArrayBuffer,
@@ -89,7 +94,12 @@ ctx.onmessage = async (e: MessageEvent<WorkerRequest>) => {
           count: hist.count,
         },
       },
-      [voxelsBuf as ArrayBuffer, preparedBuf as ArrayBuffer, histBuf as ArrayBuffer],
+      [
+        voxelsBuf as ArrayBuffer,
+        preparedBuf as ArrayBuffer,
+        histBuf as ArrayBuffer,
+        occupancy.buffer as ArrayBuffer,
+      ],
     );
   } catch (err) {
     post({
