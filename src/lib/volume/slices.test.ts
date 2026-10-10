@@ -198,7 +198,10 @@ describe('cache byte budget', () => {
     // Four more push past the budget; the oldest go, the newest stay.
     const extra = Array.from({ length: 4 }, (_, i) => refetch(volume, capacity + i));
     expect(refetch(volume, capacity + 3)).toBe(extra[3]);
-    expect(refetch(volume, 0)).not.toBe(stored[0]);
+    // Not `.not.toBe`: on a miss Vitest deep-compares the two images to suggest
+    // toStrictEqual, and a re-extracted slice is equal pixel for pixel — 1 MiB
+    // compared element by element took ~3 s and timed the test out on CI.
+    expect(refetch(volume, 0) === stored[0]).toBe(false);
   });
 
   it('caches far more than 64 slices when they are small', () => {
