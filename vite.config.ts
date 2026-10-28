@@ -110,22 +110,12 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Pre-cache all build assets; skip large binary example files.
+        // Pre-cache all build assets (the bundled IBM Plex woff2 files
+        // included); skip large binary example files. No runtime caching:
+        // DICOM/NIfTI volumes loaded by the user come from the local file
+        // system (File API) and never hit the network.
         globPatterns: ["**/*.{js,css,html,svg,png,ico,woff2}"],
         globIgnores: ["**/examples/**"],
-        // Never cache DICOM/NIfTI volumes loaded by the user — they come from
-        // the local file system (File API) and never hit the network.
-        runtimeCaching: [
-          {
-            // Google Fonts — cache-first, 1-year TTL.
-            urlPattern: /^https:\/\/fonts\.(googleapis|gstatic)\.com\/.*/i,
-            handler: "CacheFirst",
-            options: {
-              cacheName: "google-fonts",
-              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 365 },
-            },
-          },
-        ],
       },
     }),
   ],

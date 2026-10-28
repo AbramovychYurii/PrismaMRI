@@ -178,7 +178,7 @@ export function ImportOverlay() {
             <DisclaimerText>
               For research and educational use only — not a medical device.
               <br />
-              No upload, no cloud, no telemetry. Data never leaves the browser.
+              Three synchronized planes, live 3D and optional AI-assisted analysis.
             </DisclaimerText>
           </LeftCol>
 
