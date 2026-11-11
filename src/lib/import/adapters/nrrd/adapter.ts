@@ -1,11 +1,40 @@
 import { SCALAR_BYTES, type ScalarKind, decodeScalars, inflatedSize } from '@/lib/import/decode';
 import { inflateWithProgress, readWithProgress } from '@/lib/import/read-file';
-import type { ImportFormatAdapter, ImportSource, ProgressFn } from '@/lib/import/types';
+import type {
+  ImportFormatAdapter,
+  ImportSource,
+  ParsedVolume,
+  ProgressFn,
+} from '@/lib/import/types';
 import { resolveWindowLevel } from '@/lib/volume/math';
-import type { LoadedVolume, Vec3 } from '@/types';
+import type { AxisDirections } from '@/lib/volume/orientation';
+import type { Vec3 } from '@/types';
 
 function isNrrdName(name: string): boolean {
   return name.endsWith('.nrrd') || name.endsWith('.nhdr');
+}
+
+/**
+ * Sign that turns each component of a `space` frame into LPS, for the
+ * anatomical spaces NRRD names. `scanner-xyz` and the plain 3D-*-handed
+ * spaces say nothing about the patient, so they are absent.
+ */
+const SPACE_TO_LPS: Record<string, Vec3> = {
+  'left-posterior-superior': [1, 1, 1],
+  lps: [1, 1, 1],
+  'right-anterior-superior': [-1, -1, 1],
+  ras: [-1, -1, 1],
+  'left-anterior-superior': [1, -1, 1],
+  las: [1, -1, 1],
+};
+
+/** LPS direction of each axis, when `space` is anatomical and `space directions` lists three. */
+function axisDirections(space: string | undefined, vecs: number[][]): AxisDirections | undefined {
+  const sign = space ? SPACE_TO_LPS[space.toLowerCase()] : undefined;
+  if (!sign || vecs.length !== 3) return undefined;
+  if (vecs.some((v) => v.length !== 3 || v.some((n) => !Number.isFinite(n)))) return undefined;
+  const lps = (v: number[]): Vec3 => [v[0] * sign[0], v[1] * sign[1], v[2] * sign[2]];
+  return [lps(vecs[0]), lps(vecs[1]), lps(vecs[2])];
 }
 
 /** NRRD `type` field values the viewer decodes, and the scalar each one stores. */
@@ -34,7 +63,7 @@ export const nrrdAdapter: ImportFormatAdapter = {
   matches(source) {
     return source.files.some((f) => isNrrdName(f.name));
   },
-  async parse(source: ImportSource, onProgress: ProgressFn): Promise<LoadedVolume> {
+  async parse(source: ImportSource, onProgress: ProgressFn): Promise<ParsedVolume> {
     const file = source.files.find((f) => isNrrdName(f.name));
     if (!file) throw new Error('No NRRD file found.');
     const bytes = await readWithProgress(file.file, onProgress);
@@ -146,9 +175,11 @@ export const nrrdAdapter: ImportFormatAdapter = {
 
     // spacing from "space directions" or "spacings"
     let spacing: Vec3 = [1, 1, 1];
+    let directions: AxisDirections | undefined;
     const sd = fields.get('space directions');
     if (sd) {
       const vecs = [...sd.matchAll(/\(([^)]+)\)/g)].map((mm) => mm[1].split(',').map(Number));
+      directions = axisDirections(fields.get('space'), vecs);
       if (vecs.length >= 3) {
         spacing = [
           Math.hypot(...vecs[0]) || 1,
@@ -180,6 +211,7 @@ export const nrrdAdapter: ImportFormatAdapter = {
       scalarMax,
       windowLevel: resolveWindowLevel(scalarMin, scalarMax),
       formatId: 'nrrd',
+      axisDirections: directions,
     };
   },
 };

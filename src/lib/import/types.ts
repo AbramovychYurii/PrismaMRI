@@ -1,3 +1,4 @@
+import type { AxisDirections } from '@/lib/volume/orientation';
 import type { ImportProgress, LoadedVolume } from '@/types';
 
 export interface ImportFile {
@@ -33,6 +34,15 @@ export interface SeriesChoice {
   orientation?: 'Axial' | 'Sagittal' | 'Coronal' | 'Oblique';
 }
 
+/**
+ * An adapter's volume, voxels still in the order the file stores them, with
+ * where those axes point in the patient when the header records it. The
+ * loader turns it into canonical order (see reorientToCanonical).
+ */
+export interface ParsedVolume extends LoadedVolume {
+  axisDirections?: AxisDirections;
+}
+
 export interface ImportFormatAdapter {
   id: LoadedVolume['formatId'];
   label: string;
@@ -55,5 +65,5 @@ export interface ImportFormatAdapter {
     source: ImportSource,
     onProgress: ProgressFn,
     seriesKey?: string,
-  ) => Promise<LoadedVolume>;
+  ) => Promise<ParsedVolume>;
 }

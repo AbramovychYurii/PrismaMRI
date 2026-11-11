@@ -1,5 +1,6 @@
 import { importFormatAdapters } from '@/lib/import/adapters';
 import type { ImportFile, ImportSource, ProgressFn, SeriesChoice } from '@/lib/import/types';
+import { reorientToCanonical } from '@/lib/volume/orientation';
 import type { LoadedVolume } from '@/types';
 import { unzipSync } from 'fflate';
 
@@ -74,7 +75,8 @@ export async function loadVolumeFromSource(
   }
 
   onProgress({ stage: 'parsing-headers', message: `Reading ${adapter.label}…` });
-  const volume = await adapter.parse(source, onProgress, seriesKey);
+  const { axisDirections, ...parsed } = await adapter.parse(source, onProgress, seriesKey);
+  const volume = reorientToCanonical(parsed, axisDirections);
   onProgress({ stage: 'done', message: 'Volume ready', current: 1, total: 1 });
   return { kind: 'volume', volume };
 }

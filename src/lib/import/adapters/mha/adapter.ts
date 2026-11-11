@@ -1,8 +1,14 @@
 import { SCALAR_BYTES, type ScalarKind, decodeScalars, inflatedSize } from '@/lib/import/decode';
 import { inflateWithProgress, readWithProgress } from '@/lib/import/read-file';
-import type { ImportFormatAdapter, ImportSource, ProgressFn } from '@/lib/import/types';
+import type {
+  ImportFormatAdapter,
+  ImportSource,
+  ParsedVolume,
+  ProgressFn,
+} from '@/lib/import/types';
 import { resolveWindowLevel } from '@/lib/volume/math';
-import type { LoadedVolume, Vec3 } from '@/types';
+import type { AxisDirections } from '@/lib/volume/orientation';
+import type { Vec3 } from '@/types';
 
 function isMhaName(name: string): boolean {
   return name.endsWith('.mha') || name.endsWith('.mhd');
@@ -20,13 +26,30 @@ const ELEMENT_TYPE: Record<string, ScalarKind> = {
   MET_DOUBLE: 'f64',
 };
 
+/**
+ * LPS direction of each axis from the direction-cosine matrix. MetaImage's
+ * physical space is ITK's, which is LPS, and ITK writes the matrix one axis
+ * per triple: the first three values are where axis 0 points. `Rotation` and
+ * `Orientation` are older names for the same field.
+ */
+function axisDirections(fields: Map<string, string>): AxisDirections | undefined {
+  const raw = fields.get('TransformMatrix') ?? fields.get('Rotation') ?? fields.get('Orientation');
+  const m = (raw ?? '').split(/\s+/).map(Number);
+  if (m.length !== 9 || m.some((n) => !Number.isFinite(n))) return undefined;
+  return [
+    [m[0], m[1], m[2]],
+    [m[3], m[4], m[5]],
+    [m[6], m[7], m[8]],
+  ];
+}
+
 export const mhaAdapter: ImportFormatAdapter = {
   id: 'mha',
   label: 'MHA / MHD',
   matches(source) {
     return source.files.some((f) => isMhaName(f.name));
   },
-  async parse(source: ImportSource, onProgress: ProgressFn): Promise<LoadedVolume> {
+  async parse(source: ImportSource, onProgress: ProgressFn): Promise<ParsedVolume> {
     const file = source.files.find((f) => isMhaName(f.name));
     if (!file) throw new Error('No MHA/MHD file found.');
     const bytes = await readWithProgress(file.file, onProgress);
@@ -127,6 +150,7 @@ export const mhaAdapter: ImportFormatAdapter = {
       scalarMax,
       windowLevel: resolveWindowLevel(scalarMin, scalarMax),
       formatId: 'mha',
+      axisDirections: axisDirections(fields),
     };
   },
 };

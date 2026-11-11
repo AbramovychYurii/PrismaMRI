@@ -8,11 +8,13 @@ import type {
   ImportFile,
   ImportFormatAdapter,
   ImportSource,
+  ParsedVolume,
   ProgressFn,
   SeriesChoice,
 } from '@/lib/import/types';
 import { resolveWindowLevel } from '@/lib/volume/math';
-import type { LoadedVolume, Vec3 } from '@/types';
+import { type AxisDirections, cross } from '@/lib/volume/orientation';
+import type { Vec3 } from '@/types';
 
 function isDicomName(name: string): boolean {
   return name.endsWith('.dcm') || name.endsWith('.dicom') || name.endsWith('.ima');
@@ -199,7 +201,7 @@ export const dicomAdapter: ImportFormatAdapter = {
     source: ImportSource,
     onProgress: ProgressFn,
     seriesKey?: string,
-  ): Promise<LoadedVolume> {
+  ): Promise<ParsedVolume> {
     const candidates = await collectCandidates(source);
     if (candidates.length === 0) throw new Error('No DICOM files found in selection.');
 
@@ -293,9 +295,30 @@ export const dicomAdapter: ImportFormatAdapter = {
       scalarMax,
       windowLevel: resolveWindowLevel(scalarMin, scalarMax, first.windowCenter, first.windowWidth),
       formatId: 'dicom',
+      axisDirections: axisDirections(sorted),
     };
   },
 };
+
+/**
+ * Patient direction of the assembled volume's axes: columns run along the row
+ * cosine, rows along the column cosine, and slices — sorted by position along
+ * the normal of the two (sortDicomSlices) — along that normal.
+ *
+ * Undefined when any slice lacks a position, or holds several frames: the
+ * stacking order then came from slice location or instance number, or from
+ * within a file, and is not known to run along the normal.
+ */
+function axisDirections(slices: { tags: DicomTags }[]): AxisDirections | undefined {
+  const iop = slices[0]?.tags.imageOrientationPatient;
+  if (!iop || iop.length < 6) return undefined;
+  if (slices.some((s) => !s.tags.imagePositionPatient || s.tags.numberOfFrames > 1)) {
+    return undefined;
+  }
+  const row: Vec3 = [iop[0], iop[1], iop[2]];
+  const col: Vec3 = [iop[3], iop[4], iop[5]];
+  return [row, col, cross(row, col)];
+}
 
 function formatAcquired(date?: string, time?: string): string | undefined {
   if (!date || date.length < 8) return undefined;

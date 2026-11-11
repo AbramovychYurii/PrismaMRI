@@ -30,6 +30,15 @@ describe('parseNiftiHeader', () => {
         magic: 'n+1',
         sclSlope: 2,
         sclInter: -7,
+        qformCode: 0,
+        sformCode: 0,
+        quatern: [0, 0, 0],
+        qfac: 1,
+        srow: [
+          [0, 0, 0],
+          [0, 0, 0],
+          [0, 0, 0],
+        ],
       });
     }
   });

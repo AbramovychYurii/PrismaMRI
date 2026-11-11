@@ -76,6 +76,10 @@ export interface NiftiOptions {
   voxOffset?: number;
   /** 'n+1' (single file) or 'ni1' (.hdr/.img pair). */
   magic?: 'n+1' | 'ni1';
+  /** Sets sform_code 1 and srow_x/y/z to these rows (RAS, 4 values each). */
+  sform?: [number[], number[], number[]];
+  /** Sets qform_code 1, quatern_b/c/d and pixdim[0] (qfac, default 1). */
+  qform?: { quatern: [number, number, number]; qfac?: number };
 }
 
 /** A NIfTI-1 header, followed by the voxels when `voxOffset` > 0. */
@@ -99,6 +103,17 @@ export function niftiBytes(o: NiftiOptions): Uint8Array {
   view.setFloat32(108, voxOffset, le);
   view.setFloat32(112, o.slope ?? 1, le);
   view.setFloat32(116, o.intercept ?? 0, le);
+  if (o.qform) {
+    view.setFloat32(76, o.qform.qfac ?? 1, le);
+    view.setInt16(252, 1, le);
+    o.qform.quatern.forEach((q, i) => view.setFloat32(256 + i * 4, q, le));
+  }
+  if (o.sform) {
+    view.setInt16(254, 1, le);
+    o.sform.forEach((row, r) => {
+      row.forEach((v, c) => view.setFloat32(280 + r * 16 + c * 4, v, le));
+    });
+  }
   out.set(ascii(`${o.magic ?? 'n+1'}\0`), 344);
   if (voxOffset > 0) out.set(o.data, voxOffset);
   return out;

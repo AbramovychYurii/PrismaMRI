@@ -1,9 +1,18 @@
-import { niftiScalarKind, parseNiftiHeader } from '@/lib/import/adapters/nifti/header';
+import {
+  niftiAxisDirections,
+  niftiScalarKind,
+  parseNiftiHeader,
+} from '@/lib/import/adapters/nifti/header';
 import { decodeScalars } from '@/lib/import/decode';
 import { inflateWithProgress, readWithProgress } from '@/lib/import/read-file';
-import type { ImportFormatAdapter, ImportSource, ProgressFn } from '@/lib/import/types';
+import type {
+  ImportFormatAdapter,
+  ImportSource,
+  ParsedVolume,
+  ProgressFn,
+} from '@/lib/import/types';
 import { resolveWindowLevel } from '@/lib/volume/math';
-import type { LoadedVolume, Vec3 } from '@/types';
+import type { Vec3 } from '@/types';
 
 const isSingleFile = (name: string) => name.endsWith('.nii') || name.endsWith('.nii.gz');
 /** The header half of a NIfTI-1 (or Analyze 7.5) .hdr/.img pair. */
@@ -23,7 +32,7 @@ export const niftiAdapter: ImportFormatAdapter = {
   matches(source) {
     return source.files.some((f) => isNiftiName(f.name));
   },
-  async parse(source: ImportSource, onProgress: ProgressFn): Promise<LoadedVolume> {
+  async parse(source: ImportSource, onProgress: ProgressFn): Promise<ParsedVolume> {
     const file =
       source.files.find((f) => isSingleFile(f.name)) ??
       source.files.find((f) => isPairHeader(f.name));
@@ -88,6 +97,7 @@ export const niftiAdapter: ImportFormatAdapter = {
       scalarMax,
       windowLevel: resolveWindowLevel(scalarMin, scalarMax),
       formatId: 'nifti',
+      axisDirections: niftiAxisDirections(header),
     };
   },
 };

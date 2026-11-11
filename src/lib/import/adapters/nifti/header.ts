@@ -1,4 +1,6 @@
 import type { ScalarKind } from '@/lib/import/decode';
+import { type AxisDirections, rasToLps } from '@/lib/volume/orientation';
+import type { Vec3 } from '@/types';
 
 /** NIfTI-1 datatype codes the viewer decodes, and the scalar each one stores. */
 const DATATYPES: Record<number, ScalarKind> = {
@@ -30,6 +32,15 @@ export interface NiftiHeader {
   /** scl_slope, with 0 / non-finite treated as 1 per the spec. */
   sclSlope: number;
   sclInter: number;
+  /** qform_code / sform_code — 0 means that transform is not set. */
+  qformCode: number;
+  sformCode: number;
+  /** quatern_b, quatern_c, quatern_d. */
+  quatern: Vec3;
+  /** pixdim[0]: the qform's handedness, -1 or (anything else) +1. */
+  qfac: number;
+  /** srow_x, srow_y, srow_z: the first three columns of the sform's rows. */
+  srow: [Vec3, Vec3, Vec3];
 }
 
 export function parseNiftiHeader(view: DataView): NiftiHeader {
@@ -53,7 +64,52 @@ export function parseNiftiHeader(view: DataView): NiftiHeader {
     magic: String.fromCharCode(view.getUint8(344), view.getUint8(345), view.getUint8(346)),
     sclSlope: Number.isFinite(slope) && slope !== 0 ? slope : 1,
     sclInter: view.getFloat32(116, le),
+    qformCode: view.getInt16(252, le),
+    sformCode: view.getInt16(254, le),
+    quatern: [view.getFloat32(256, le), view.getFloat32(260, le), view.getFloat32(264, le)],
+    qfac: view.getFloat32(76, le) < 0 ? -1 : 1,
+    srow: [280, 296, 312].map((at) => [
+      view.getFloat32(at, le),
+      view.getFloat32(at + 4, le),
+      view.getFloat32(at + 8, le),
+    ]) as [Vec3, Vec3, Vec3],
   };
+}
+
+/**
+ * Patient direction (LPS) of each voxel axis, from the sform when it is set,
+ * else the qform — the order nibabel's `get_best_affine` uses. Undefined for
+ * Analyze 7.5 headers, whose bytes there hold other fields, and when neither
+ * transform is set: the method-1 fallback only scales, it does not orient.
+ */
+export function niftiAxisDirections(h: NiftiHeader): AxisDirections | undefined {
+  if (h.magic !== 'n+1' && h.magic !== 'ni1') return undefined;
+  if (h.sformCode > 0) {
+    const [x, y, z] = h.srow;
+    // Column a of the sform's 3×3 is where voxel axis a points.
+    return [
+      rasToLps([x[0], y[0], z[0]]),
+      rasToLps([x[1], y[1], z[1]]),
+      rasToLps([x[2], y[2], z[2]]),
+    ];
+  }
+  if (h.qformCode > 0) {
+    // Rotation from the unit quaternion (b, c, d), a = √(1 − b² − c² − d²),
+    // as nifti1_io's quatern_to_mat44 builds it; qfac flips the third axis.
+    const [b, c, d] = h.quatern;
+    const a = Math.sqrt(Math.max(0, 1 - b * b - c * c - d * d));
+    const q = h.qfac;
+    return [
+      rasToLps([a * a + b * b - c * c - d * d, 2 * (b * c + a * d), 2 * (b * d - a * c)]),
+      rasToLps([2 * (b * c - a * d), a * a + c * c - b * b - d * d, 2 * (c * d + a * b)]),
+      rasToLps([
+        q * 2 * (b * d + a * c),
+        q * 2 * (c * d - a * b),
+        q * (a * a + d * d - c * c - b * b),
+      ]),
+    ];
+  }
+  return undefined;
 }
 
 export function niftiScalarKind(datatype: number): ScalarKind {

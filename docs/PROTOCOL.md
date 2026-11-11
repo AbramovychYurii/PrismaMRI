@@ -94,6 +94,8 @@ A consistent coordinate frame is the most error-prone part of any imaging API. P
 | **Slice index** | 1-based | `1 … sliceTotals[plane]` | `navigate_to_slice`, `step.result.slice`, `sliceIndices` in results |
 | **Fractional pin** `(fx, fy)` | top-left of the captured image | `0.0 … 1.0` | `add_annotation` (input only) |
 
+Voxel axes are patient-aligned, whatever order the file stored them in: on import the volume is reordered so `x` runs towards the patient's left, `y` posterior and `z` superior (DICOM's LPS frame), taking the nearest axis for an oblique series. A file whose header records no orientation is kept as stored.
+
 ### Plane → axis mapping
 
 | Plane | Constant axis | In-plane axes (image-space) |
