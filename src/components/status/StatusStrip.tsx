@@ -1,51 +1,6 @@
 import { intensityUnit } from '@/lib/volume/units';
 import { useViewerStore } from '@/viewer';
-import styled from 'styled-components';
-
-const StripGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  align-items: center;
-`;
-
-const RunCellWrap = styled.div<{ $last?: boolean }>`
-  padding: 6px 18px;
-  border-right: ${({ $last }) => ($last ? 'none' : '1px solid var(--rule)')};
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  min-width: 0;
-`;
-
-const RunKey = styled.div`
-  font-family: var(--mono);
-  font-size: 9.5px;
-  color: var(--ink-3);
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  margin-bottom: 3px;
-`;
-
-const RunVal = styled.div`
-  font-family: var(--mono);
-  font-size: 12.5px;
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-`;
-
-const RunDim = styled.span`
-  color: var(--ink-3);
-`;
-
-const MeasureVal = styled(RunVal)`
-  font-size: 13px;
-  font-weight: 700;
-`;
+import styles from './StatusStrip.module.css';
 
 function RunCell({
   k,
@@ -59,13 +14,13 @@ function RunCell({
   last?: boolean;
 }) {
   return (
-    <RunCellWrap $last={last}>
-      <RunKey>{k}</RunKey>
-      <RunVal>
+    <div className={styles.runCell} data-last={last || undefined}>
+      <div className={styles.runKey}>{k}</div>
+      <div className={styles.runVal}>
         {v}
-        {dim && <RunDim>{` ${dim}`}</RunDim>}
-      </RunVal>
-    </RunCellWrap>
+        {dim && <span className={styles.runDim}>{` ${dim}`}</span>}
+      </div>
+    </div>
   );
 }
 
@@ -93,7 +48,7 @@ export function StatusStrip() {
   }
 
   return (
-    <StripGrid>
+    <div className={styles.stripGrid}>
       <RunCell k="Scanner" v={meta?.scanner ?? '—'} />
       <RunCell
         k="Volume"
@@ -116,17 +71,17 @@ export function StatusStrip() {
             : undefined
         }
       />
-      <RunCellWrap $last>
-        <RunKey>Measure</RunKey>
+      <div className={styles.runCell} data-last>
+        <div className={styles.runKey}>Measure</div>
         {measurement?.distanceMm !== null && measurement !== null ? (
-          <MeasureVal>
+          <div className={`${styles.runVal} ${styles.measureVal}`}>
             {measureValue}
             {measureDim && <>{` ${measureDim}`}</>}
-          </MeasureVal>
+          </div>
         ) : (
-          <RunVal>{measureValue}</RunVal>
+          <div className={styles.runVal}>{measureValue}</div>
         )}
-      </RunCellWrap>
-    </StripGrid>
+      </div>
+    </div>
   );
 }

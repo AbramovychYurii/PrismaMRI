@@ -8,96 +8,17 @@ import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import { useViewerLabels, useViewerStore } from '@/viewer';
 import { ChevronDown } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
-import styled from 'styled-components';
+import styles from './Dock.module.css';
 
+/** Dock height in px — mirrored in Dock.module.css (.panel, .toggle[data-open]). */
 export const DOCK_H = 200;
-
-const HeadLine = styled.span`
-  flex: 1;
-  height: 1px;
-  background: var(--rule);
-`;
-
-const HeadTitle = styled.span`
-  font-family: var(--serif);
-  font-size: 15px;
-  color: var(--ink);
-  letter-spacing: 0.005em;
-`;
-
-const StyledCellHead = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
-`;
-
-const StyledDockCell = styled.div<{ $last?: boolean }>`
-  padding: 14px 22px 16px;
-  border-right: ${({ $last }) => ($last ? 'none' : '1px solid var(--rule)')};
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-`;
-
-const ToggleButton = styled.button<{
-  $open: boolean;
-  $hover: boolean;
-  $reduced: boolean;
-}>`
-  position: absolute;
-  bottom: ${({ $open }) => ($open ? DOCK_H + 10 : 10)}px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: var(--z-dock-ui);
-  transition: ${({ $reduced }) =>
-    $reduced ? 'none' : 'bottom 260ms ease, background 100ms, border-color 100ms'};
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  background: ${({ $hover }) => ($hover ? 'rgba(28,22,14,0.97)' : 'rgba(15,12,8,0.88)')};
-  border: 1px solid
-    ${({ $hover }) => ($hover ? 'var(--amber)' : 'var(--amber-dim)')};
-  border-radius: 50%;
-  color: ${({ $hover }) => ($hover ? 'var(--amber)' : 'var(--ink-3)')};
-  cursor: pointer;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(8px);
-`;
-
-const ChevronWrap = styled.span<{ $open: boolean; $reduced: boolean }>`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transform: ${({ $open }) => ($open ? 'rotate(0deg)' : 'rotate(180deg)')};
-  transition: ${({ $reduced }) => ($reduced ? 'none' : 'transform 260ms ease')};
-`;
-
-const DockPanel = styled.div<{ $open: boolean; $reduced: boolean }>`
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: ${DOCK_H}px;
-  transform: ${({ $open }) => ($open ? 'translateY(0)' : `translateY(${DOCK_H}px)`)};
-  transition: ${({ $reduced }) => ($reduced ? 'none' : 'transform 260ms ease')};
-  z-index: var(--z-dock-panel);
-  background: var(--panel);
-  border-top: 1px solid var(--rule);
-  display: grid;
-  grid-template-columns: 1.5fr 1fr 1fr 1.5fr 1fr;
-  align-items: stretch;
-  padding-bottom: 12px;
-`;
 
 function CellHead({ title }: { title: string }) {
   return (
-    <StyledCellHead>
-      <HeadTitle>{title}</HeadTitle>
-      <HeadLine />
-    </StyledCellHead>
+    <div className={styles.styledCellHead}>
+      <span className={styles.headTitle}>{title}</span>
+      <span className={styles.headLine} />
+    </div>
   );
 }
 
@@ -111,10 +32,10 @@ function DockCell({
   last?: boolean;
 }) {
   return (
-    <StyledDockCell $last={last}>
+    <div className={styles.cell} data-last={last || undefined}>
       <CellHead title={title} />
       {children}
-    </StyledDockCell>
+    </div>
   );
 }
 
@@ -140,7 +61,8 @@ function PanelsToggle({
 
   return (
     <>
-      <ToggleButton
+      <button
+        className={styles.toggle}
         type="button"
         aria-label={open ? 'Hide control panels' : 'Show control panels'}
         aria-expanded={open}
@@ -149,14 +71,14 @@ function PanelsToggle({
         onMouseLeave={handleMouseLeave}
         onFocus={tip.onFocus}
         onBlur={tip.onBlur}
-        $open={open}
-        $hover={hover}
-        $reduced={reduced}
+        data-open={open || undefined}
+        data-hover={hover || undefined}
+        data-reduced={reduced || undefined}
       >
-        <ChevronWrap $open={open} $reduced={reduced}>
+        <span className={styles.chevron}>
           <ChevronDown size={12} aria-hidden="true" />
-        </ChevronWrap>
-      </ToggleButton>
+        </span>
+      </button>
       {tip.portal}
     </>
   );
@@ -178,7 +100,11 @@ export function Dock() {
       <PanelsToggle open={dockOpen} onToggle={handleToggle} />
 
       {/* Fixed panel — slides over the stage, never resizes it */}
-      <DockPanel $open={dockOpen} $reduced={reduced}>
+      <div
+        className={styles.panel}
+        data-open={dockOpen || undefined}
+        data-reduced={reduced || undefined}
+      >
         <DockCell title={sections.display}>
           <DisplayCell />
         </DockCell>
@@ -194,7 +120,7 @@ export function Dock() {
         <DockCell title={sections.session} last>
           <SessionCell />
         </DockCell>
-      </DockPanel>
+      </div>
     </>
   );
 }

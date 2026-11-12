@@ -1,0 +1,143 @@
+/* Hover / press are tracked in JS; --scrub-accent comes from the plane. */
+.chevronBtn {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 3px;
+  border: 1px solid var(--pmri-rule-2);
+  background: rgba(15, 13, 10, 0.85);
+  color: var(--pmri-ink-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transform: none;
+  transition: transform 80ms ease;
+}
+.chevronBtn[data-large] {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+}
+.chevronBtn[data-hover] {
+  border-color: var(--pmri-ink-4);
+  background: rgba(28, 24, 18, 0.95);
+  color: var(--pmri-ink);
+}
+.chevronBtn[data-pressed] {
+  transform: scale(0.94);
+}
+.chevronBtn[data-reduced] {
+  transition: none;
+}
+[data-layout="mobile"] .chevronBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+}
+
+.scrubber {
+  position: absolute;
+  top: 32px;
+  right: 0;
+  bottom: 0;
+  width: 40px;
+  z-index: var(--pmri-z-panel-chrome);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 6px 8px 4px;
+  background: linear-gradient(to left, rgba(10, 8, 5, 0.85), transparent 70%);
+  opacity: 0;
+  transform: translateX(8px);
+  pointer-events: none;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+.scrubber[data-large] {
+  top: 52px;
+  width: 48px;
+}
+.scrubber[data-visible] {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+.scrubber[data-reduced] {
+  transition: none;
+}
+/* Inline mode: lives inside a flex column, fills available space. */
+.scrubber[data-inline] {
+  position: relative;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  background: none;
+  padding: 0;
+}
+
+/* Track pieces, inset 4px top and bottom (INSET in SliceScrubber.tsx). */
+.tickSheet {
+  position: absolute;
+  left: 50%;
+  top: 4px;
+  bottom: 4px;
+  width: 12px;
+  transform: translateX(-50%);
+  opacity: 0.5;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--pmri-rule) 0,
+    var(--pmri-rule) 1px,
+    transparent 1px,
+    transparent 6px
+  );
+}
+
+.railLine {
+  position: absolute;
+  left: 50%;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  transform: translateX(-50%);
+  background: var(--pmri-rule);
+  border-radius: 999px;
+}
+
+.fillBar {
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  width: 2px;
+  transform: translateX(-50%);
+  background: var(--scrub-accent);
+  border-radius: 999px;
+}
+
+/* 16px tall — THUMB_PILL_H in SliceScrubber.tsx. */
+.thumbPill {
+  position: absolute;
+  left: 50%;
+  width: 26px;
+  height: 16px;
+  transform: translate(-50%, -50%);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--scrub-accent) 90%, transparent);
+  border: 1px solid var(--scrub-accent);
+  z-index: var(--pmri-z-layout);
+  color: var(--pmri-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--pmri-mono);
+  font-size: 9px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}

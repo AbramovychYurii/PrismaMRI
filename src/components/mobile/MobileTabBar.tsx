@@ -7,41 +7,8 @@ import {
   useViewerStore,
 } from '@/viewer';
 import { Box, Settings } from 'lucide-react';
-import { useRef } from 'react';
-import styled from 'styled-components';
-
-const Bar = styled.div<{ $count: number }>`
-  flex-shrink: 0;
-  display: grid;
-  grid-template-columns: repeat(${({ $count }) => $count}, 1fr);
-  background: var(--panel);
-  border-top: 1px solid var(--rule);
-  /* Safe area for notch phones (iPhone X+) */
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-`;
-
-const TabBtn = styled.button<{ $active: boolean; $accent: string }>`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  padding: 10px 4px 8px;
-  min-height: 56px;
-  border: none;
-  background: none;
-  color: ${({ $active, $accent }) => ($active ? $accent : 'var(--ink-3)')};
-  cursor: pointer;
-  transition: color 100ms;
-  -webkit-tap-highlight-color: transparent;
-`;
-
-const TabLabel = styled.span`
-  font-family: var(--mono);
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-`;
+import { type CSSProperties, useRef } from 'react';
+import styles from './MobileTabBar.module.css';
 
 function PlaneGlyph({
   letter,
@@ -55,11 +22,11 @@ function PlaneGlyph({
   return (
     <span
       style={{
-        fontFamily: 'var(--serif)',
+        fontFamily: 'var(--pmri-serif)',
         fontStyle: 'italic',
         fontSize: 20,
         lineHeight: 1,
-        color: active ? accent : 'var(--ink-3)',
+        color: active ? accent : 'var(--pmri-ink-3)',
       }}
     >
       {letter}
@@ -81,35 +48,35 @@ const TABS: Tab[] = [
     id: '3d',
     name: (l) => l.view3d,
     label: '3D',
-    accent: 'var(--amber)',
+    accent: 'var(--pmri-amber)',
     icon: (a) => <Box size={20} strokeWidth={a ? 1.8 : 1.4} />,
   },
   {
     id: 'coronal',
     name: (l) => l.planes.coronal.name,
     label: 'COR',
-    accent: 'var(--amber)',
+    accent: 'var(--pmri-amber)',
     icon: (a, acc) => <PlaneGlyph letter="C" active={a} accent={acc} />,
   },
   {
     id: 'sagittal',
     name: (l) => l.planes.sagittal.name,
     label: 'SAG',
-    accent: 'var(--violet)',
+    accent: 'var(--pmri-violet)',
     icon: (a, acc) => <PlaneGlyph letter="S" active={a} accent={acc} />,
   },
   {
     id: 'axial',
     name: (l) => l.planes.axial.name,
     label: 'AXI',
-    accent: 'var(--azure)',
+    accent: 'var(--pmri-azure)',
     icon: (a, acc) => <PlaneGlyph letter="A" active={a} accent={acc} />,
   },
   {
     id: 'controls',
     name: (l) => l.controlsTab,
     label: 'CTRL',
-    accent: 'var(--amber)',
+    accent: 'var(--pmri-amber)',
     icon: (a) => <Settings size={19} strokeWidth={a ? 1.8 : 1.4} />,
   },
 ];
@@ -155,15 +122,22 @@ export function MobileTabBar() {
   };
 
   return (
-    <Bar ref={barRef} $count={tabs.length} role="tablist" aria-label="Views" onKeyDown={onKeyDown}>
+    <div
+      className={styles.bar}
+      style={{ '--tab-count': tabs.length } as CSSProperties}
+      ref={barRef}
+      role="tablist"
+      aria-label="Views"
+      onKeyDown={onKeyDown}
+    >
       {tabs.map((tab) => {
         const active = mobileTab === tab.id;
         const handleClick = () => setMobileTab(tab.id);
         return (
-          <TabBtn
+          <button
+            className={styles.tabBtn}
             key={tab.id}
-            $active={active}
-            $accent={tab.accent}
+            style={active ? { color: tab.accent } : undefined}
             type="button"
             role="tab"
             data-tab={tab.id}
@@ -173,10 +147,10 @@ export function MobileTabBar() {
             onClick={handleClick}
           >
             {tab.icon(active, tab.accent)}
-            <TabLabel>{tab.label}</TabLabel>
-          </TabBtn>
+            <span className={styles.tabLabel}>{tab.label}</span>
+          </button>
         );
       })}
-    </Bar>
+    </div>
   );
 }

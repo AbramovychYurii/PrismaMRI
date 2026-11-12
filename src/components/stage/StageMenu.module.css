@@ -1,0 +1,86 @@
+/* Round trigger beside the toolbar buttons. Hover is tracked in JS (useHover). */
+.triggerBtn {
+  background: rgba(20, 18, 14, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--pmri-rule);
+  border-radius: 999px;
+  padding: 12px 12px;
+  color: var(--pmri-ink-2);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: 120ms;
+  -webkit-tap-highlight-color: transparent;
+}
+.triggerBtn[data-hover] {
+  background: rgba(28, 24, 18, 0.92);
+  color: var(--pmri-ink);
+}
+.triggerBtn[data-on] {
+  background: rgba(255, 181, 71, 0.08);
+  border-color: var(--pmri-amber-dim);
+  color: var(--pmri-amber);
+}
+[data-layout="mobile"] .triggerBtn {
+  padding: 14px 14px;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: spin 700ms linear infinite;
+}
+
+.itemBtn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 11px;
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+  color: var(--pmri-ink-2);
+  font-family: var(--pmri-sans);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+  transition: background 80ms, color 80ms;
+  min-height: 32px;
+}
+.itemBtn[data-hover] {
+  background: var(--pmri-highlight-sm);
+  color: var(--pmri-ink);
+}
+
+.wrap {
+  position: relative;
+}
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: var(--pmri-surface-glass);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--pmri-rule-2);
+  border-radius: 8px;
+  padding: 4px;
+  min-width: 200px;
+  z-index: var(--pmri-z-dock-ui);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.65);
+}
+
+.divider {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--pmri-rule);
+}

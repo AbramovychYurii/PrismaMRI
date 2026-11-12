@@ -1,0 +1,510 @@
+/*
+ * AnnotationHud — two states share this file:
+ *   • collapsed pill (.pillWrap, .pill, .specular, .sparkleWrap, .pillCount, .pillLabel)
+ *   • expanded card (.card, .accentBar, .body, .topRow, …, .footer)
+ * Offsets: 22px from the stage top, 30px from its left; 12px on mobile.
+ * The card's severity colour arrives as --sev-color.
+ */
+
+@keyframes slide-down {
+  from {
+    transform: translateY(-8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes pop-in {
+  from {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes aurora-slide {
+  to {
+    background-position: 320% 0;
+  }
+}
+
+/* One-time, calm effect when findings first appear: the pill glides in, its
+   aurora ring spins up to the slow loop, a specular streak sweeps once, the
+   sparkle scales up once and the count fades up. */
+@keyframes pill-entrance {
+  0% {
+    transform: translateY(-8px) scale(0.98);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes ring-spin-up {
+  0% {
+    background-position: 0% 0;
+  }
+  100% {
+    background-position: 320% 0;
+  }
+}
+
+@keyframes specular-sweep {
+  0% {
+    transform: translateX(-160%) skewX(-18deg);
+    opacity: 0;
+  }
+  40% {
+    opacity: 0.3;
+  }
+  60% {
+    opacity: 0.3;
+  }
+  100% {
+    transform: translateX(260%) skewX(-18deg);
+    opacity: 0;
+  }
+}
+
+@keyframes sparkle-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 4px rgba(180, 160, 255, 0.4));
+  }
+  50% {
+    transform: scale(1.1);
+    filter: drop-shadow(0 0 8px rgba(200, 180, 255, 0.7));
+  }
+}
+
+@keyframes digit-tick {
+  0% {
+    transform: translateY(-3px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.card {
+  position: absolute;
+  top: 22px;
+  left: 30px;
+  z-index: var(--pmri-z-modal);
+  width: 360px;
+  max-width: calc(100% - 60px);
+  background: rgba(16, 14, 10, 0.97);
+  border: 1px solid var(--pmri-rule-2);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(14px);
+  font-family: var(--pmri-mono);
+  overflow: hidden;
+  display: flex;
+  flex-direction: row;
+  animation: slide-down 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+[data-layout="mobile"] .card {
+  width: calc(100% - 24px);
+  top: 12px;
+  left: 12px;
+  /* Constrain to the stage: its height minus the card's top offset and a
+     matching bottom gap. */
+  max-height: calc(100% - 12px - 12px);
+}
+
+/* Left vertical accent stripe — full card height, severity-coloured. */
+.accentBar {
+  width: 4px;
+  flex-shrink: 0;
+  background: var(--sev-color);
+  border-radius: 12px 0 0 12px;
+}
+
+.severityChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sev-color);
+  border: 1px solid color-mix(in srgb, var(--sev-color) 40%, transparent);
+  background: color-mix(in srgb, var(--sev-color) 7.8%, transparent);
+  padding: 3px 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.chipDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sev-color);
+}
+
+/* Confidence accent — neutral blue, independent of severity. */
+.confidenceValue {
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #60a5fa;
+  flex-shrink: 0;
+}
+
+.hintText {
+  position: absolute;
+  top: calc(22px + 100% + 8px);
+  left: 30px;
+  margin: 0;
+  font-family: var(--pmri-mono);
+  font-size: 10px;
+  color: var(--pmri-ink-3);
+  letter-spacing: 0.06em;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.hintText strong {
+  color: var(--pmri-ink-2);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+[data-layout="mobile"] .hintText {
+  left: 12px;
+}
+
+/* The aurora ring around the pill: 0.8px outside the pill's own offsets. */
+.pillWrap {
+  position: absolute;
+  top: 21.2px;
+  left: 29.2px;
+  z-index: var(--pmri-z-modal);
+  border-radius: 999px;
+  padding: 1.6px;
+  background: linear-gradient(110deg, #ff8a3c, #ffd24a, #7ee0c0, #7aa7ff, #c79bff, #ff8a3c);
+  background-size: 320% 100%;
+  animation: aurora-slide 9s linear infinite;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55), 0 0 0px rgba(150, 130, 255, 0.22);
+  transition: transform 160ms ease, filter 160ms ease, box-shadow 1000ms ease 400ms;
+}
+/* Ring colour glide: spins up gently during the entrance, then settles to the
+   slow continuous loop. */
+.pillWrap[data-entrance] {
+  animation:
+    pill-entrance 540ms cubic-bezier(0.22, 1, 0.36, 1) both,
+    ring-spin-up 1600ms cubic-bezier(0.22, 1, 0.36, 1) both,
+    aurora-slide 9s linear 1600ms infinite;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55), 0 0 18px rgba(150, 130, 255, 0.22);
+}
+.pillWrap:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.06);
+}
+@media (prefers-reduced-motion: reduce) {
+  .pillWrap,
+  .pillWrap[data-entrance] {
+    animation: none;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55);
+  }
+}
+[data-layout="mobile"] .pillWrap {
+  top: 11.2px;
+  left: 11.2px;
+}
+
+.pill {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 17px 10px 14px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(180deg, #171410, #100d0a);
+  font-family: var(--pmri-mono);
+  cursor: pointer;
+  animation: pop-in 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+  white-space: nowrap;
+  overflow: hidden; /* clip the specular sweep */
+}
+
+/* Diagonal specular highlight that streaks across the pill once. */
+.specular {
+  pointer-events: none;
+  position: absolute;
+  top: -20%;
+  left: 0;
+  width: 38%;
+  height: 140%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.4) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  filter: blur(2px);
+  opacity: 0;
+}
+.specular[data-entrance] {
+  animation: specular-sweep 1100ms cubic-bezier(0.22, 1, 0.36, 1) 360ms both;
+}
+
+.sparkleWrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center;
+}
+.sparkleWrap[data-entrance] {
+  animation: sparkle-pulse 1400ms cubic-bezier(0.4, 0, 0.2, 1) 320ms both;
+}
+
+.pillCount {
+  font-size: 14px;
+  font-weight: 700;
+  color: #f2ece2;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  display: inline-block;
+}
+.pillCount[data-entrance] {
+  animation: digit-tick 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .specular[data-entrance],
+  .sparkleWrap[data-entrance],
+  .pillCount[data-entrance] {
+    animation: none;
+  }
+}
+
+.body {
+  flex: 1;
+  min-width: 0;
+  padding: 13px 15px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+[data-layout="mobile"] .body {
+  /* Allow vertical scroll when card height is capped. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.topRow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+[data-layout="mobile"] .topRow {
+  position: sticky;
+  top: 0;
+  background: rgba(16, 14, 10, 0.97);
+  z-index: 1;
+  /* compensate body padding so it spans full width */
+  margin: -13px -15px 0;
+  padding: 13px 15px 9px;
+}
+
+.location {
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  color: var(--pmri-ink-3);
+  text-transform: uppercase;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.headerBtn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--pmri-ink-3);
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.headerBtn:hover {
+  color: var(--pmri-ink);
+}
+
+.title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--pmri-ink);
+  line-height: 1.3;
+}
+
+.confidenceRow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.confidenceLabel {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--pmri-ink-3);
+}
+
+.summary {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--pmri-ink-2);
+}
+
+.tagRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 1px;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  color: var(--pmri-ink-3);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--pmri-rule);
+  border-radius: 6px;
+  padding: 3px 7px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tagKey {
+  color: var(--pmri-ink-3);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.divider {
+  border: none;
+  border-top: 1px solid var(--pmri-rule);
+  margin: 2px 0 0;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+[data-layout="mobile"] .footer {
+  position: sticky;
+  bottom: 0;
+  background: rgba(16, 14, 10, 0.97);
+  z-index: 1;
+  /* compensate body padding so it spans full width */
+  margin: 0 -15px -14px;
+  padding: 9px 15px 14px;
+}
+
+/* Footer action in the findings card — exported for actions a host adds through its slot. */
+.actionBtn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(182, 173, 153, 0.06);
+  border: 1px solid var(--pmri-ink-2);
+  border-radius: 6px;
+  padding: 4px 9px;
+  cursor: pointer;
+  font-family: var(--pmri-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--pmri-ink-2);
+  transition: background 120ms, filter 120ms;
+}
+.actionBtn:hover {
+  background: rgba(182, 173, 153, 0.12);
+  filter: brightness(1.15);
+}
+
+.dismissBtn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: 1px solid var(--pmri-rule);
+  border-radius: 6px;
+  padding: 4px 9px;
+  cursor: pointer;
+  font-family: var(--pmri-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--pmri-ink-3);
+  transition: border-color 120ms, color 120ms, background 120ms;
+}
+.dismissBtn:hover {
+  border-color: #e05252aa;
+  color: #e05252;
+  background: rgba(224, 82, 82, 0.07);
+}
+
+.navGroup {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.navBtn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--pmri-rule);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--pmri-ink-2);
+  cursor: pointer;
+  padding: 0;
+}
+.navBtn:hover {
+  border-color: var(--pmri-rule-2);
+  color: var(--pmri-ink);
+}
+
+.navIndex {
+  font-size: 10.5px;
+  color: var(--pmri-ink-3);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  min-width: 34px;
+  text-align: center;
+}
+
+.pillLabel {
+  font-size: 13px;
+  color: #8e887e;
+  letter-spacing: 0.14em;
+}

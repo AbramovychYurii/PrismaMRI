@@ -1,21 +1,6 @@
 import type { SliceWindowLevel, VolumeHistogram } from '@/types';
 import { useEffect, useRef } from 'react';
-import styled from 'styled-components';
-
-const Wrap = styled.div`
-  position: relative;
-  width: 100%;
-  height: 22px;
-  border-radius: 3px;
-  overflow: hidden;
-  background: #08070580;
-`;
-
-const Canvas = styled.canvas`
-  display: block;
-  width: 100%;
-  height: 100%;
-`;
+import styles from './HistogramBar.module.css';
 
 interface Props {
   histogram: VolumeHistogram;
@@ -95,8 +80,8 @@ export function HistogramBar({ histogram, wl }: Props) {
   }, [histogram, wl]);
 
   return (
-    <Wrap>
-      <Canvas ref={canvasRef} />
-    </Wrap>
+    <div className={styles.wrap}>
+      <canvas className={styles.canvas} ref={canvasRef} />
+    </div>
   );
 }

@@ -1,0 +1,29 @@
+/* Positioned at the anchor (inline left/top), below it or — data-above — over it. */
+.tip {
+  position: fixed;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: var(--pmri-surface-glass);
+  border: 1px solid var(--pmri-highlight-border);
+  border-radius: 4px;
+  padding: 4px 9px;
+  font-family: var(--pmri-sans);
+  font-size: 11px;
+  color: var(--pmri-ink-2);
+  pointer-events: none;
+  z-index: var(--pmri-z-popover);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+  animation: tip-in 80ms ease forwards;
+}
+.tip[data-above] {
+  transform: translate(-50%, -100%);
+}
+
+@keyframes tip-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

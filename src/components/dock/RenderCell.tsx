@@ -3,7 +3,7 @@ import { useHover } from '@/hooks/useHover';
 import type { RenderPreset } from '@/types';
 import { useViewerFeatures, useViewerStore } from '@/viewer';
 import { Info } from 'lucide-react';
-import styled from 'styled-components';
+import styles from './RenderCell.module.css';
 
 const SLAB_PRESETS: Array<[string, number]> = [
   ['Off', 0],
@@ -11,107 +11,6 @@ const SLAB_PRESETS: Array<[string, number]> = [
   ['5 mm', 5],
   ['10 mm', 10],
 ];
-
-const Wrap = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-  flex: 1;
-`;
-
-const PresetGrid = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 6px;
-`;
-
-const PresetBtn = styled.button<{ $active: boolean; $hover: boolean }>`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  padding: 10px;
-  border-radius: 4px;
-  border: 1px solid
-    ${({ $active, $hover }) =>
-      $active ? 'var(--amber)' : $hover ? 'var(--ink-4)' : 'var(--rule-2)'};
-  background: ${({ $active, $hover }) =>
-    $active ? 'rgba(196,153,70,0.12)' : $hover ? 'rgba(255,255,255,0.04)' : 'transparent'};
-  cursor: pointer;
-  text-align: center;
-  transition:
-    background 80ms,
-    border-color 80ms;
-`;
-
-const PresetName = styled.span<{ $active: boolean }>`
-  font-family: var(--mono);
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: ${({ $active }) => ($active ? 'var(--amber)' : 'var(--ink-2)')};
-`;
-
-/** Mirrors the dock cell heading (HeadTitle + HeadLine in Dock.tsx) so the
- * "Slab MIP" sub-section reads as a peer of "Render Mode" rather than an
- * inline label. */
-const SlabHead = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 4px;
-`;
-
-const SlabHeadTitle = styled.span`
-  font-family: var(--serif);
-  font-size: 15px;
-  color: var(--ink);
-  letter-spacing: 0.005em;
-`;
-
-const SlabHeadLine = styled.span`
-  flex: 1;
-  height: 1px;
-  background: var(--rule);
-`;
-
-const SlabSection = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-`;
-
-const SlabRow = styled.div`
-  display: flex;
-  gap: 6px;
-`;
-
-const SlabBtn = styled.button<{ $active: boolean }>`
-  flex: 1;
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  padding: 6px 8px;
-  border-radius: 4px;
-  border: 1px solid ${({ $active }) => ($active ? 'var(--amber)' : 'var(--rule-2)')};
-  background: ${({ $active }) => ($active ? 'rgba(196,153,70,0.12)' : 'transparent')};
-  color: ${({ $active }) => ($active ? 'var(--amber)' : 'var(--ink-2)')};
-  cursor: pointer;
-  transition:
-    background 80ms,
-    border-color 80ms,
-    color 80ms;
-
-  &:hover {
-    ${({ $active }) =>
-      !$active &&
-      `
-      background: rgba(255,255,255,0.04);
-      border-color: var(--ink-4);
-    `}
-  }
-`;
 
 const PRESETS: { id: RenderPreset; name: string; desc: string }[] = [
   { id: 'mip', name: 'MIP', desc: 'Max intensity — full range grayscale' },
@@ -133,18 +32,19 @@ function PresetButton({
   const { hover, onMouseEnter, onMouseLeave } = useHover();
   return (
     <Tooltip label={desc} above>
-      <PresetBtn
+      <button
+        className={styles.presetBtn}
         type="button"
-        $active={active}
-        $hover={hover && !active}
+        data-active={active || undefined}
+        data-hover={(hover && !active) || undefined}
         onClick={onClick}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
         aria-pressed={active}
         aria-label={`${name} — ${desc}`}
       >
-        <PresetName $active={active}>{name}</PresetName>
-      </PresetBtn>
+        <span className={styles.presetName}>{name}</span>
+      </button>
     </Tooltip>
   );
 }
@@ -159,8 +59,8 @@ export function RenderCell() {
   const offered = features.renderPresets.flatMap((id) => PRESETS.filter((p) => p.id === id));
 
   return (
-    <Wrap>
-      <PresetGrid>
+    <div className={styles.wrap}>
+      <div className={styles.presetGrid}>
         {offered.map(({ id, name, desc }) => (
           <PresetButton
             key={id}
@@ -170,35 +70,39 @@ export function RenderCell() {
             onClick={() => setRenderPreset(id)}
           />
         ))}
-      </PresetGrid>
+      </div>
 
       {features.slab && (
-        <SlabSection>
-          <SlabHead>
-            <SlabHeadTitle>Slab MIP</SlabHeadTitle>
+        <div className={styles.slabSection}>
+          <div className={styles.slabHead}>
+            <span className={styles.slabHeadTitle}>Slab MIP</span>
             <Tooltip
               label="Maximum Intensity Projection — composites several adjacent slices into one image. Reveals vessels, fractures and lesions that span multiple slices. 3–5 mm is ideal for most CT studies."
               above
             >
-              <Info size={13} style={{ color: 'var(--ink-3)', cursor: 'default', flexShrink: 0 }} />
+              <Info
+                size={13}
+                style={{ color: 'var(--pmri-ink-3)', cursor: 'default', flexShrink: 0 }}
+              />
             </Tooltip>
-            <SlabHeadLine />
-          </SlabHead>
-          <SlabRow>
+            <span className={styles.slabHeadLine} />
+          </div>
+          <div className={styles.slabRow}>
             {SLAB_PRESETS.map(([label, mm]) => (
-              <SlabBtn
+              <button
+                className={styles.slabBtn}
                 key={label}
                 type="button"
-                $active={slabMm === mm}
+                data-active={slabMm === mm || undefined}
                 onClick={() => setSlabMm(mm)}
                 aria-pressed={slabMm === mm}
               >
                 {label}
-              </SlabBtn>
+              </button>
             ))}
-          </SlabRow>
-        </SlabSection>
+          </div>
+        </div>
       )}
-    </Wrap>
+    </div>
   );
 }

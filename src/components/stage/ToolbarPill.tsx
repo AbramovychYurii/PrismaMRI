@@ -4,9 +4,8 @@ import { useHover } from '@/hooks/useHover';
 import type { ThreePreview } from '@/lib/volume/three-preview';
 import type { PlanesMode, ToolbarState } from '@/types';
 import { useViewerFeatures, useViewerLayout, useViewerStore } from '@/viewer';
-import { accentAlpha } from '@/viewer/theme';
 import { Maximize2, PanelRight } from 'lucide-react';
-import styled from 'styled-components';
+import styles from './ToolbarPill.module.css';
 
 interface ToolbarButton {
   id: Exclude<keyof ToolbarState, 'planes'>;
@@ -103,49 +102,6 @@ const BUTTONS: ToolbarButton[] = [
   },
 ];
 
-const PillWrap = styled.div`
-  position: absolute;
-  top: 22px;
-  right: 30px;
-  display: flex;
-  gap: 8px;
-  z-index: var(--z-panel-chrome);
-
-  [data-layout='mobile'] & {
-    top: 12px;
-    right: 12px;
-    gap: 6px;
-  }
-`;
-
-const ToolBtn = styled.button<{ $on: boolean; $hover: boolean }>`
-  background: ${({ $on, $hover }) =>
-    $on ? accentAlpha('amber', 0.08) : $hover ? 'rgba(28,24,18,0.92)' : 'rgba(20,18,14,0.85)'};
-  backdrop-filter: blur(8px);
-  border: 1px solid ${({ $on }) => ($on ? 'var(--amber-dim)' : 'var(--rule)')};
-  border-radius: 999px;
-  padding: 12px 12px;
-  color: ${({ $on, $hover }) => ($on ? 'var(--amber)' : $hover ? 'var(--ink)' : 'var(--ink-2)')};
-  font-family: var(--mono);
-  font-size: 10.5px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  transition: 120ms;
-  -webkit-tap-highlight-color: transparent;
-
-  [data-layout='mobile'] & {
-    /* Ensure minimum 44×44 px touch target. */
-    padding: 14px 14px;
-    min-width: 44px;
-    min-height: 44px;
-    justify-content: center;
-  }
-`;
-
 const PLANES_TIP: Record<PlanesMode, string> = {
   off: 'Show slice planes',
   active: 'Show all 3 planes',
@@ -166,17 +122,18 @@ function PlanesButton() {
 
   return (
     <Tooltip label={PLANES_TIP[mode]}>
-      <ToolBtn
+      <button
+        className={styles.toolBtn}
         type="button"
         aria-label={PLANES_TIP[mode]}
         onClick={cyclePlanesMode}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
-        $on={on}
-        $hover={hover}
+        data-on={on || undefined}
+        data-hover={hover || undefined}
       >
         {icon[mode]}
-      </ToolBtn>
+      </button>
     </Tooltip>
   );
 }
@@ -188,17 +145,18 @@ function ClipButton() {
 
   return (
     <Tooltip label={on ? 'Disable clip mode' : 'Clip volume at active slice'}>
-      <ToolBtn
+      <button
+        className={styles.toolBtn}
         type="button"
         aria-label={on ? 'Disable clip mode' : 'Clip volume at active slice'}
         onClick={() => toggle('clip')}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
-        $on={on}
-        $hover={hover}
+        data-on={on || undefined}
+        data-hover={hover || undefined}
       >
         <IconClipPlane />
-      </ToolBtn>
+      </button>
     </Tooltip>
   );
 }
@@ -210,18 +168,19 @@ function ToolButton({ btn }: { btn: ToolbarButton }) {
 
   return (
     <Tooltip label={on ? btn.tipOn : btn.tipOff}>
-      <ToolBtn
+      <button
+        className={styles.toolBtn}
         type="button"
         aria-label={on ? btn.tipOn : btn.tipOff}
         onClick={() => toggle(btn.id)}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
-        $on={on}
-        $hover={hover}
+        data-on={on || undefined}
+        data-hover={hover || undefined}
       >
         {btn.icon}
         {btn.label}
-      </ToolBtn>
+      </button>
     </Tooltip>
   );
 }
@@ -246,7 +205,7 @@ export function ToolbarPill({ previewRef, has3D = true }: ToolbarPillProps) {
   const beforeMenu = visible.filter((b) => b.id !== 'rail');
   const afterMenu = visible.filter((b) => b.id === 'rail');
   return (
-    <PillWrap>
+    <div className={styles.pillWrap}>
       {has3D && features.planes && <PlanesButton />}
       {has3D && features.clip && <ClipButton />}
       {beforeMenu.map((b) => (
@@ -256,6 +215,6 @@ export function ToolbarPill({ previewRef, has3D = true }: ToolbarPillProps) {
       {afterMenu.map((b) => (
         <ToolButton key={b.id} btn={b} />
       ))}
-    </PillWrap>
+    </div>
   );
 }

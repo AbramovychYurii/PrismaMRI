@@ -7,15 +7,7 @@ import type { SlicePlane } from '@/types';
 import { useViewerLabels } from '@/viewer';
 import { Download } from 'lucide-react';
 import { memo } from 'react';
-import {
-  PanelHeader,
-  PlaneGlyph,
-  PlaneLabel,
-  PlaneLabelAccent,
-  SliceCounter,
-  SliceDim,
-  TrayBtn,
-} from './SlicePanel.styles';
+import styles from './SlicePanel.module.css';
 
 /**
  * The small pieces a slice panel is assembled from. Each takes only what it
@@ -37,7 +29,8 @@ export const TrayButton = memo(function TrayButton({
 }) {
   return (
     <Tooltip label={label}>
-      <TrayBtn
+      <button
+        className={styles.trayBtn}
         type="button"
         aria-label={label}
         aria-pressed={active}
@@ -46,11 +39,11 @@ export const TrayButton = memo(function TrayButton({
           onClick();
         }}
         onPointerDown={(e) => e.stopPropagation()}
-        $active={active}
-        $large={large}
+        data-active={active || undefined}
+        data-large={large || undefined}
       >
         {children}
-      </TrayBtn>
+      </button>
     </Tooltip>
   );
 });
@@ -90,22 +83,26 @@ export function PlaneHeading({ plane }: { plane: SlicePlane }) {
   const accent = PLANE_ACCENT[plane];
   const label = useViewerLabels().planes[plane];
   return (
-    <PanelHeader>
-      <PlaneGlyph $color={accent}>{PLANE_GLYPH[plane]}</PlaneGlyph>
-      <PlaneLabel>
-        <PlaneLabelAccent $color={accent}>{label.name}</PlaneLabelAccent>
+    <div className={styles.panelHeader}>
+      <span className={styles.planeGlyph} style={{ color: accent }}>
+        {PLANE_GLYPH[plane]}
+      </span>
+      <span className={styles.planeLabel}>
+        <b className={styles.planeLabelAccent} style={{ color: accent }}>
+          {label.name}
+        </b>
         {` · ${label.detail}`}
-      </PlaneLabel>
-    </PanelHeader>
+      </span>
+    </div>
   );
 }
 
 export function SliceCount({ idx, total }: { idx: number; total: number }) {
   return (
-    <SliceCounter>
+    <span className={styles.sliceCounter}>
       <span>{idx}</span>
-      <SliceDim> / {total}</SliceDim>
-    </SliceCounter>
+      <span className={styles.sliceDim}> / {total}</span>
+    </span>
   );
 }
 

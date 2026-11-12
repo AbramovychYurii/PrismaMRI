@@ -19,7 +19,7 @@ import { type ViewerLabelsInput, resolveLabels } from '@/viewer/labels';
 import { type ViewerLayoutMode, useContainerLayout } from '@/viewer/layout';
 import { type ViewerThemeInput, resolveTheme, themeCssVars } from '@/viewer/theme';
 import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useState } from 'react';
-import styled from 'styled-components';
+import styles from './Viewer.module.css';
 
 export interface ViewerProps {
   viewer: ViewerInstance;
@@ -50,79 +50,15 @@ export interface ViewerProps {
   style?: CSSProperties;
 }
 
-/**
- * Fills its container. `isolation` keeps the viewer's own stacking — dock,
- * focus mode, the findings card — from reaching over the host's page.
- */
-const ViewerRoot = styled.div`
-  position: relative;
-  isolation: isolate;
-  width: 100%;
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-
-  /* Focusable only so a click inside gives the shortcuts somewhere to land. */
-  &:focus {
-    outline: none;
-  }
-`;
-
-const DesktopGrid = styled.div<{ $railOpen: boolean }>`
-  display: grid;
-  grid-template-columns: ${({ $railOpen }) => ($railOpen ? '1fr 360px' : '1fr 0px')};
-  grid-template-rows: minmax(0, 1fr);
-  grid-template-areas: "stage rail";
-  height: 100%;
-`;
-
-const MobileColumn = styled.div`
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-`;
-
-/** Content area above the tab bar. */
-const MobileContent = styled.div`
-  flex: 1;
-  position: relative;
-  min-height: 0;
-  overflow: hidden;
-`;
-
-/** Wraps the 3D Stage. Always in the DOM to preserve the WebGL context. */
-const StageWrap = styled.div<{ $visible: boolean }>`
-  position: absolute;
-  inset: 0;
-  /* Use visibility (not display) so getBoundingClientRect keeps correct dims. */
-  visibility: ${({ $visible }) => ($visible ? 'visible' : 'hidden')};
-  pointer-events: ${({ $visible }) => ($visible ? 'auto' : 'none')};
-`;
-
-/** Full-bleed wrapper for a single slice panel on mobile. */
-const MobileSliceWrap = styled.div`
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-`;
-
-/** Scrollable container for the controls tab. */
-const MobileControlsWrap = styled.div`
-  position: absolute;
-  inset: 0;
-`;
-
 function DesktopViewer() {
   const features = useViewerFeatures();
   const railOpen = useViewerStore((s) => s.toolbar.rail) && features.rail;
   return (
-    <DesktopGrid $railOpen={railOpen}>
+    <div className={styles.desktopGrid} data-rail={railOpen || undefined}>
       <Stage />
       {features.rail && <Rail />}
       {features.dock && <Dock />}
-    </DesktopGrid>
+    </div>
   );
 }
 
@@ -132,31 +68,31 @@ function MobileViewer() {
   const mobileTab = isTabOffered(storedTab, features) ? storedTab : '3d';
   const volumeLoaded = useViewerStore((s) => s.volume !== null);
   return (
-    <MobileColumn>
-      <MobileContent>
+    <div className={styles.mobileColumn}>
+      <div className={styles.mobileContent}>
         {/* Stage stays mounted at all times to preserve the WebGL/Three.js context. */}
-        <StageWrap $visible={mobileTab === '3d'}>
+        <div className={styles.stageWrap} data-visible={mobileTab === '3d' || undefined}>
           <Stage />
-        </StageWrap>
+        </div>
 
         {/* isSlicePlane narrows mobileTab → SlicePlane for the SlicePanel prop. */}
         {isSlicePlane(mobileTab) && (
-          <MobileSliceWrap>
+          <div className={styles.mobileSliceWrap}>
             <SlicePanel plane={mobileTab} />
-          </MobileSliceWrap>
+          </div>
         )}
 
         {/* Controls view — replaces the Dock on mobile. */}
         {mobileTab === 'controls' && (
-          <MobileControlsWrap>
+          <div className={styles.mobileControlsWrap}>
             <MobileControlsView />
-          </MobileControlsWrap>
+          </div>
         )}
-      </MobileContent>
+      </div>
 
       {/* Tab bar only shown while viewing a loaded volume. */}
       {volumeLoaded && <MobileTabBar />}
-    </MobileColumn>
+    </div>
   );
 }
 
@@ -239,11 +175,13 @@ export function Viewer({
   const portalRoot = usePortalRoot(portalContainer, vars, layout);
 
   return (
-    <ViewerRoot
+    <div
       ref={setRoot}
       tabIndex={-1}
       data-layout={layout ?? undefined}
-      className={className}
+      className={
+        className ? `pmri-root ${styles.viewerRoot} ${className}` : `pmri-root ${styles.viewerRoot}`
+      }
       style={rootStyle}
     >
       {root && layout && portalRoot && (
@@ -263,6 +201,6 @@ export function Viewer({
           {layout === 'mobile' ? <MobileViewer /> : <DesktopViewer />}
         </ViewerProvider>
       )}
-    </ViewerRoot>
+    </div>
   );
 }

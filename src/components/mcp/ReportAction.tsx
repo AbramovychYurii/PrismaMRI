@@ -1,4 +1,4 @@
-import { ActionBtn } from '@/components/annotations/AnnotationHud.styles';
+import { AnnotationActionButton } from '@/components/annotations/AnnotationHud';
 import { ReportModal } from '@/components/mcp/ReportModal';
 import type { AnnotationActionContext } from '@/viewer';
 import { FileText } from 'lucide-react';
@@ -9,10 +9,10 @@ export function ReportAction({ finding, index, all }: AnnotationActionContext) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <ActionBtn type="button" aria-label="Generate report" onClick={() => setOpen(true)}>
+      <AnnotationActionButton aria-label="Generate report" onClick={() => setOpen(true)}>
         <FileText size={11} />
         Report
-      </ActionBtn>
+      </AnnotationActionButton>
       {open && (
         <ReportModal
           finding={finding}

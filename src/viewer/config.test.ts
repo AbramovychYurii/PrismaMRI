@@ -2,6 +2,7 @@ import { defaultFeatures, resolveFeatures } from '@/viewer/features';
 import { defaultLabels, resolveLabels } from '@/viewer/labels';
 import { defaultTheme, resolveTheme, themeCssVars, withAlpha } from '@/viewer/theme';
 import { describe, expect, it } from 'vitest';
+import tokensCss from './tokens.css?raw';
 
 describe('resolveTheme', () => {
   it('fills what the host leaves out from the default theme', () => {
@@ -14,12 +15,18 @@ describe('resolveTheme', () => {
 
   it('writes the tokens under the names the stylesheets read', () => {
     const vars = themeCssVars(defaultTheme);
-    expect(vars['--panel-2']).toBe('#1c1a14');
-    expect(vars['--ink-3']).toBe('#8a8068');
-    expect(vars['--amber-dim']).toBe('#b67e2c');
-    expect(vars['--surface-deep']).toBe('#050403');
-    expect(vars['--mono']).toBe(defaultTheme.fonts.mono);
-    expect(vars['--measure-glow']).toBe('color-mix(in srgb, #ff4500 45%, transparent)');
+    expect(vars['--pmri-panel-2']).toBe('#1c1a14');
+    expect(vars['--pmri-ink-3']).toBe('#8a8068');
+    expect(vars['--pmri-amber-dim']).toBe('#b67e2c');
+    expect(vars['--pmri-surface-deep']).toBe('#050403');
+    expect(vars['--pmri-mono']).toBe(defaultTheme.fonts.mono);
+    expect(vars['--pmri-measure-glow']).toBe('color-mix(in srgb, #ff4500 45%, transparent)');
+  });
+
+  it('declares the same defaults in tokens.css as in defaultTheme', () => {
+    for (const [name, value] of Object.entries(themeCssVars(defaultTheme))) {
+      expect(tokensCss, name).toContain(`${name}: ${value};`);
+    }
   });
 
   it('fades any CSS colour, not only #rrggbb', () => {

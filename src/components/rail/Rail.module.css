@@ -1,0 +1,8 @@
+.railAside {
+  grid-area: rail;
+  background: var(--pmri-panel);
+  border-bottom: 1px solid var(--pmri-rule);
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
+}
