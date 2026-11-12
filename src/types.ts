@@ -148,8 +148,8 @@ export interface VolumeHistogram {
  */
 export type AnnotationSeverity = 'critical' | 'serious' | 'moderate' | 'comment';
 
-/** A finding placed on the volume by the AI agent. */
-export interface AiAnnotation {
+/** A finding placed on the volume — by an AI agent, a reader, or any other source. */
+export interface Annotation {
   /** Unique ID so React keys are stable. */
   id: string;
   /** Stable identifier of the volume this finding belongs to (see deriveVolumeId). */

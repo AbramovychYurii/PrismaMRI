@@ -17,7 +17,7 @@ import { waitForPaint } from '@/lib/mcp/canvas-utils';
 import { type Capture, annotateCanvas, captureRaw } from '@/lib/report/capture';
 import { sliceNumber } from '@/lib/volume/plane';
 import { intensityUnit } from '@/lib/volume/units';
-import type { AiAnnotation, SlicePlane } from '@/types';
+import type { Annotation, SlicePlane } from '@/types';
 import { useViewerStore, useViewerSurfaces } from '@/viewer';
 import { Download, FileText, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -77,7 +77,7 @@ import {
 
 const planeName = (plane: SlicePlane) => PLANE_LABEL[plane].primary;
 
-const sliceNum = (a: AiAnnotation) => sliceNumber(a.voxel, a.plane);
+const sliceNum = (a: Annotation) => sliceNumber(a.voxel, a.plane);
 
 /** Avoid allocating a fresh `style` object on every render of the disabled toggle. */
 const FORMAT_TOGGLE_DISABLED_STYLE: React.CSSProperties = { opacity: 0.4 };
@@ -87,9 +87,9 @@ type Scope = 'finding' | 'all';
 type Format = 'images' | 'markers';
 
 interface Props {
-  finding: AiAnnotation;
+  finding: Annotation;
   findingIndex: number;
-  allFindings: AiAnnotation[];
+  allFindings: Annotation[];
   onClose: () => void;
 }
 

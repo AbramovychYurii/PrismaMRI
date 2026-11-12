@@ -268,7 +268,8 @@ export const Footer = styled.div`
   }
 `;
 
-export const ReportBtn = styled.button`
+/** Footer action in the findings card — exported for actions a host adds through its slot. */
+export const ActionBtn = styled.button`
   display: flex;
   align-items: center;
   gap: 5px;

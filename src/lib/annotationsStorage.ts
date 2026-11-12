@@ -13,14 +13,14 @@
  *    Zustand store is the source of truth at runtime.
  */
 
-import type { AiAnnotation } from '@/types';
+import type { Annotation } from '@/types';
 
 const STORAGE_KEY = 'prismamri.annotations.v2';
 const SCHEMA_VERSION = 2 as const;
 
 interface VolumeSlot {
   savedAt: string;
-  annotations: AiAnnotation[];
+  annotations: Annotation[];
 }
 
 interface StoredEnvelope {
@@ -58,7 +58,7 @@ function writeEnvelope(ls: Storage, envelope: StoredEnvelope): void {
 }
 
 /** Read annotations for a specific volume. Returns [] when nothing is saved. */
-export function load(volumeId: string): AiAnnotation[] {
+export function load(volumeId: string): Annotation[] {
   const ls = safeLocalStorage();
   if (!ls) return [];
   const envelope = readEnvelope(ls);
@@ -68,7 +68,7 @@ export function load(volumeId: string): AiAnnotation[] {
 }
 
 /** Save annotations for a specific volume (overwrites that volume's slot). */
-export function save(volumeId: string, annotations: AiAnnotation[]): void {
+export function save(volumeId: string, annotations: Annotation[]): void {
   const ls = safeLocalStorage();
   if (!ls) return;
   const envelope = readEnvelope(ls);

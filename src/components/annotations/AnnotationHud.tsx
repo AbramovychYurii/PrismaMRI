@@ -1,7 +1,7 @@
 /**
  * AnnotationHud
  *
- * Floating summary panel for AI findings — top-left corner. Two states:
+ * Floating summary panel for findings — top-left corner. Two states:
  *
  *  • Collapsed → compact pill showing the count of findings + severity dot.
  *    Click to expand. Always present once at least one finding exists.
@@ -12,17 +12,19 @@
  *    Auto-expands when a marker is focused (click on viewer / nav).
  *    The X button hides the expanded card AND clears the active finding.
  *
+ * The host adds its own footer actions (PrismaMRI: the PDF report) and the
+ * hint line under the card through `slots.annotationActions` / `annotationHint`.
+ *
  * All styling lives in `AnnotationHud.styles.ts`.
  */
 
-import { ReportModal } from '@/components/mcp/ReportModal';
 import { AuroraSparkles } from '@/components/ui/AuroraSparkles';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { PLANE_LABEL, SEVERITY_HEX, SEVERITY_LABEL, SEVERITY_RANK } from '@/constants';
 import { sliceNumber } from '@/lib/volume/plane';
-import type { AiAnnotation, SlicePlane, VolumeCursor } from '@/types';
-import { useViewerStore } from '@/viewer';
-import { ChevronLeft, ChevronRight, FileText, Sparkles, Trash2, X } from 'lucide-react';
+import type { Annotation, SlicePlane, VolumeCursor } from '@/types';
+import { useViewerHost, useViewerStore } from '@/viewer';
+import { ChevronLeft, ChevronRight, Sparkles, Trash2, X } from 'lucide-react';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccentBar,
@@ -45,7 +47,6 @@ import {
   PillCount,
   PillLabel,
   PillWrap,
-  ReportBtn,
   SeverityChip,
   SparkleWrap,
   Specular,
@@ -61,7 +62,7 @@ function sliceInfo(plane: SlicePlane, v: VolumeCursor): string {
   return `${PLANE_LABEL[plane].primary} · slice ${sliceNumber(v, plane)}`;
 }
 
-function orderAll(list: AiAnnotation[]): AiAnnotation[] {
+function orderAll(list: Annotation[]): Annotation[] {
   return [...list].sort(
     (a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity] || a.id.localeCompare(b.id),
   );
@@ -105,15 +106,15 @@ const ENTRANCE_DURATION_MS = 1400;
 const COUNT_UP_DURATION_MS = 520;
 
 export function AnnotationHud() {
-  const annotations = useViewerStore((s) => s.aiAnnotations);
+  const annotations = useViewerStore((s) => s.annotations);
   const activeId = useViewerStore((s) => s.activeAnnotationId);
   const focusAnnotation = useViewerStore((s) => s.focusAnnotation);
   const setActiveAnnotation = useViewerStore((s) => s.setActiveAnnotation);
-  const removeAiAnnotation = useViewerStore((s) => s.removeAiAnnotation);
+  const removeAnnotation = useViewerStore((s) => s.removeAnnotation);
 
   const [open, setOpen] = useState(false);
   const [confirmDismiss, setConfirmDismiss] = useState(false);
-  const [showReport, setShowReport] = useState(false);
+  const { slots } = useViewerHost();
 
   // The pill plays its full multi-layer entrance only the first time it
   // appears for a given run.  Subsequent re-renders (collapse/expand,
@@ -224,9 +225,7 @@ export function AnnotationHud() {
 
   return (
     <>
-      <HintText>
-        Click <strong>REPORT</strong> to open the export dialog
-      </HintText>
+      {slots.annotationHint && <HintText>{slots.annotationHint}</HintText>}
       <Card aria-label="Finding summary" aria-live="polite">
         {/* Left vertical accent bar */}
         <AccentBar $color={color} />
@@ -293,14 +292,7 @@ export function AnnotationHud() {
           <Divider />
           <Footer>
             <NavGroup>
-              <ReportBtn
-                type="button"
-                aria-label="Generate report"
-                onClick={() => setShowReport(true)}
-              >
-                <FileText size={11} />
-                Report
-              </ReportBtn>
+              {slots.annotationActions?.({ finding: shown, index: idx, all: ordered })}
               <DismissBtn
                 type="button"
                 aria-label="Dismiss finding"
@@ -327,15 +319,6 @@ export function AnnotationHud() {
           </Footer>
         </Body>
 
-        {showReport && (
-          <ReportModal
-            finding={shown}
-            findingIndex={idx}
-            allFindings={ordered}
-            onClose={() => setShowReport(false)}
-          />
-        )}
-
         {confirmDismiss && (
           <ConfirmModal
             title="Remove finding?"
@@ -347,7 +330,7 @@ export function AnnotationHud() {
             onConfirm={() => {
               setConfirmDismiss(false);
               const nextIdx = ordered.length > 1 ? (idx + 1) % ordered.length : -1;
-              removeAiAnnotation(shown.id);
+              removeAnnotation(shown.id);
               if (nextIdx >= 0) {
                 const neighbour = ordered[nextIdx === ordered.length - 1 ? idx - 1 : nextIdx];
                 if (neighbour && neighbour.id !== shown.id) focusAnnotation(neighbour.id);

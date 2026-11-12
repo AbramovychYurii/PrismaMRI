@@ -4,7 +4,7 @@ import { clampToDims, volumeCenter } from '@/lib/volume/plane';
 import { deriveVolumeId } from '@/lib/volumeId';
 import type {
   ActiveMeasurement,
-  AiAnnotation,
+  Annotation,
   ImportProgress,
   LoadedVolume,
   MeasurementPoint,
@@ -51,8 +51,8 @@ export interface ViewerState {
   expandedPlane: SlicePlane | null;
   /** Stable ID of the currently loaded volume (null when no volume is open). */
   activeVolumeId: string | null;
-  /** AI annotation findings for the active volume only. */
-  aiAnnotations: AiAnnotation[];
+  /** Findings placed on the active volume only. */
+  annotations: Annotation[];
   /** Currently focused finding — drives the summary card + marker emphasis. */
   activeAnnotationId: string | null;
   /**
@@ -99,11 +99,11 @@ export interface ViewerActions {
   requestSnapToView: (plane: SlicePlane) => void;
   setMobileTab: (tab: MobileTab) => void;
   setExpandedPlane: (plane: SlicePlane | null) => void;
-  addAiAnnotation: (a: Omit<AiAnnotation, 'volumeId'>) => void;
+  addAnnotation: (a: Omit<Annotation, 'volumeId'>) => void;
   /** Atomically replace all annotations for the active volume (used by demo loader). */
-  setAiAnnotations: (list: Omit<AiAnnotation, 'volumeId'>[]) => void;
-  removeAiAnnotation: (id: string) => void;
-  clearAiAnnotations: () => void;
+  setAnnotations: (list: Omit<Annotation, 'volumeId'>[]) => void;
+  removeAnnotation: (id: string) => void;
+  clearAnnotations: () => void;
   setActiveAnnotation: (id: string | null) => void;
   /** Jump the cursor/active plane to a finding and mark it active. */
   focusAnnotation: (id: string) => void;
@@ -119,8 +119,8 @@ export type ViewerStore = StoreApi<ViewerStoreState>;
 
 /** Where a viewer keeps the findings placed on each volume, keyed by volume ID. */
 export interface AnnotationStorage {
-  load: (volumeId: string) => AiAnnotation[];
-  save: (volumeId: string, annotations: AiAnnotation[]) => void;
+  load: (volumeId: string) => Annotation[];
+  save: (volumeId: string, annotations: Annotation[]) => void;
   clear: (volumeId: string) => void;
 }
 
@@ -137,7 +137,7 @@ export interface ViewerStoreOptions {
 
 /** Keeps findings for the life of the store and nowhere else. */
 function memoryAnnotationStorage(): AnnotationStorage {
-  const slots = new Map<string, AiAnnotation[]>();
+  const slots = new Map<string, Annotation[]>();
   return {
     load: (id) => slots.get(id) ?? [],
     save: (id, list) => void slots.set(id, list),
@@ -180,7 +180,7 @@ const initialState: ViewerState = {
   mobileTab: '3d',
   expandedPlane: null,
   activeVolumeId: null,
-  aiAnnotations: [],
+  annotations: [],
   activeAnnotationId: null,
   seriesSource: null,
   seriesList: null,
@@ -207,14 +207,14 @@ function persistedSlice(state: ViewerStoreState) {
 
 function viewerState(
   set: StoreApi<ViewerStoreState>['setState'],
-  annotations: AnnotationStorage,
+  annotationStorage: AnnotationStorage,
 ): ViewerStoreState {
   return {
     ...initialState,
 
     setVolume: (volume, prepared3D, histogram) => {
       const activeVolumeId = deriveVolumeId(volume);
-      const aiAnnotations = annotations.load(activeVolumeId);
+      const annotations = annotationStorage.load(activeVolumeId);
       set({
         volume,
         prepared3D,
@@ -229,23 +229,23 @@ function viewerState(
         snapSeq: 0,
         error: null,
         activeVolumeId,
-        aiAnnotations,
+        annotations,
         activeAnnotationId: null,
       });
     },
 
     restoreVolume: (volume, prepared3D, histogram) => {
       const activeVolumeId = deriveVolumeId(volume);
-      const aiAnnotations = annotations.load(activeVolumeId);
+      const annotations = annotationStorage.load(activeVolumeId);
       const dims = volume.meta.dims;
       set((state) => ({
         volume,
         prepared3D,
         histogram,
         activeVolumeId,
-        aiAnnotations,
+        annotations,
         cursor: state.cursor ? clampToDims(state.cursor, dims) : volumeCenter(dims),
-        activeAnnotationId: aiAnnotations.some((a) => a.id === state.activeAnnotationId)
+        activeAnnotationId: annotations.some((a) => a.id === state.activeAnnotationId)
           ? state.activeAnnotationId
           : null,
         error: null,
@@ -348,45 +348,45 @@ function viewerState(
         activePlane: expandedPlane ?? state.activePlane,
       })),
 
-    addAiAnnotation: (a) =>
+    addAnnotation: (a) =>
       set((state) => {
         if (!state.activeVolumeId) return {};
         const tagged = { ...a, volumeId: state.activeVolumeId };
-        const next = [...state.aiAnnotations, tagged];
-        annotations.save(state.activeVolumeId, next);
-        return { aiAnnotations: next };
+        const next = [...state.annotations, tagged];
+        annotationStorage.save(state.activeVolumeId, next);
+        return { annotations: next };
       }),
 
-    setAiAnnotations: (list) =>
+    setAnnotations: (list) =>
       set((state) => {
         if (!state.activeVolumeId) return {};
         const volumeId = state.activeVolumeId;
         const tagged = list.map((a) => ({ ...a, volumeId }));
-        annotations.save(volumeId, tagged);
-        return { aiAnnotations: tagged, activeAnnotationId: null };
+        annotationStorage.save(volumeId, tagged);
+        return { annotations: tagged, activeAnnotationId: null };
       }),
 
-    removeAiAnnotation: (id) =>
+    removeAnnotation: (id) =>
       set((state) => {
-        const next = state.aiAnnotations.filter((a) => a.id !== id);
-        if (state.activeVolumeId) annotations.save(state.activeVolumeId, next);
+        const next = state.annotations.filter((a) => a.id !== id);
+        if (state.activeVolumeId) annotationStorage.save(state.activeVolumeId, next);
         return {
-          aiAnnotations: next,
+          annotations: next,
           activeAnnotationId: state.activeAnnotationId === id ? null : state.activeAnnotationId,
         };
       }),
 
-    clearAiAnnotations: () =>
+    clearAnnotations: () =>
       set((state) => {
-        if (state.activeVolumeId) annotations.clear(state.activeVolumeId);
-        return { aiAnnotations: [], activeAnnotationId: null };
+        if (state.activeVolumeId) annotationStorage.clear(state.activeVolumeId);
+        return { annotations: [], activeAnnotationId: null };
       }),
 
     setActiveAnnotation: (activeAnnotationId) => set({ activeAnnotationId }),
 
     focusAnnotation: (id) =>
       set((state) => {
-        const finding = state.aiAnnotations.find((a) => a.id === id);
+        const finding = state.annotations.find((a) => a.id === id);
         if (!finding) return {};
         const dims = state.volume?.meta.dims;
         return {
@@ -409,13 +409,13 @@ function viewerState(
  * share a cursor, W/L or findings.
  */
 export function createViewerStore(options: ViewerStoreOptions = {}): ViewerStore {
-  const annotations = options.annotationStorage ?? memoryAnnotationStorage();
+  const annotationStorage = options.annotationStorage ?? memoryAnnotationStorage();
   const { persistence } = options;
   if (!persistence) {
-    return createStore<ViewerStoreState>()((set) => viewerState(set, annotations));
+    return createStore<ViewerStoreState>()((set) => viewerState(set, annotationStorage));
   }
   return createStore<ViewerStoreState>()(
-    persist((set) => viewerState(set, annotations), {
+    persist((set) => viewerState(set, annotationStorage), {
       name: persistence.key,
       storage: createJSONStorage(() => persistence.storage),
       version: 1,

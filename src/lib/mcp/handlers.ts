@@ -10,13 +10,7 @@ import {
   volumeCenter,
 } from '@/lib/volume/plane';
 import { extractSliceGrayImage } from '@/lib/volume/slices';
-import type {
-  AiAnnotation,
-  LoadedVolume,
-  MeasurementPoint,
-  SlicePlane,
-  VolumeCursor,
-} from '@/types';
+import type { Annotation, LoadedVolume, MeasurementPoint, SlicePlane, VolumeCursor } from '@/types';
 import type { Viewer } from '@/viewer';
 import type { ViewerStoreState } from '@/viewer/store';
 
@@ -279,7 +273,7 @@ const handleAddAnnotation: Handler = ({ msg, ok, fail, viewer }) => {
   const fy = requireFraction(msg, 'fy');
   const rawConfidence = msg.confidence == null ? undefined : requireNumber(msg, 'confidence');
 
-  const annotation: Omit<AiAnnotation, 'volumeId'> = {
+  const annotation: Omit<Annotation, 'volumeId'> = {
     id: crypto.randomUUID(),
     plane,
     fx,
@@ -296,7 +290,7 @@ const handleAddAnnotation: Handler = ({ msg, ok, fail, viewer }) => {
     sizeMm: msg.size_mm != null ? Number(msg.size_mm) : undefined,
   };
 
-  state.addAiAnnotation(annotation);
+  state.addAnnotation(annotation);
   state.setActiveAnnotation(annotation.id);
   ok({ id: annotation.id });
 };
@@ -304,16 +298,16 @@ const handleAddAnnotation: Handler = ({ msg, ok, fail, viewer }) => {
 const handleRemoveAnnotation: Handler = ({ msg, ok, fail, viewer }) => {
   const removeId = requireString(msg, 'id');
   const state = viewer.store.getState();
-  if (!state.aiAnnotations.some((a) => a.id === removeId)) {
+  if (!state.annotations.some((a) => a.id === removeId)) {
     fail(`Annotation ${removeId} not found`);
     return;
   }
-  state.removeAiAnnotation(removeId);
+  state.removeAnnotation(removeId);
   ok();
 };
 
 const handleListAnnotations: Handler = ({ ok, viewer }) => {
-  const annotations = viewer.store.getState().aiAnnotations.map((a) => ({
+  const annotations = viewer.store.getState().annotations.map((a) => ({
     id: a.id,
     plane: a.plane,
     voxel: a.voxel,
@@ -325,7 +319,7 @@ const handleListAnnotations: Handler = ({ ok, viewer }) => {
 };
 
 const handleClearAnnotations: Handler = ({ ok, viewer }) => {
-  viewer.store.getState().clearAiAnnotations();
+  viewer.store.getState().clearAnnotations();
   ok();
 };
 

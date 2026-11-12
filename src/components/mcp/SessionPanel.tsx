@@ -184,7 +184,7 @@ export function SessionPanel() {
   const localPort = useAgentStore((s) => s.localPort);
   const dockOpen = useViewerStore((s) => s.toolbar.dock);
   const activeVolumeId = useViewerStore((s) => s.activeVolumeId);
-  const setAiAnnotations = useViewerStore((s) => s.setAiAnnotations);
+  const setAnnotations = useViewerStore((s) => s.setAnnotations);
   // Prefer the store's localPort over isLocalMode() — localPort is set only when
   // the bridge actually connected directly to 127.0.0.1 (covers both PWA standalone
   // and localhost dev-server cases that isLocalMode() would miss).
@@ -203,7 +203,7 @@ export function SessionPanel() {
     if (!sampleReport) return;
     setSampleState('idle');
     try {
-      setAiAnnotations(sampleReport.annotations);
+      setAnnotations(sampleReport.annotations);
       setSampleState('ok');
       // Collapse the panel so the user immediately sees the AnnotationHud
       // entrance animation and the annotated findings on the volume.
@@ -213,7 +213,7 @@ export function SessionPanel() {
       setSampleState('err');
       setTimeout(() => setSampleState('idle'), 3000);
     }
-  }, [sampleReport, setAiAnnotations]);
+  }, [sampleReport, setAnnotations]);
 
   const handleDownloadDxt = useCallback(async () => {
     setDxtState('idle');

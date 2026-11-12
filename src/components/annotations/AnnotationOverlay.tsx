@@ -6,7 +6,7 @@
 
 import { SEVERITY_HEX } from '@/constants';
 import { sliceIndex } from '@/lib/volume/plane';
-import type { AiAnnotation, SlicePlane } from '@/types';
+import type { Annotation, SlicePlane } from '@/types';
 import { useViewerStore } from '@/viewer';
 import { memo, useMemo } from 'react';
 import styled from 'styled-components';
@@ -75,7 +75,7 @@ const PinItem = memo(function PinItem({
   opacity,
   onSelect,
 }: {
-  annotation: AiAnnotation;
+  annotation: Annotation;
   active: boolean;
   opacity: number;
   onSelect: (id: string) => void;
@@ -113,7 +113,7 @@ export function AnnotationOverlay({
   plane: SlicePlane;
   halfSlabs?: number;
 }) {
-  const annotations = useViewerStore((s) => s.aiAnnotations);
+  const annotations = useViewerStore((s) => s.annotations);
   const cursor = useViewerStore((s) => s.cursor);
   const activeId = useViewerStore((s) => s.activeAnnotationId);
   const focusAnnotation = useViewerStore((s) => s.focusAnnotation);

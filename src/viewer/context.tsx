@@ -1,3 +1,4 @@
+import type { Annotation } from '@/types';
 import type { Viewer } from '@/viewer/createViewer';
 import type { ViewerStore, ViewerStoreState } from '@/viewer/store';
 import type { ViewerSurfaces } from '@/viewer/surfaces';
@@ -16,14 +17,49 @@ export interface ViewerEnvironment {
   portalContainer: Element;
 }
 
-interface ViewerContextValue extends ViewerEnvironment {
+/** The finding a navigator action is rendered for. */
+export interface AnnotationActionContext {
+  finding: Annotation;
+  /** Position of `finding` within `all`. */
+  index: number;
+  /** Every finding on the volume, most severe first. */
+  all: Annotation[];
+}
+
+/** Places where a host renders its own UI inside the viewer. */
+export interface ViewerSlots {
+  /** Drawn over the 3-D stage, and hidden in focus mode with the rest of the chrome. */
+  stageOverlay?: ReactNode;
+  /**
+   * Extra buttons in the findings card footer, before Dismiss — an export, a
+   * share. Return a component element, not bare markup, so its state survives
+   * stepping between findings.
+   */
+  annotationActions?: (context: AnnotationActionContext) => ReactNode;
+  /** One line under the open findings card, e.g. a hint for the actions above. */
+  annotationHint?: ReactNode;
+}
+
+/** What the host plugs into the viewer: its slots and its way out. */
+export interface ViewerHost {
+  slots: ViewerSlots;
+  /** Offered as "Back" in the session panel. Without it, the button is not shown. */
+  onExit?: () => void;
+}
+
+interface ViewerContextValue extends ViewerEnvironment, ViewerHost {
   viewer: Viewer;
 }
+
+const NO_SLOTS: ViewerSlots = {};
 
 const ViewerContext = createContext<ViewerContextValue | null>(null);
 
 export interface ViewerProviderProps extends Partial<ViewerEnvironment> {
   viewer: Viewer;
+  /** Keep the object stable (module-level or memoised): it is part of the context value. */
+  slots?: ViewerSlots;
+  onExit?: () => void;
   children: ReactNode;
 }
 
@@ -31,13 +67,15 @@ export function ViewerProvider({
   viewer,
   keyboardTarget = typeof window === 'undefined' ? null : window,
   portalContainer = document.body,
+  slots = NO_SLOTS,
+  onExit,
   children,
 }: ViewerProviderProps) {
   // Every hook below reads this context, so a fresh object per render would
   // re-render every consumer whenever the provider's parent does.
   const value = useMemo(
-    () => ({ viewer, keyboardTarget, portalContainer }),
-    [viewer, keyboardTarget, portalContainer],
+    () => ({ viewer, keyboardTarget, portalContainer, slots, onExit }),
+    [viewer, keyboardTarget, portalContainer, slots, onExit],
   );
   return <ViewerContext.Provider value={value}>{children}</ViewerContext.Provider>;
 }
@@ -73,6 +111,12 @@ export function useViewerSurfaces(): ViewerSurfaces {
  */
 export function usePortalContainer(): Element {
   return useContext(ViewerContext)?.portalContainer ?? document.body;
+}
+
+/** The host's slots and exit, as given to the provider. */
+export function useViewerHost(): ViewerHost {
+  const { slots, onExit } = useViewerContext();
+  return { slots, onExit };
 }
 
 export function useViewerEnvironment(): ViewerEnvironment {

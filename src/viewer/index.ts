@@ -1,11 +1,15 @@
 export { type Viewer, type ViewerOptions, createViewer } from './createViewer';
 export {
+  type AnnotationActionContext,
   type ViewerEnvironment,
+  type ViewerHost,
+  type ViewerSlots,
   ViewerProvider,
   type ViewerProviderProps,
   usePortalContainer,
   useViewer,
   useViewerEnvironment,
+  useViewerHost,
   useViewerStore,
   useViewerStoreApi,
   useViewerSurfaces,
