@@ -1,12 +1,14 @@
-import { isAbort, useVolumeLoader } from '@/hooks/useVolumeLoader';
 import { type DirPickerWindow, IMPORT_ACCEPT, pickFiles } from '@/lib/file-pickers';
 import { fromDirectoryHandle, fromFileList } from '@/lib/import/scan-folder';
-import { useViewerStore } from '@/viewer';
+import * as volumeDb from '@/lib/volumeDb';
+import { isAbort, useViewer, useViewerStore } from '@/viewer';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 /**
- * Top-level app glue: worker-backed loading, file/folder pickers, and the
- * global keyboard shortcuts.
+ * Top-level app glue: what the app does once a volume loads (show the viewer
+ * route, cache the volume for reloads), the file/folder pickers, and the
+ * global keyboard shortcuts. Loading itself belongs to the viewer.
  *
  * Its result is the ViewerActions context value, so it must not subscribe to
  * anything that changes while the user works — a W/L drag or plane change here
@@ -14,23 +16,42 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
  * Store-driven effects live in `useViewerStoreEffects` instead.
  */
 export function useViewerApp() {
+  const viewer = useViewer();
   const setError = useViewerStore((s) => s.setError);
-  const {
-    loadFromSource,
-    loadFromUrl,
-    cancelLoad,
-    pendingSeries,
-    resolveSeriesChoice,
-    switchSeries,
-  } = useVolumeLoader();
+  const navigate = useNavigate();
+
+  // Runs inside the viewer's load commit, so the import screen starts
+  // unmounting in the same frame the volume lands.
+  useEffect(
+    () =>
+      viewer.onVolumeLoaded(({ volume, prepared3D, histogram }) => {
+        navigate('/viewer');
+        volumeDb
+          .saveVolume(volume, prepared3D, histogram)
+          .then((outcome) => {
+            // Skipping the cache is not a user-facing failure — the volume is
+            // already open, only the next reload will be slower. Worth a line
+            // in the console though, or a silently uncached tab looks like a bug.
+            if (!outcome.stored) {
+              console.debug(
+                `[volume-cache] skipped (${outcome.reason}) — ${Math.round(outcome.bytes / 1e6)} MB`,
+              );
+            }
+          })
+          .catch(() => {
+            /* unexpected storage failure — the volume still loaded */
+          });
+      }),
+    [viewer, navigate],
+  );
 
   const openFiles = useCallback(
     (files: FileList | File[]) => {
       const picked = Array.from(files);
       if (picked.length === 0) return;
-      void loadFromSource(fromFileList(picked));
+      void viewer.load(fromFileList(picked));
     },
-    [loadFromSource],
+    [viewer],
   );
 
   const openFolder = useCallback(async () => {
@@ -41,13 +62,13 @@ export function useViewerApp() {
     }
     try {
       const handle = await picker();
-      await loadFromSource(await fromDirectoryHandle(handle));
+      await viewer.load(await fromDirectoryHandle(handle));
     } catch (err) {
       if (!isAbort(err)) {
         setError(err instanceof Error ? err.message : 'Folder pick failed.');
       }
     }
-  }, [loadFromSource, openFiles, setError]);
+  }, [viewer, openFiles, setError]);
 
   const openFile = useCallback(() => {
     pickFiles({ accept: IMPORT_ACCEPT }, openFiles);
@@ -75,30 +96,7 @@ export function useViewerApp() {
   }, [openFolder]);
 
   return useMemo(
-    () => ({
-      loadFromSource,
-      openFiles,
-      openFolder,
-      openFile,
-      loadFromUrl,
-      cancelLoad,
-      pendingSeries,
-      resolveSeriesChoice,
-      switchSeries,
-      showShortcuts,
-      setShowShortcuts,
-    }),
-    [
-      loadFromSource,
-      openFiles,
-      openFolder,
-      openFile,
-      loadFromUrl,
-      cancelLoad,
-      pendingSeries,
-      resolveSeriesChoice,
-      switchSeries,
-      showShortcuts,
-    ],
+    () => ({ openFiles, openFolder, openFile, showShortcuts, setShowShortcuts }),
+    [openFiles, openFolder, openFile, showShortcuts],
   );
 }

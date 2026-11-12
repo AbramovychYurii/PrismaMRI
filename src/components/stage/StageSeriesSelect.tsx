@@ -5,9 +5,8 @@
  * Picking a series re-assembles it from the retained files via `switchSeries`.
  */
 
-import { useViewerActions } from '@/hooks/ViewerActionsContext';
 import type { SeriesChoice } from '@/lib/import/types';
-import { useViewerStore } from '@/viewer';
+import { useViewer, useViewerStore } from '@/viewer';
 import { ChevronDown, Layers } from 'lucide-react';
 import styled from 'styled-components';
 
@@ -97,7 +96,7 @@ export function StageSeriesSelect() {
   const seriesList = useViewerStore((s) => s.seriesList);
   const activeSeriesKey = useViewerStore((s) => s.activeSeriesKey);
   const loading = useViewerStore((s) => s.loading.active);
-  const { switchSeries } = useViewerActions();
+  const { switchSeries } = useViewer();
 
   if (!seriesList || seriesList.length <= 1) return null;
 

@@ -64,6 +64,11 @@ export interface ViewerState {
   seriesSource: ImportSource | null;
   seriesList: SeriesChoice[] | null;
   activeSeriesKey: string | null;
+  /**
+   * Series of a source being loaded, while the load waits for the user to pick
+   * one (answered with `viewer.resolveSeries`). Null otherwise.
+   */
+  pendingSeries: SeriesChoice[] | null;
 }
 
 export interface ViewerActions {
@@ -180,6 +185,7 @@ const initialState: ViewerState = {
   seriesSource: null,
   seriesList: null,
   activeSeriesKey: null,
+  pendingSeries: null,
 };
 
 /** The part of the state worth restoring after a reload. */

@@ -13,7 +13,7 @@ import { APP_NAME } from '@/constants';
 import { useViewerActions } from '@/hooks/ViewerActionsContext';
 import { type FsEntry, collectFilesFromEntry } from '@/lib/import/scan-folder';
 import { loadViewerPage } from '@/pages/loadViewerPage';
-import { useViewerStore } from '@/viewer';
+import { useViewer, useViewerStore } from '@/viewer';
 import { FolderOpen, Github } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
@@ -93,8 +93,9 @@ export function ImportOverlay() {
   const [hover, setHover] = useState(false);
   const error = useViewerStore((s) => s.error);
   const loading = useViewerStore((s) => s.loading);
-  const { openFiles, openFolder, openFile, cancelLoad, pendingSeries, resolveSeriesChoice } =
-    useViewerActions();
+  const { openFiles, openFolder, openFile } = useViewerActions();
+  const viewer = useViewer();
+  const pendingSeries = useViewerStore((s) => s.pendingSeries);
 
   // Fetch the viewer chunk while the user picks a file, so the route swap
   // after a load never waits on the network.
@@ -109,11 +110,11 @@ export function ImportOverlay() {
   useEffect(() => {
     if (!loading.active) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') cancelLoad();
+      if (e.key === 'Escape') viewer.cancel();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [loading.active, cancelLoad]);
+  }, [loading.active, viewer]);
 
   async function handleDrop(e: React.DragEvent) {
     e.preventDefault();
@@ -224,7 +225,11 @@ export function ImportOverlay() {
 
               <ButtonsRow>
                 {loading.active ? (
-                  <SecondaryButton type="button" onClick={cancelLoad} aria-label="Cancel loading">
+                  <SecondaryButton
+                    type="button"
+                    onClick={viewer.cancel}
+                    aria-label="Cancel loading"
+                  >
                     Cancel
                   </SecondaryButton>
                 ) : (
@@ -265,8 +270,8 @@ export function ImportOverlay() {
       {pendingSeries && (
         <SeriesPickerModal
           series={pendingSeries}
-          onSelect={(key) => resolveSeriesChoice(key)}
-          onCancel={() => resolveSeriesChoice(null)}
+          onSelect={(key) => viewer.resolveSeries(key)}
+          onCancel={() => viewer.resolveSeries(null)}
         />
       )}
     </ImportMain>

@@ -1,7 +1,6 @@
 import { AuroraSparkles } from '@/components/ui/AuroraSparkles';
-import { useViewerActions } from '@/hooks/ViewerActionsContext';
 import { useHover } from '@/hooks/useHover';
-import { useViewerStore } from '@/viewer';
+import { useViewer, useViewerStore } from '@/viewer';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
@@ -422,7 +421,7 @@ function ExampleCard({
 }
 
 export function ExamplesSection() {
-  const { loadFromUrl } = useViewerActions();
+  const viewer = useViewer();
   const examplesDisabled = useViewerStore((s) => s.loading.active);
 
   const trackRef = useRef<HTMLUListElement>(null);
@@ -459,7 +458,7 @@ export function ExamplesSection() {
   };
 
   const handleLoad = (ex: ExampleMeta) => () =>
-    loadFromUrl(`${NRRD_BASE}/examples/${ex.file}`, ex.file);
+    void viewer.loadUrl(`${NRRD_BASE}/examples/${ex.file}`, ex.file);
 
   return (
     <ExamplesSectionWrap aria-label="Example datasets">
