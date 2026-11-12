@@ -19,4 +19,11 @@ export {
   type ViewerStoreState,
   createViewerStore,
 } from './store';
+export {
+  type ViewerLoader,
+  type ViewerLoaderOptions,
+  type VolumeLoadRunner,
+  type VolumeLoadedListener,
+  isAbort,
+} from './loader';
 export type { ViewerSurfaces } from './surfaces';
