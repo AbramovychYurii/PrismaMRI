@@ -1,0 +1,101 @@
+.cell {
+  padding: 14px 22px 16px;
+  border-right: 1px solid var(--pmri-rule);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.cell[data-last] {
+  border-right: none;
+}
+
+/* Rides on top of the dock: 10px above it when open (DOCK_H 200 + 10). */
+.toggle {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--pmri-z-dock-ui);
+  transition: bottom 260ms ease, background 100ms, border-color 100ms;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: rgba(15, 12, 8, 0.88);
+  border: 1px solid var(--pmri-amber-dim);
+  border-radius: 50%;
+  color: var(--pmri-ink-3);
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(8px);
+}
+.toggle[data-open] {
+  bottom: 210px;
+}
+.toggle[data-hover] {
+  background: rgba(28, 22, 14, 0.97);
+  border-color: var(--pmri-amber);
+  color: var(--pmri-amber);
+}
+.toggle[data-reduced] {
+  transition: none;
+}
+
+.chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: rotate(180deg);
+  transition: transform 260ms ease;
+}
+.toggle[data-open] .chevron {
+  transform: rotate(0deg);
+}
+.toggle[data-reduced] .chevron {
+  transition: none;
+}
+
+/* 200px tall — DOCK_H in Dock.tsx. */
+.panel {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 200px;
+  transform: translateY(200px);
+  transition: transform 260ms ease;
+  z-index: var(--pmri-z-dock-panel);
+  background: var(--pmri-panel);
+  border-top: 1px solid var(--pmri-rule);
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 1.5fr 1fr;
+  align-items: stretch;
+  padding-bottom: 12px;
+}
+.panel[data-open] {
+  transform: translateY(0);
+}
+.panel[data-reduced] {
+  transition: none;
+}
+
+.headLine {
+  flex: 1;
+  height: 1px;
+  background: var(--pmri-rule);
+}
+
+.headTitle {
+  font-family: var(--pmri-serif);
+  font-size: 15px;
+  color: var(--pmri-ink);
+  letter-spacing: 0.005em;
+}
+
+.styledCellHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}

@@ -1,35 +1,7 @@
 import { usePortalContainer } from '@/viewer';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import styled from 'styled-components';
-
-const TipBox = styled.div<{ $x: number; $y: number; $above: boolean }>`
-  position: fixed;
-  left: ${({ $x }) => $x}px;
-  top: ${({ $y }) => $y}px;
-  transform: ${({ $above }) => ($above ? 'translate(-50%, -100%)' : 'translateX(-50%)')};
-  white-space: nowrap;
-  background: var(--surface-glass);
-  border: 1px solid var(--highlight-border);
-  border-radius: 4px;
-  padding: 4px 9px;
-  font-family: var(--sans);
-  font-size: 11px;
-  color: var(--ink-2);
-  pointer-events: none;
-  z-index: var(--z-popover);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
-  animation: _tip-in 80ms ease forwards;
-
-  @keyframes _tip-in {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
-  }
-`;
+import styles from './Tooltip.module.css';
 
 /** Where the tip goes for an element: centred under it, or above it. */
 function anchorOf(el: Element, above: boolean): { x: number; y: number } {
@@ -78,9 +50,14 @@ export function useTooltip(label: string, above = false) {
 
   const portal = pos
     ? createPortal(
-        <TipBox role="tooltip" $x={pos.x} $y={pos.y} $above={above}>
+        <div
+          className={styles.tip}
+          role="tooltip"
+          data-above={above || undefined}
+          style={{ left: pos.x, top: pos.y }}
+        >
           {label}
-        </TipBox>,
+        </div>,
         portalContainer,
       )
     : null;
@@ -123,9 +100,14 @@ export const Tooltip = memo(function Tooltip({ label, above = false, children }:
       {children}
       {pos &&
         createPortal(
-          <TipBox role="tooltip" $x={pos.x} $y={pos.y} $above={above}>
+          <div
+            className={styles.tip}
+            role="tooltip"
+            data-above={above || undefined}
+            style={{ left: pos.x, top: pos.y }}
+          >
             {label}
-          </TipBox>,
+          </div>,
           portalContainer,
         )}
     </span>

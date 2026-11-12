@@ -8,84 +8,7 @@
 import type { SeriesChoice } from '@/lib/import/types';
 import { useViewer, useViewerFeatures, useViewerStore } from '@/viewer';
 import { ChevronDown, Layers } from 'lucide-react';
-import styled from 'styled-components';
-
-const Wrap = styled.div`
-  position: absolute;
-  top: 22px;
-  left: 30px;
-  z-index: var(--z-panel-chrome);
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 10px 0 12px;
-  height: 44px;
-  background: rgba(20, 18, 14, 0.85);
-  backdrop-filter: blur(8px);
-  border: 1px solid var(--rule);
-  border-radius: 999px;
-  color: var(--ink-2);
-  transition: 120ms;
-
-  &:hover {
-    background: rgba(28, 24, 18, 0.92);
-    border-color: var(--amber-dim);
-    color: var(--ink);
-  }
-
-  [data-layout='mobile'] & {
-    top: 12px;
-    left: 12px;
-    height: 40px;
-  }
-`;
-
-const IconWrap = styled.span`
-  display: inline-flex;
-  color: var(--amber);
-  pointer-events: none;
-`;
-
-const SelectInner = styled.div`
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-`;
-
-const Select = styled.select`
-  appearance: none;
-  -webkit-appearance: none;
-  background: transparent;
-  border: none;
-  outline: none;
-  color: inherit;
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 0 20px 0 0;
-  max-width: 230px;
-  cursor: pointer;
-
-  /* Native option list is light-on-dark on most platforms; force readable. */
-  option {
-    background: #14120e;
-    color: var(--ink);
-    text-transform: none;
-    letter-spacing: normal;
-  }
-
-  &:focus-visible {
-    color: var(--ink);
-  }
-`;
-
-const Chevron = styled(ChevronDown)`
-  position: absolute;
-  right: 0;
-  pointer-events: none;
-  color: var(--ink-3);
-`;
+import styles from './StageSeriesSelect.module.css';
 
 function optionLabel(s: SeriesChoice): string {
   const bits = [s.label, s.orientation, `${s.count} sl`].filter(Boolean);
@@ -102,12 +25,13 @@ export function StageSeriesSelect() {
   if (!seriesSelect || !seriesList || seriesList.length <= 1) return null;
 
   return (
-    <Wrap>
-      <IconWrap aria-hidden="true">
+    <div className={styles.wrap}>
+      <span className={styles.iconWrap} aria-hidden="true">
         <Layers size={15} />
-      </IconWrap>
-      <SelectInner>
-        <Select
+      </span>
+      <div className={styles.selectInner}>
+        <select
+          className={styles.select}
           aria-label="Switch series"
           value={activeSeriesKey ?? ''}
           disabled={loading}
@@ -118,9 +42,9 @@ export function StageSeriesSelect() {
               {optionLabel(s)}
             </option>
           ))}
-        </Select>
-        <Chevron size={14} aria-hidden="true" />
-      </SelectInner>
-    </Wrap>
+        </select>
+        <ChevronDown className={styles.chevron} size={14} aria-hidden="true" />
+      </div>
+    </div>
   );
 }

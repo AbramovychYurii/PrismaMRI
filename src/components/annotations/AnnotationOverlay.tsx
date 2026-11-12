@@ -6,67 +6,9 @@
 
 import { sliceIndex } from '@/lib/volume/plane';
 import type { Annotation, SlicePlane } from '@/types';
-import { useViewerFeatures, useViewerStore, useViewerTheme, withAlpha } from '@/viewer';
-import { memo, useMemo } from 'react';
-import styled from 'styled-components';
-
-const Overlay = styled.div`
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: var(--z-panel-top);
-  overflow: visible;
-`;
-
-const Pin = styled.button<{ $color: string; $active: boolean }>`
-  position: absolute;
-  transform: translate(-50%, -50%);
-  width: ${({ $active }) => ($active ? '30px' : '24px')};
-  height: ${({ $active }) => ($active ? '30px' : '24px')};
-  border-radius: 50%;
-  padding: 0;
-  background: transparent;
-  /* Thin ring — kept slim so it never hides the underlying anatomy. */
-  border: ${({ $active }) => ($active ? '1.75px' : '1.25px')} solid ${({ $color }) => $color};
-  box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.55),
-    0 0 ${({ $active }) => ($active ? '12px' : '6px')} ${({ $color }) => withAlpha($color, 0.667)};
-  cursor: pointer;
-  pointer-events: auto;
-  -webkit-tap-highlight-color: transparent;
-  animation: annotation-pulse 2.4s ease-in-out infinite;
-
-  @keyframes annotation-pulse {
-    0%, 100% { box-shadow: 0 0 0 1px rgba(0,0,0,0.55), 0 0 6px ${({ $color }) => withAlpha($color, 0.533)}; }
-    50%       { box-shadow: 0 0 0 1px rgba(0,0,0,0.55), 0 0 13px ${({ $color }) => withAlpha($color, 0.867)}; }
-  }
-`;
-
-const PinLabel = styled.span<{
-  $color: string;
-  $side: 'left' | 'right';
-  $vSide: 'top' | 'bottom' | 'center';
-}>`
-  position: absolute;
-  ${({ $side }) => ($side === 'right' ? 'left: calc(100% + 7px);' : 'right: calc(100% + 7px);')}
-  ${({ $vSide }) =>
-    $vSide === 'center'
-      ? 'top: 50%; transform: translateY(-50%);'
-      : $vSide === 'top'
-        ? 'top: 0;'
-        : 'bottom: 0;'}
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  white-space: nowrap;
-  color: ${({ $color }) => $color};
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
-  background: rgba(8, 7, 5, 0.72);
-  padding: 2px 6px;
-  border-radius: 3px;
-  border: 1px solid ${({ $color }) => withAlpha($color, 0.267)};
-  pointer-events: none;
-`;
+import { useViewerFeatures, useViewerStore, useViewerTheme } from '@/viewer';
+import { type CSSProperties, memo, useMemo } from 'react';
+import styles from './AnnotationOverlay.module.css';
 
 const PinItem = memo(function PinItem({
   annotation,
@@ -83,11 +25,18 @@ const PinItem = memo(function PinItem({
   const labelSide = annotation.fx > 0.55 ? 'left' : 'right';
   const labelVSide = annotation.fy < 0.15 ? 'top' : annotation.fy > 0.85 ? 'bottom' : 'center';
   return (
-    <Pin
+    <button
+      className={styles.pin}
       type="button"
-      $color={color}
-      $active={active}
-      style={{ left: `${annotation.fx * 100}%`, top: `${annotation.fy * 100}%`, opacity }}
+      data-active={active || undefined}
+      style={
+        {
+          left: `${annotation.fx * 100}%`,
+          top: `${annotation.fy * 100}%`,
+          opacity,
+          '--pin-color': color,
+        } as CSSProperties
+      }
       title={annotation.label}
       aria-label={`${annotation.severity}: ${annotation.label}`}
       onClick={(e) => {
@@ -97,11 +46,11 @@ const PinItem = memo(function PinItem({
       onPointerDown={(e) => e.stopPropagation()}
     >
       {active && (
-        <PinLabel $color={color} $side={labelSide} $vSide={labelVSide}>
+        <span className={styles.pinLabel} data-side={labelSide} data-vside={labelVSide}>
           {annotation.label}
-        </PinLabel>
+        </span>
       )}
-    </Pin>
+    </button>
   );
 });
 
@@ -133,7 +82,7 @@ export function AnnotationOverlay({
   if (!enabled || !cursor || visible.length === 0) return null;
 
   return (
-    <Overlay>
+    <div className={styles.overlay}>
       {visible.map(({ a, dist }) => (
         <PinItem
           key={a.id}
@@ -143,6 +92,6 @@ export function AnnotationOverlay({
           onSelect={focusAnnotation}
         />
       ))}
-    </Overlay>
+    </div>
   );
 }

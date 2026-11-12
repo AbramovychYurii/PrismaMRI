@@ -23,17 +23,7 @@ import { useViewerEnvironment, useViewerLabels, useViewerLayout, useViewerStore 
 import { ChevronsUpDown, Maximize2, Minimize2 } from 'lucide-react';
 import { useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import {
-  ActiveBorder,
-  ButtonTray,
-  FullscreenOverlay,
-  MobileCounter,
-  MobileRightCol,
-  PanelFooter,
-  PanelWrap,
-  SliceDim,
-  StyledCanvas,
-} from './SlicePanel.styles';
+import styles from './SlicePanel.module.css';
 
 function ExpandedSlicePanel({ plane }: { plane: SlicePlane }) {
   // Drawn inside the viewer, over its stage and rail — not over the host page.
@@ -73,9 +63,10 @@ function ExpandedSlicePanel({ plane }: { plane: SlicePlane }) {
   useEscapeKey(onClose);
 
   return createPortal(
-    <FullscreenOverlay
+    <div
+      className={styles.fullscreenOverlay}
       ref={overlayRef}
-      $isActive={isActive}
+      data-active={isActive || undefined}
       onClick={(e) => {
         e.stopPropagation();
         if (!e.shiftKey) moveCrosshair(e);
@@ -87,7 +78,10 @@ function ExpandedSlicePanel({ plane }: { plane: SlicePlane }) {
       {...dragHandlers}
       {...panelKeys}
     >
-      <StyledCanvas ref={core.frame.canvasRef as React.Ref<HTMLCanvasElement>} />
+      <canvas
+        className={styles.styledCanvas}
+        ref={core.frame.canvasRef as React.Ref<HTMLCanvasElement>}
+      />
 
       <SliceCrosshair
         plane={plane}
@@ -100,7 +94,7 @@ function ExpandedSlicePanel({ plane }: { plane: SlicePlane }) {
 
       <PlaneHeading plane={plane} />
 
-      <ButtonTray>
+      <div className={styles.buttonTray}>
         <ExportSliceButton canvasRef={core.frame.canvasRef} plane={plane} idx={idx} large />
         <TrayButton large label="Collapse panel" onClick={onClose}>
           <Minimize2 size={13} />
@@ -115,7 +109,7 @@ function ExpandedSlicePanel({ plane }: { plane: SlicePlane }) {
             <ChevronsUpDown size={13} />
           </TrayButton>
         )}
-      </ButtonTray>
+      </div>
 
       {total > 0 && (
         <SliceScrubber
@@ -128,18 +122,18 @@ function ExpandedSlicePanel({ plane }: { plane: SlicePlane }) {
         />
       )}
 
-      <PanelFooter $scrubVisible={scrubVisible}>
+      <div className={styles.panelFooter} data-scrub={scrubVisible || undefined}>
         <span>
           {hint} · {PLANE_AXIS_CODE[plane]}
           {measure.enabled && ' · SHIFT+DRAG · MEASURE'}
         </span>
         {total > 0 && <SliceCount idx={idx} total={total} />}
-      </PanelFooter>
+      </div>
 
-      {isActive && <ActiveBorder />}
+      {isActive && <div className={styles.activeBorder} />}
 
       <MeasureContextMenu measure={measure} onSnapToView={core.onSnapToView} />
-    </FullscreenOverlay>,
+    </div>,
     container,
   );
 }
@@ -164,17 +158,18 @@ function RailSlicePanel({ plane }: { plane: SlicePlane }) {
   const scrubberVisible = isMobile || scrubVisible;
 
   return (
-    <PanelWrap
+    <div
+      className={styles.panelWrap}
       data-testid={`slice-panel-${plane}`}
       data-slice-panel={plane}
       onClick={moveCrosshair}
       onWheel={core.slice.onWheel}
       {...swipeHandlers}
       {...panelKeys}
-      $isLast={plane === 'axial'}
-      $isActive={isActive}
+      data-last={plane === 'axial' || undefined}
+      data-active={isActive || undefined}
     >
-      <StyledCanvas ref={canvasRef as React.Ref<HTMLCanvasElement>} />
+      <canvas className={styles.styledCanvas} ref={canvasRef as React.Ref<HTMLCanvasElement>} />
 
       <SliceCrosshair
         plane={plane}
@@ -186,7 +181,7 @@ function RailSlicePanel({ plane }: { plane: SlicePlane }) {
       <PlaneHeading plane={plane} />
 
       {isMobile ? (
-        <MobileRightCol>
+        <div className={styles.mobileRightCol}>
           {total > 0 && (
             <SliceScrubber
               axis={plane}
@@ -199,15 +194,15 @@ function RailSlicePanel({ plane }: { plane: SlicePlane }) {
           )}
           <ExportSliceButton canvasRef={canvasRef} plane={plane} idx={idx} />
           {total > 0 && (
-            <MobileCounter>
+            <span className={styles.mobileCounter}>
               {idx}
-              <SliceDim> / {total}</SliceDim>
-            </MobileCounter>
+              <span className={styles.sliceDim}> / {total}</span>
+            </span>
           )}
-        </MobileRightCol>
+        </div>
       ) : (
         <>
-          <ButtonTray>
+          <div className={styles.buttonTray}>
             <TrayButton label="Expand panel" onClick={() => setExpandedPlane(plane)}>
               <Maximize2 size={11} />
             </TrayButton>
@@ -220,7 +215,7 @@ function RailSlicePanel({ plane }: { plane: SlicePlane }) {
                 <ChevronsUpDown size={11} />
               </TrayButton>
             )}
-          </ButtonTray>
+          </div>
           {total > 0 && (
             <SliceScrubber
               axis={plane}
@@ -233,19 +228,19 @@ function RailSlicePanel({ plane }: { plane: SlicePlane }) {
         </>
       )}
 
-      <PanelFooter $scrubVisible={scrubberVisible}>
+      <div className={styles.panelFooter} data-scrub={scrubberVisible || undefined}>
         <span>
           {labels.planes[plane].hint} · {PLANE_AXIS_CODE[plane]}
         </span>
         {!isMobile && total > 0 && <SliceCount idx={idx} total={total} />}
-      </PanelFooter>
+      </div>
 
-      {isActive && <ActiveBorder />}
+      {isActive && <div className={styles.activeBorder} />}
 
       <MeasureContextMenu measure={measure} onSnapToView={core.onSnapToView} />
 
       <AnnotationOverlay plane={plane} halfSlabs={halfSlabs} />
-    </PanelWrap>
+    </div>
   );
 }
 

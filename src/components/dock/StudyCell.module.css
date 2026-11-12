@@ -1,0 +1,31 @@
+.studyGrid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  row-gap: 5px;
+  column-gap: 14px;
+  align-items: baseline;
+  flex: 1;
+}
+
+.rowKey {
+  font-family: var(--pmri-mono);
+  font-size: 10px;
+  color: var(--pmri-ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+}
+
+.rowValue {
+  font-family: var(--pmri-mono);
+  font-size: 12px;
+  color: var(--pmri-ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.rowDim {
+  color: var(--pmri-ink-3);
+}

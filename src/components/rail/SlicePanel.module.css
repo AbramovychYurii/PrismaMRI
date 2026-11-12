@@ -1,0 +1,278 @@
+/* A rail panel. Focusable for keyboard use; the ring sits inside, where no
+   neighbour or clipping parent can cover it. */
+.panelWrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  background: var(--pmri-surface-deep);
+  border-bottom: 1px solid var(--pmri-rule);
+  overflow: visible;
+  cursor: pointer;
+  touch-action: none;
+}
+.panelWrap:focus-visible {
+  outline-offset: -3px;
+}
+.panelWrap[data-last] {
+  border-bottom: none;
+}
+.panelWrap[data-active] {
+  cursor: crosshair;
+}
+
+/* Crosshair lines take their axis colour and glow from --cross-color / --cross-glow. */
+.crossH,
+.crossV {
+  position: absolute;
+  background: var(--cross-color);
+  opacity: 0.7;
+  box-shadow: 0 0 4px var(--cross-glow);
+}
+.crossH {
+  left: 0;
+  right: 0;
+  height: 1px;
+}
+.crossV {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+}
+
+.planeGlyph {
+  font-family: var(--pmri-serif);
+  font-style: italic;
+  font-size: 18px;
+  line-height: 1;
+  font-weight: 500;
+}
+
+.planeLabelAccent {
+  font-weight: 600;
+}
+
+.panelFooter {
+  position: absolute;
+  bottom: 8px;
+  left: 14px;
+  right: 14px;
+  z-index: var(--pmri-z-panel-header);
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--pmri-mono);
+  font-size: 9.5px;
+  color: var(--pmri-ink-3);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  pointer-events: none;
+  transition: right 160ms ease;
+}
+.panelFooter[data-scrub] {
+  right: 48px;
+}
+
+.activeBorder {
+  position: absolute;
+  inset: 0;
+  z-index: var(--pmri-z-panel-chrome);
+  border: 1.5px solid var(--pmri-amber);
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pmri-amber) 15%, transparent);
+}
+
+.trayBtn {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 3px;
+  border: 1px solid var(--pmri-rule);
+  background: rgba(15, 13, 10, 0.9);
+  color: var(--pmri-ink-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+}
+.trayBtn[data-large] {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+}
+.trayBtn[data-active] {
+  border-color: var(--pmri-amber-dim);
+  background: color-mix(in srgb, var(--pmri-amber) 8%, transparent);
+  color: var(--pmri-amber);
+}
+.trayBtn:not([data-active]):hover {
+  border-color: var(--pmri-rule-2);
+  color: var(--pmri-ink);
+}
+[data-layout="mobile"] .trayBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+}
+
+/* The fullscreen panel. Focusable for keyboard use; the ring sits inside. */
+.fullscreenOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: var(--pmri-z-fullscreen);
+  background: var(--pmri-surface-deep);
+  overflow: hidden;
+  cursor: default;
+}
+.fullscreenOverlay:focus-visible {
+  outline-offset: -3px;
+}
+.fullscreenOverlay[data-active] {
+  cursor: crosshair;
+}
+
+.styledCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.crosshairOverlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: var(--pmri-z-overlay-local);
+}
+
+.crossCenter {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  transform: translate(-50%, -50%);
+}
+
+.crossDot {
+  position: absolute;
+  inset: 4px;
+  border: 1px solid var(--pmri-teal);
+  border-radius: 99px;
+  opacity: 0.7;
+}
+
+.panelHeader {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  padding: 0 62px 0 14px;
+  background: linear-gradient(to bottom, rgba(8, 7, 5, 0.92), rgba(8, 7, 5, 0.55) 70%, transparent);
+  z-index: var(--pmri-z-panel-header);
+  gap: 12px;
+  min-width: 0;
+}
+
+.planeLabel {
+  font-family: var(--pmri-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--pmri-ink-2);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.sliceCounter {
+  font-family: var(--pmri-mono);
+  font-size: 11px;
+  color: var(--pmri-ink-2);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+  margin-right: 3px;
+}
+
+.sliceDim {
+  color: var(--pmri-ink-3);
+}
+
+.measureLine {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: var(--pmri-z-panel-top);
+  overflow: visible;
+}
+
+.measureDot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--pmri-measure);
+  pointer-events: none;
+  z-index: var(--pmri-z-panel-top);
+}
+
+/* Live distance chip rendered next to the measurement line. */
+.measureLabel {
+  position: absolute;
+  transform: translate(10px, -50%);
+  font-family: var(--pmri-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--pmri-measure);
+  background: rgba(8, 7, 5, 0.82);
+  border: 1px solid var(--pmri-measure-glow);
+  border-radius: 3px;
+  padding: 2px 6px;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: var(--pmri-z-panel-top);
+  box-shadow: 0 0 6px var(--pmri-measure-glow);
+  font-variant-numeric: tabular-nums;
+}
+
+.buttonTray {
+  position: absolute;
+  top: 5px;
+  right: 8px;
+  z-index: var(--pmri-z-panel-top);
+  display: flex;
+  gap: 7px;
+  pointer-events: auto;
+}
+
+/* Mobile-only right column: stacks Scrubber → Eye icon → Counter using flex-column + gap so no pixel math is needed. */
+.mobileRightCol {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 46px;
+  z-index: var(--pmri-z-panel-chrome);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 6px 18px 4px;
+  background: linear-gradient(to left, rgba(10, 8, 5, 0.85), transparent 70%);
+  pointer-events: none;
+}
+
+.mobileCounter {
+  font-family: var(--pmri-mono);
+  font-size: 11px;
+  color: var(--pmri-ink-2);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+  pointer-events: none;
+}

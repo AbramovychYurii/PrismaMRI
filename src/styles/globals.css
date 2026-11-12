@@ -160,44 +160,6 @@ textarea {
   font-variant-numeric: tabular-nums;
 }
 
-/* === W/L sliders (Display cell) === */
-.wl-slider {
-  --accent: var(--amber);
-  --fill: 0%;
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 4px;
-  border-radius: 99px;
-  background: linear-gradient(
-    to right,
-    var(--accent) 0%,
-    var(--accent) var(--fill),
-    var(--rule) var(--fill),
-    var(--rule) 100%
-  );
-  cursor: ew-resize;
-}
-.wl-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 99px;
-  background: var(--accent);
-  border: 2px solid var(--panel);
-  box-shadow: 0 0 0 1px var(--accent), 0 0 6px color-mix(in srgb, var(--accent) 50%, transparent);
-  cursor: ew-resize;
-}
-.wl-slider::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  border-radius: 99px;
-  background: var(--accent);
-  border: 2px solid var(--panel);
-  cursor: ew-resize;
-}
-
 /* ── Mobile overrides (≤ 767px) ────────────────────────────────────────────── */
 
 @media (max-width: 767px) {
@@ -205,22 +167,6 @@ textarea {
     /* Prevent pull-to-refresh and other unwanted touch behaviours. */
     overscroll-behavior: none;
     touch-action: manipulation;
-  }
-
-  /* Larger, easier-to-hit slider thumb on touch screens. */
-  .wl-slider {
-    height: 6px;
-    cursor: default;
-  }
-  .wl-slider::-webkit-slider-thumb {
-    width: 26px;
-    height: 26px;
-    cursor: default;
-  }
-  .wl-slider::-moz-range-thumb {
-    width: 26px;
-    height: 26px;
-    cursor: default;
   }
 
   /* Thinner scrollbars — less visual noise on small screens. */

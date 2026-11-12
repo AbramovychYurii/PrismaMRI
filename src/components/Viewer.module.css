@@ -1,0 +1,66 @@
+/* Fills its container. `isolation` keeps the viewer's own stacking — dock, focus mode, the findings card — from reaching over the host's page. */
+.viewerRoot {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+/* Focusable only so a click inside gives the shortcuts somewhere to land. */
+.viewerRoot:focus {
+  outline: none;
+}
+
+.mobileColumn {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Content area above the tab bar. */
+.mobileContent {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Full-bleed wrapper for a single slice panel on mobile. */
+.mobileSliceWrap {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Scrollable container for the controls tab. */
+.mobileControlsWrap {
+  position: absolute;
+  inset: 0;
+}
+
+.desktopGrid {
+  display: grid;
+  grid-template-columns: 1fr 0px;
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: "stage rail";
+  height: 100%;
+}
+.desktopGrid[data-rail] {
+  grid-template-columns: 1fr 360px;
+}
+
+/* Wraps the 3D Stage. Always in the DOM to preserve the WebGL context. */
+.stageWrap {
+  position: absolute;
+  inset: 0;
+  /* Use visibility (not display) so getBoundingClientRect keeps correct dims. */
+  visibility: hidden;
+  pointer-events: none;
+}
+.stageWrap[data-visible] {
+  visibility: visible;
+  pointer-events: auto;
+}

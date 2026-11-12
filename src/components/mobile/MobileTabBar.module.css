@@ -1,0 +1,33 @@
+.bar {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--tab-count), 1fr);
+  background: var(--pmri-panel);
+  border-top: 1px solid var(--pmri-rule);
+  /* Safe area for notch phones (iPhone X+) */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* The active tab takes its accent as an inline colour. */
+.tabBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 10px 4px 8px;
+  min-height: 56px;
+  border: none;
+  background: none;
+  color: var(--pmri-ink-3);
+  cursor: pointer;
+  transition: color 100ms;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tabLabel {
+  font-family: var(--pmri-mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}

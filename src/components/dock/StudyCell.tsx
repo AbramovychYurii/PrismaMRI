@@ -1,38 +1,6 @@
 import { intensityUnit } from '@/lib/volume/units';
 import { useViewerStore } from '@/viewer';
-import styled from 'styled-components';
-
-const StudyGrid = styled.div`
-  display: grid;
-  grid-template-columns: auto 1fr;
-  row-gap: 5px;
-  column-gap: 14px;
-  align-items: baseline;
-  flex: 1;
-`;
-
-const RowKey = styled.div`
-  font-family: var(--mono);
-  font-size: 10px;
-  color: var(--ink-3);
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-`;
-
-const RowValue = styled.div`
-  font-family: var(--mono);
-  font-size: 12px;
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-`;
-
-const RowDim = styled.span`
-  color: var(--ink-3);
-`;
+import styles from './StudyCell.module.css';
 
 function formatBytes(n: number) {
   if (n < 1024) return `${n} B`;
@@ -44,11 +12,11 @@ function formatBytes(n: number) {
 function Row({ k, v, dim }: { k: string; v: string; dim?: string }) {
   return (
     <>
-      <RowKey>{k}</RowKey>
-      <RowValue>
+      <div className={styles.rowKey}>{k}</div>
+      <div className={styles.rowValue}>
         {v}
-        {dim && <RowDim>{` ${dim}`}</RowDim>}
-      </RowValue>
+        {dim && <span className={styles.rowDim}>{` ${dim}`}</span>}
+      </div>
     </>
   );
 }
@@ -63,7 +31,7 @@ export function StudyCell() {
   const bytes = voxelCount * bytesPerVoxel;
 
   return (
-    <StudyGrid>
+    <div className={styles.studyGrid}>
       <Row k="ID" v={meta?.studyId ?? '—'} />
       <Row k="Acquired" v={meta?.acquired ?? '—'} />
       <Row k="Protocol" v={meta?.protocol ?? '—'} />
@@ -81,6 +49,6 @@ export function StudyCell() {
         }
       />
       <Row k="Source" v={volume ? 'Local · in-memory' : '—'} />
-    </StudyGrid>
+    </div>
   );
 }

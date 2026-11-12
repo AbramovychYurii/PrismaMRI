@@ -1,62 +1,7 @@
 import { HistogramBar } from '@/components/dock/HistogramBar';
 import { intensityUnit } from '@/lib/volume/units';
 import { useViewerStore } from '@/viewer';
-import styled from 'styled-components';
-
-const DisplayCellWrap = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-  flex: 1;
-`;
-
-const SliderRowWrap = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-`;
-
-const SliderLabelRow = styled.div`
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-`;
-
-const SliderName = styled.div`
-  font-family: var(--serif);
-  font-size: 15px;
-  color: var(--ink);
-  letter-spacing: -0.005em;
-  line-height: 1;
-`;
-
-const SliderValue = styled.div`
-  font-family: var(--mono);
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-  letter-spacing: -0.01em;
-`;
-
-const HuLabel = styled.span`
-  font-family: var(--mono);
-  font-size: 10px;
-  color: var(--ink-3);
-  font-weight: 400;
-  margin-left: 4px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-`;
-
-const SliderHint = styled.div`
-  font-family: var(--sans);
-  font-size: 11.5px;
-  color: var(--ink-3);
-  line-height: 1.4;
-`;
+import styles from './DisplayCell.module.css';
 
 interface SliderRowProps {
   name: 'Window' | 'Level';
@@ -77,17 +22,18 @@ function SliderRow({ name, value, unit, min, max, accent, hint, onChange }: Slid
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => onChange(Number(e.target.value));
 
   return (
-    <SliderRowWrap>
-      <SliderLabelRow>
-        <SliderName>{name}</SliderName>
-        <SliderValue>
+    <div className={styles.sliderRowWrap}>
+      <div className={styles.sliderLabelRow}>
+        <div className={styles.sliderName}>{name}</div>
+        <div className={styles.sliderValue}>
           {Math.round(value)}
-          {unit && <HuLabel>{unit}</HuLabel>}
-        </SliderValue>
-      </SliderLabelRow>
+          {unit && <span className={styles.huLabel}>{unit}</span>}
+        </div>
+      </div>
       <input
         type="range"
-        className="wl-slider"
+        // `wl-slider` is unstyled: kept as the hook the e2e specs find the sliders by.
+        className={`wl-slider ${styles.wlSlider}`}
         aria-label={name}
         aria-valuetext={unit ? `${Math.round(value)} ${unit}` : String(Math.round(value))}
         min={min}
@@ -97,13 +43,13 @@ function SliderRow({ name, value, unit, min, max, accent, hint, onChange }: Slid
         onChange={handleChange}
         style={
           {
-            '--accent': accent,
-            '--fill': fill,
+            '--slider-accent': accent,
+            '--slider-fill': fill,
           } as React.CSSProperties
         }
       />
-      <SliderHint>{hint}</SliderHint>
-    </SliderRowWrap>
+      <div className={styles.sliderHint}>{hint}</div>
+    </div>
   );
 }
 
@@ -128,7 +74,7 @@ export function DisplayCell() {
   const handleLevelChange = (v: number) => commit({ level: v });
 
   return (
-    <DisplayCellWrap>
+    <div className={styles.displayCellWrap}>
       {histogram && <HistogramBar histogram={histogram} wl={wlDraft} />}
       <SliderRow
         name="Window"
@@ -136,7 +82,7 @@ export function DisplayCell() {
         unit={unit}
         min={1}
         max={fullSpan}
-        accent="var(--amber)"
+        accent="var(--pmri-amber)"
         hint="Contrast span — narrower window sharpens bone & raises 3D contrast."
         onChange={handleWindowChange}
       />
@@ -146,10 +92,10 @@ export function DisplayCell() {
         unit={unit}
         min={scalarMin}
         max={scalarMax}
-        accent="var(--teal)"
+        accent="var(--pmri-teal)"
         hint="Brightness center — higher emphasizes dense tissue in 2D & 3D."
         onChange={handleLevelChange}
       />
-    </DisplayCellWrap>
+    </div>
   );
 }

@@ -24,5 +24,8 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.test.ts'],
     restoreMocks: true,
+    // CSS imports are stubbed to '' by default; the token test reads the real
+    // tokens.css (via ?raw) to keep it in step with the default theme.
+    css: { include: [/tokens\.css/] },
   },
 });

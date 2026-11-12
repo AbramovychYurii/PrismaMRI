@@ -1,0 +1,39 @@
+.backButton {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 9px 14px;
+  border: 1px solid var(--pmri-rule-2);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--pmri-ink);
+  font-family: var(--pmri-sans);
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: 120ms;
+}
+.backButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.disclaimer {
+  margin-top: 10px;
+  font-family: var(--pmri-sans);
+  font-size: 10.5px;
+  color: var(--pmri-ink-3);
+  line-height: 1.4;
+  padding-top: 8px;
+  border-top: 1px dashed var(--pmri-rule);
+}
+/* Alone when the host offers no way back. */
+.disclaimer:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.disclaimerBold {
+  color: var(--pmri-ink-2);
+}

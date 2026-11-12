@@ -1,61 +1,9 @@
 import { useMenuKeyboard } from '@/hooks/useMenuKeyboard';
 import { usePortalContainer } from '@/viewer';
-import { accentAlpha } from '@/viewer/theme';
 import { Eye, MapPin, Ruler, Trash2 } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import styled from 'styled-components';
-
-const Menu = styled.div`
-  position: fixed;
-  z-index: var(--z-popover);
-  background: var(--surface-glass);
-  border: 1px solid var(--rule);
-  border-radius: 6px;
-  padding: 3px 0;
-  min-width: 196px;
-  box-shadow:
-    0 8px 28px rgba(0, 0, 0, 0.7),
-    0 0 0 1px var(--highlight-xs);
-  backdrop-filter: blur(12px);
-`;
-
-const Item = styled.button`
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: 100%;
-  padding: 7px 13px;
-  background: none;
-  border: none;
-  color: var(--ink-2);
-  font-family: var(--sans);
-  font-size: 12.5px;
-  line-height: 1;
-  cursor: pointer;
-  text-align: left;
-  white-space: nowrap;
-
-  &:hover {
-    background: var(--highlight-sm);
-    color: var(--ink);
-  }
-`;
-
-const DangerItem = styled(Item)`
-  color: var(--ink-3);
-
-  &:hover {
-    background: ${accentAlpha('amber', 0.08)};
-    color: var(--amber);
-  }
-`;
-
-const Divider = styled.div`
-  height: 1px;
-  background: var(--rule);
-  margin: 3px 0;
-`;
+import styles from './MeasureMenu.module.css';
 
 interface Props {
   x: number;
@@ -110,7 +58,9 @@ export function MeasureMenu({
   }
 
   return createPortal(
-    <Menu
+    // biome-ignore lint/a11y/useKeyWithClickEvents: the click handler only stops clicks reaching the panel below; keys go through useMenuKeyboard
+    <div
+      className={styles.menu}
       ref={ref}
       role="menu"
       aria-label="Slice actions"
@@ -119,33 +69,57 @@ export function MeasureMenu({
     >
       {canMeasure && (
         <>
-          <Item type="button" role="menuitem" tabIndex={-1} onClick={wrap(onMeasureFrom)}>
+          <button
+            className={styles.item}
+            type="button"
+            role="menuitem"
+            tabIndex={-1}
+            onClick={wrap(onMeasureFrom)}
+          >
             <MapPin size={12} />
             Measure from here
-          </Item>
+          </button>
           {hasMeasurementFrom && (
-            <Item type="button" role="menuitem" tabIndex={-1} onClick={wrap(onMeasureTo)}>
+            <button
+              className={styles.item}
+              type="button"
+              role="menuitem"
+              tabIndex={-1}
+              onClick={wrap(onMeasureTo)}
+            >
               <Ruler size={12} />
               Measure to here
-            </Item>
+            </button>
           )}
-          <Divider aria-hidden />
+          <div className={styles.divider} aria-hidden />
         </>
       )}
-      <Item type="button" role="menuitem" tabIndex={-1} onClick={wrap(onSnapToView)}>
+      <button
+        className={styles.item}
+        type="button"
+        role="menuitem"
+        tabIndex={-1}
+        onClick={wrap(onSnapToView)}
+      >
         <Eye size={12} />
         View from this side
-      </Item>
+      </button>
       {hasMeasurementFrom && (
         <>
-          <Divider aria-hidden />
-          <DangerItem type="button" role="menuitem" tabIndex={-1} onClick={wrap(onClear)}>
+          <div className={styles.divider} aria-hidden />
+          <button
+            className={`${styles.item} ${styles.dangerItem}`}
+            type="button"
+            role="menuitem"
+            tabIndex={-1}
+            onClick={wrap(onClear)}
+          >
             <Trash2 size={12} />
             Clear measurement
-          </DangerItem>
+          </button>
         </>
       )}
-    </Menu>,
+    </div>,
     portalContainer,
   );
 }

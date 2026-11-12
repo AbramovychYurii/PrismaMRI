@@ -35,6 +35,8 @@ export {
   type VolumeLoadedListener,
   isAbort,
 } from './loader';
+import './tokens.css';
+
 export type { ViewerSurfaces } from './surfaces';
 export {
   ALL_RENDER_PRESETS,

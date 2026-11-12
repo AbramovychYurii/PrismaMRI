@@ -4,82 +4,7 @@ import { useStageExport } from '@/hooks/useStageExport';
 import { ThreePreview } from '@/lib/volume/three-preview';
 import { Loader, Share2 } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
-import styled, { keyframes } from 'styled-components';
-
-const Wrap = styled.div`
-  position: relative;
-`;
-
-const TriggerBtn = styled.button<{ $on: boolean; $hover: boolean }>`
-  background: ${({ $on, $hover }) =>
-    $on ? 'rgba(255,181,71,0.08)' : $hover ? 'rgba(28,24,18,0.92)' : 'rgba(20,18,14,0.85)'};
-  backdrop-filter: blur(8px);
-  border: 1px solid ${({ $on }) => ($on ? 'var(--amber-dim)' : 'var(--rule)')};
-  border-radius: 999px;
-  padding: 12px 12px;
-  color: ${({ $on, $hover }) => ($on ? 'var(--amber)' : $hover ? 'var(--ink)' : 'var(--ink-2)')};
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: 120ms;
-  -webkit-tap-highlight-color: transparent;
-
-  [data-layout='mobile'] & {
-    padding: 14px 14px;
-    min-width: 44px;
-    min-height: 44px;
-  }
-`;
-
-const Dropdown = styled.div`
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  background: var(--surface-glass);
-  backdrop-filter: blur(16px);
-  border: 1px solid var(--rule-2);
-  border-radius: 8px;
-  padding: 4px;
-  min-width: 200px;
-  z-index: var(--z-dock-ui);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.65);
-`;
-
-const spin = keyframes`
-  to { transform: rotate(360deg); }
-`;
-
-const SpinIcon = styled(Loader)`
-  animation: ${spin} 700ms linear infinite;
-`;
-
-const Divider = styled.div`
-  height: 1px;
-  margin: 4px 6px;
-  background: var(--rule);
-`;
-
-const ItemBtn = styled.button<{ $hover: boolean }>`
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 8px 11px;
-  background: ${({ $hover }) => ($hover ? 'var(--highlight-sm)' : 'transparent')};
-  border: none;
-  border-radius: 5px;
-  color: ${({ $hover }) => ($hover ? 'var(--ink)' : 'var(--ink-2)')};
-  font-family: var(--sans);
-  font-size: 13px;
-  cursor: pointer;
-  text-align: left;
-  white-space: nowrap;
-  transition:
-    background 80ms,
-    color 80ms;
-  min-height: 32px;
-`;
+import styles from './StageMenu.module.css';
 
 function IconMoreHorizontal() {
   return (
@@ -141,18 +66,19 @@ function MenuItem({
 }) {
   const { hover, onMouseEnter, onMouseLeave } = useHover();
   return (
-    <ItemBtn
+    <button
+      className={styles.itemBtn}
       type="button"
       role="menuitem"
       tabIndex={-1}
-      $hover={hover}
+      data-hover={hover || undefined}
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
       {icon}
       {label}
-    </ItemBtn>
+    </button>
   );
 }
 
@@ -227,8 +153,9 @@ export function StageMenu({ previewRef }: Props) {
   const recording = recordPct !== null;
 
   return (
-    <Wrap ref={wrapRef}>
-      <TriggerBtn
+    <div className={styles.wrap} ref={wrapRef}>
+      <button
+        className={styles.triggerBtn}
         type="button"
         aria-label={
           recording ? `Recording 3D spin — ${Math.round((recordPct ?? 0) * 100)}%` : 'Stage options'
@@ -236,17 +163,17 @@ export function StageMenu({ previewRef }: Props) {
         aria-haspopup="menu"
         aria-expanded={open}
         disabled={recording}
-        $on={open || recording}
-        $hover={hover && !open && !recording}
+        data-on={open || recording || undefined}
+        data-hover={(hover && !open && !recording) || undefined}
         onClick={() => setOpen((v) => !v)}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
       >
-        {recording ? <SpinIcon size={20} /> : <IconMoreHorizontal />}
-      </TriggerBtn>
+        {recording ? <Loader className={styles.spin} size={20} /> : <IconMoreHorizontal />}
+      </button>
 
       {open && (
-        <Dropdown ref={menuRef} role="menu" aria-label="Stage options">
+        <div className={styles.dropdown} ref={menuRef} role="menu" aria-label="Stage options">
           <MenuItem
             icon={<IconDownload />}
             label="Export 3D view (.png)"
@@ -261,7 +188,7 @@ export function StageMenu({ previewRef }: Props) {
           )}
           {CAN_SHARE_FILES && (
             <>
-              <Divider aria-hidden />
+              <div className={styles.divider} aria-hidden />
               <MenuItem
                 icon={<Share2 size={14} />}
                 label="Share 3D view (.png)"
@@ -276,8 +203,8 @@ export function StageMenu({ previewRef }: Props) {
               )}
             </>
           )}
-        </Dropdown>
+        </div>
       )}
-    </Wrap>
+    </div>
   );
 }

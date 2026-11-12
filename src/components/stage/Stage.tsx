@@ -5,96 +5,7 @@ import { ToolbarPill } from '@/components/stage/ToolbarPill';
 import { useThreePreview } from '@/hooks/useThreePreview';
 import { useViewerHost, useViewerLabels, useViewerStore } from '@/viewer';
 import { useEffect, useRef } from 'react';
-import styled, { css } from 'styled-components';
-
-/** Focus mode fills the viewer — the host decides whether that is the window. */
-const focusedStyles = css`
-  position: absolute;
-  inset: 0;
-  z-index: var(--z-stage);
-  background: radial-gradient(
-    ellipse at 50% 55%,
-    rgba(28, 26, 20, 0.7) 0%,
-    rgba(8, 7, 5, 0.97) 80%
-  );
-  overflow: hidden;
-`;
-
-const normalStyles = css`
-  grid-area: stage;
-  position: relative;
-  background: radial-gradient(
-    ellipse at 50% 55%,
-    rgba(28, 26, 20, 0.7) 0%,
-    rgba(8, 7, 5, 0.97) 80%
-  );
-  overflow: hidden;
-  border-right: 1px solid var(--rule);
-
-  [data-layout='mobile'] & {
-    /* StageWrap is position:absolute;inset:0 — child needs explicit height to fill it. */
-    height: 100%;
-    border-right: none;
-  }
-`;
-
-const StageSection = styled.section<{ $focus: boolean }>`
-  ${({ $focus }) => ($focus ? focusedStyles : normalStyles)}
-`;
-
-const StageCanvas = styled.canvas`
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-`;
-
-/** Centred over the canvas, behind the stage chrome; never takes the pointer. */
-const StageMessage = styled.div`
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 0 30px;
-  text-align: center;
-  pointer-events: none;
-`;
-
-const StageMessageTitle = styled.p`
-  margin: 0;
-  color: var(--ink-3);
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-`;
-
-/** The dock's hint style (DisplayCell's SliderHint). */
-const StageMessageHint = styled.p`
-  margin: 0;
-  max-width: 320px;
-  color: var(--ink-3);
-  font-family: var(--sans);
-  font-size: 11.5px;
-  line-height: 1.4;
-`;
-
-const NoVolumePlaceholder = styled.div`
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--ink-3);
-  font-family: var(--mono);
-  font-size: 11px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  pointer-events: none;
-`;
+import styles from './Stage.module.css';
 
 export function Stage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -113,27 +24,27 @@ export function Stage() {
   }, [status, focus, toggleToolbar]);
 
   return (
-    <StageSection $focus={focus} data-testid="stage-section">
-      <StageCanvas ref={canvasRef} data-testid="stage-canvas" />
+    <section className={styles.stage} data-focus={focus || undefined} data-testid="stage-section">
+      <canvas className={styles.canvas} ref={canvasRef} data-testid="stage-canvas" />
       {status === 'ready' && !hasVolume && (
-        <NoVolumePlaceholder>{labels.stage.noVolume}</NoVolumePlaceholder>
+        <div className={styles.noVolume}>{labels.stage.noVolume}</div>
       )}
       {status === 'unavailable' && (
-        <StageMessage>
-          <StageMessageTitle>{labels.stage.unavailableTitle}</StageMessageTitle>
-          <StageMessageHint>{labels.stage.unavailableHint}</StageMessageHint>
-        </StageMessage>
+        <div className={styles.message}>
+          <p className={styles.messageTitle}>{labels.stage.unavailableTitle}</p>
+          <p className={styles.messageHint}>{labels.stage.unavailableHint}</p>
+        </div>
       )}
       {/* Always mounted, empty while the view is fine: a live region added
           together with its text is not reliably announced. */}
-      <StageMessage as="output">
+      <output className={styles.message}>
         {status === 'context-lost' && (
           <>
-            <StageMessageTitle>{labels.stage.contextLostTitle}</StageMessageTitle>
-            <StageMessageHint>{labels.stage.contextLostHint}</StageMessageHint>
+            <p className={styles.messageTitle}>{labels.stage.contextLostTitle}</p>
+            <p className={styles.messageHint}>{labels.stage.contextLostHint}</p>
           </>
         )}
-      </StageMessage>
+      </output>
       <StageSeriesSelect />
       <StageAlert />
       <ToolbarPill previewRef={previewRef} has3D={status !== 'unavailable'} />
@@ -142,6 +53,6 @@ export function Stage() {
           mode — it's part of the chrome the user asked to mute. Unmounting
           also collapses any expanded panel state cleanly on re-entry. */}
       {!focus && slots.stageOverlay}
-    </StageSection>
+    </section>
   );
 }

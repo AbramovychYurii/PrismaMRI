@@ -15,7 +15,7 @@
  * The host adds its own footer actions (PrismaMRI: the PDF report) and the
  * hint line under the card through `slots.annotationActions` / `annotationHint`.
  *
- * All styling lives in `AnnotationHud.styles.ts`.
+ * All styling lives in `AnnotationHud.module.css`.
  */
 
 import { AuroraSparkles } from '@/components/ui/AuroraSparkles';
@@ -31,38 +31,16 @@ import {
   useViewerTheme,
 } from '@/viewer';
 import { ChevronLeft, ChevronRight, Sparkles, Trash2, X } from 'lucide-react';
-import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AccentBar,
-  Body,
-  Card,
-  ChipDot,
-  ConfidenceLabel,
-  ConfidenceRow,
-  ConfidenceValue,
-  DismissBtn,
-  Divider,
-  Footer,
-  HeaderBtn,
-  HintText,
-  Location,
-  NavBtn,
-  NavGroup,
-  NavIndex,
-  Pill,
-  PillCount,
-  PillLabel,
-  PillWrap,
-  SeverityChip,
-  SparkleWrap,
-  Specular,
-  Summary,
-  Tag,
-  TagKey,
-  TagRow,
-  Title,
-  TopRow,
-} from './AnnotationHud.styles';
+  type ButtonHTMLAttributes,
+  type CSSProperties,
+  memo,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import styles from './AnnotationHud.module.css';
 
 function sliceInfo(planeName: string, plane: SlicePlane, v: VolumeCursor): string {
   return `${planeName} · slice ${sliceNumber(v, plane)}`;
@@ -110,6 +88,23 @@ const SparkleIcon = memo(function SparkleIcon() {
 const ENTRANCE_DURATION_MS = 1400;
 /** Count-up easing duration when the pill first appears, in ms. */
 const COUNT_UP_DURATION_MS = 520;
+
+/**
+ * A footer button styled like the card's own — for the actions a host adds
+ * through `slots.annotationActions`.
+ */
+export function AnnotationActionButton({
+  className,
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button
+      type="button"
+      {...props}
+      className={className ? `${styles.actionBtn} ${className}` : styles.actionBtn}
+    />
+  );
+}
 
 export function AnnotationHud() {
   const annotations = useViewerStore((s) => s.annotations);
@@ -200,8 +195,13 @@ export function AnnotationHud() {
     // animations restart cleanly (avoids needing to toggle the animation
     // property by hand).
     return (
-      <PillWrap key={entranceKey} $entrance={entranceActive}>
-        <Pill
+      <div
+        className={styles.pillWrap}
+        key={entranceKey}
+        data-entrance={entranceActive || undefined}
+      >
+        <button
+          className={styles.pill}
           type="button"
           onClick={() => {
             if (!activeId) focusAnnotation(ordered[0].id);
@@ -209,14 +209,20 @@ export function AnnotationHud() {
           }}
           aria-label={`Show ${annotations.length} AI findings`}
         >
-          <Specular aria-hidden="true" $entrance={entranceActive} />
-          <SparkleWrap $entrance={entranceActive}>
+          <span
+            className={styles.specular}
+            aria-hidden="true"
+            data-entrance={entranceActive || undefined}
+          />
+          <span className={styles.sparkleWrap} data-entrance={entranceActive || undefined}>
             <SparkleIcon />
-          </SparkleWrap>
-          <PillCount $entrance={entranceActive}>{displayedCount}</PillCount>
-          <PillLabel>FINDINGS</PillLabel>
-        </Pill>
-      </PillWrap>
+          </span>
+          <span className={styles.pillCount} data-entrance={entranceActive || undefined}>
+            {displayedCount}
+          </span>
+          <span className={styles.pillLabel}>FINDINGS</span>
+        </button>
+      </div>
     );
   }
 
@@ -234,22 +240,28 @@ export function AnnotationHud() {
 
   return (
     <>
-      {slots.annotationHint && <HintText>{slots.annotationHint}</HintText>}
-      <Card aria-label="Finding summary" aria-live="polite">
+      {slots.annotationHint && <p className={styles.hintText}>{slots.annotationHint}</p>}
+      <div
+        className={styles.card}
+        style={{ '--sev-color': color } as CSSProperties}
+        aria-label="Finding summary"
+        aria-live="polite"
+      >
         {/* Left vertical accent bar */}
-        <AccentBar $color={color} />
+        <div className={styles.accentBar} />
 
-        <Body>
+        <div className={styles.body}>
           {/* Severity chip + location + close */}
-          <TopRow>
-            <SeverityChip $color={color}>
-              <ChipDot $color={color} />
+          <div className={styles.topRow}>
+            <span className={styles.severityChip}>
+              <span className={styles.chipDot} />
               {labels.severity[shown.severity]}
-            </SeverityChip>
-            <Location>
+            </span>
+            <span className={styles.location}>
               {sliceInfo(labels.planes[shown.plane].name, shown.plane, shown.voxel)}
-            </Location>
-            <HeaderBtn
+            </span>
+            <button
+              className={styles.headerBtn}
               type="button"
               aria-label="Close"
               title="Close"
@@ -259,76 +271,87 @@ export function AnnotationHud() {
               }}
             >
               <X size={15} />
-            </HeaderBtn>
-          </TopRow>
+            </button>
+          </div>
 
           {/* Title */}
-          <Title>{shown.label}</Title>
+          <h3 className={styles.title}>{shown.label}</h3>
 
           {/* Confidence */}
           {confidencePct != null && (
-            <ConfidenceRow>
+            <div className={styles.confidenceRow}>
               <AuroraSparkles size={11} strokeWidth={1.5} />
-              <ConfidenceLabel>Confidence:</ConfidenceLabel>
-              <ConfidenceValue>{confidencePct}%</ConfidenceValue>
-            </ConfidenceRow>
+              <span className={styles.confidenceLabel}>Confidence:</span>
+              <span className={styles.confidenceValue}>{confidencePct}%</span>
+            </div>
           )}
 
           {/* Summary */}
-          {shown.summary && <Summary>{shown.summary}</Summary>}
+          {shown.summary && <p className={styles.summary}>{shown.summary}</p>}
 
           {/* Coordinate tags + optional size */}
-          <TagRow>
-            <Tag>
-              <TagKey>X</TagKey>
+          <div className={styles.tagRow}>
+            <span className={styles.tag}>
+              <span className={styles.tagKey}>X</span>
               {shown.voxel.x}
-            </Tag>
-            <Tag>
-              <TagKey>Y</TagKey>
+            </span>
+            <span className={styles.tag}>
+              <span className={styles.tagKey}>Y</span>
               {shown.voxel.y}
-            </Tag>
-            <Tag>
-              <TagKey>Z</TagKey>
+            </span>
+            <span className={styles.tag}>
+              <span className={styles.tagKey}>Z</span>
               {shown.voxel.z}
-            </Tag>
+            </span>
             {shown.sizeMm != null && (
-              <Tag>
-                <TagKey>ø</TagKey>
+              <span className={styles.tag}>
+                <span className={styles.tagKey}>ø</span>
                 {shown.sizeMm} mm
-              </Tag>
+              </span>
             )}
-          </TagRow>
+          </div>
 
           {/* Divider + footer: Dismiss (left) + pagination (right) */}
-          <Divider />
-          <Footer>
-            <NavGroup>
+          <hr className={styles.divider} />
+          <div className={styles.footer}>
+            <div className={styles.navGroup}>
               {slots.annotationActions?.({ finding: shown, index: idx, all: ordered })}
-              <DismissBtn
+              <button
+                className={styles.dismissBtn}
                 type="button"
                 aria-label="Dismiss finding"
                 onClick={() => setConfirmDismiss(true)}
               >
                 <Trash2 size={11} />
                 Dismiss
-              </DismissBtn>
-            </NavGroup>
+              </button>
+            </div>
 
             {ordered.length > 1 && (
-              <NavGroup>
-                <NavBtn type="button" aria-label="Previous finding" onClick={() => step(-1)}>
+              <div className={styles.navGroup}>
+                <button
+                  className={styles.navBtn}
+                  type="button"
+                  aria-label="Previous finding"
+                  onClick={() => step(-1)}
+                >
                   <ChevronLeft size={15} />
-                </NavBtn>
-                <NavIndex>
+                </button>
+                <span className={styles.navIndex}>
                   {idx + 1} / {ordered.length}
-                </NavIndex>
-                <NavBtn type="button" aria-label="Next finding" onClick={() => step(1)}>
+                </span>
+                <button
+                  className={styles.navBtn}
+                  type="button"
+                  aria-label="Next finding"
+                  onClick={() => step(1)}
+                >
                   <ChevronRight size={15} />
-                </NavBtn>
-              </NavGroup>
+                </button>
+              </div>
             )}
-          </Footer>
-        </Body>
+          </div>
+        </div>
 
         {confirmDismiss && (
           <ConfirmModal
@@ -352,7 +375,7 @@ export function AnnotationHud() {
             }}
           />
         )}
-      </Card>
+      </div>
     </>
   );
 }

@@ -1,0 +1,77 @@
+/* A finding's ring, in its severity colour (--pin-color, set inline). Thin, so
+   it never hides the underlying anatomy. */
+.pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  padding: 0;
+  background: transparent;
+  border: 1.25px solid var(--pin-color);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55), 0 0 6px
+    color-mix(in srgb, var(--pin-color) 66.7%, transparent);
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+  animation: annotation-pulse 2.4s ease-in-out infinite;
+}
+.pin[data-active] {
+  width: 30px;
+  height: 30px;
+  border-width: 1.75px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55), 0 0 12px
+    color-mix(in srgb, var(--pin-color) 66.7%, transparent);
+}
+
+@keyframes annotation-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55), 0 0 6px
+      color-mix(in srgb, var(--pin-color) 53.3%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55), 0 0 13px
+      color-mix(in srgb, var(--pin-color) 86.7%, transparent);
+  }
+}
+
+/* Beside the active pin, on whichever side keeps it inside the panel. */
+.pinLabel {
+  position: absolute;
+  font-family: var(--pmri-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  color: var(--pin-color);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  background: rgba(8, 7, 5, 0.72);
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid color-mix(in srgb, var(--pin-color) 26.7%, transparent);
+  pointer-events: none;
+}
+.pinLabel[data-side="right"] {
+  left: calc(100% + 7px);
+}
+.pinLabel[data-side="left"] {
+  right: calc(100% + 7px);
+}
+.pinLabel[data-vside="center"] {
+  top: 50%;
+  transform: translateY(-50%);
+}
+.pinLabel[data-vside="top"] {
+  top: 0;
+}
+.pinLabel[data-vside="bottom"] {
+  bottom: 0;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: var(--pmri-z-panel-top);
+  overflow: visible;
+}

@@ -5,14 +5,14 @@ export const APP_NAME = 'PrismaMRI';
 
 export const WL_DEBOUNCE_MS = 96;
 
-/** The accents CSS reaches as `var(--amber)` etc.; their values live in the theme. */
+/** The accents CSS reaches as `var(--pmri-amber)` etc.; their values live in the theme. */
 export type Accent = 'amber' | 'violet' | 'azure' | 'teal';
 
 export const ACCENT_VAR: Record<Accent, string> = {
-  amber: 'var(--amber)',
-  violet: 'var(--violet)',
-  azure: 'var(--azure)',
-  teal: 'var(--teal)',
+  amber: 'var(--pmri-amber)',
+  violet: 'var(--pmri-violet)',
+  azure: 'var(--pmri-azure)',
+  teal: 'var(--pmri-teal)',
 };
 
 export type { Axis };

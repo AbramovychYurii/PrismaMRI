@@ -17,6 +17,37 @@
       "suspicious": { "noExplicitAny": "warn" }
     }
   },
+  "overrides": [
+    {
+      "include": [
+        "src/viewer/**",
+        "src/components/Viewer.tsx",
+        "src/components/stage/**",
+        "src/components/rail/**",
+        "src/components/dock/**",
+        "src/components/mobile/**",
+        "src/components/annotations/**",
+        "src/components/status/**",
+        "src/components/ui/Tooltip.tsx",
+        "src/components/ui/ConfirmModal.tsx",
+        "src/components/ui/AuroraSparkles.tsx"
+      ],
+      "linter": {
+        "rules": {
+          "nursery": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "styled-components": "The viewer is styled with CSS Modules (it ships as a library); styled-components stays in the app's own screens."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
   "javascript": {
     "formatter": { "quoteStyle": "single", "semicolons": "always", "trailingCommas": "all" }
   }

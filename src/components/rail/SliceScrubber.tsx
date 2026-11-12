@@ -4,6 +4,7 @@ import type { SlicePlane } from '@/types';
 import { useViewerLabels } from '@/viewer';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import {
+  type CSSProperties,
   type PointerEvent as RPointerEvent,
   useCallback,
   useEffect,
@@ -11,140 +12,13 @@ import {
   useRef,
   useState,
 } from 'react';
-import styled from 'styled-components';
+import styles from './SliceScrubber.module.css';
 
 const HOLD_DELAY_MS = 350;
 const HOLD_REPEAT_MS = 50;
+/** Track inset and thumb height — mirrored in SliceScrubber.module.css. */
 const INSET = 4;
 const THUMB_PILL_H = 16;
-
-const ChevronBtn = styled.button<{
-  $hover: boolean;
-  $pressed: boolean;
-  $reduced: boolean;
-  $large: boolean;
-}>`
-  width: ${({ $large }) => ($large ? '36px' : '24px')};
-  height: ${({ $large }) => ($large ? '36px' : '24px')};
-  flex-shrink: 0;
-  border-radius: ${({ $large }) => ($large ? '6px' : '3px')};
-  border: 1px solid
-    ${({ $hover }) => ($hover ? 'var(--ink-4)' : 'var(--rule-2)')};
-  background: ${({ $hover }) => ($hover ? 'rgba(28,24,18,0.95)' : 'rgba(15,13,10,0.85)')};
-  color: ${({ $hover }) => ($hover ? 'var(--ink)' : 'var(--ink-2)')};
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  padding: 0;
-  transform: ${({ $pressed }) => ($pressed ? 'scale(0.94)' : 'none')};
-  transition: ${({ $reduced }) => ($reduced ? 'none' : 'transform 80ms ease')};
-
-  [data-layout='mobile'] & {
-    width: 36px;
-    height: 36px;
-    border-radius: 6px;
-  }
-`;
-
-const ScrubberContainer = styled.div<{
-  $visible: boolean;
-  $reduced: boolean;
-  $inline?: boolean;
-  $large?: boolean;
-}>`
-  position: absolute;
-  top: ${({ $large }) => ($large ? '52px' : '32px')};
-  right: 0;
-  bottom: 0;
-  width: ${({ $large }) => ($large ? '48px' : '40px')};
-  z-index: var(--z-panel-chrome);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 6px 8px 4px;
-  background: linear-gradient(to left, rgba(10, 8, 5, 0.85), transparent 70%);
-  opacity: ${({ $visible }) => ($visible ? 1 : 0)};
-  transform: ${({ $visible }) => ($visible ? 'translateX(0)' : 'translateX(8px)')};
-  pointer-events: ${({ $visible }) => ($visible ? 'auto' : 'none')};
-  transition: ${({ $reduced }) => ($reduced ? 'none' : 'opacity 160ms ease, transform 160ms ease')};
-
-  ${({ $inline }) =>
-    $inline &&
-    `
-    /* Inline mode: lives inside a flex column, fills available space. */
-    position: relative;
-    top: auto;
-    right: auto;
-    bottom: auto;
-    flex: 1;
-    min-height: 0;
-    width: 100%;
-    background: none;
-    padding: 0;
-  `}
-`;
-
-const TickSheet = styled.div`
-  position: absolute;
-  left: 50%;
-  top: ${INSET}px;
-  bottom: ${INSET}px;
-  width: 12px;
-  transform: translateX(-50%);
-  opacity: 0.5;
-  pointer-events: none;
-  background-image: repeating-linear-gradient(
-    to bottom,
-    var(--rule) 0,
-    var(--rule) 1px,
-    transparent 1px,
-    transparent 6px
-  );
-`;
-
-const RailLine = styled.div`
-  position: absolute;
-  left: 50%;
-  top: ${INSET}px;
-  bottom: ${INSET}px;
-  width: 2px;
-  transform: translateX(-50%);
-  background: var(--rule);
-  border-radius: 999px;
-`;
-
-const FillBar = styled.div<{ $accent: string }>`
-  position: absolute;
-  left: 50%;
-  bottom: ${INSET}px;
-  width: 2px;
-  transform: translateX(-50%);
-  background: ${({ $accent }) => $accent};
-  border-radius: 999px;
-`;
-
-const ThumbPill = styled.div<{ $accent: string }>`
-  position: absolute;
-  left: 50%;
-  width: 26px;
-  height: ${THUMB_PILL_H}px;
-  transform: translate(-50%, -50%);
-  border-radius: 3px;
-  background: color-mix(in srgb, ${({ $accent }) => $accent} 90%, transparent);
-  border: 1px solid ${({ $accent }) => $accent};
-  z-index: var(--z-layout);
-  color: var(--bg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--mono);
-  font-size: 9px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
-`;
 
 export interface SliceScrubberProps {
   axis: SlicePlane;
@@ -209,7 +83,8 @@ function ChevronButton({
   const handleMouseLeave = () => setHover(false);
 
   return (
-    <ChevronBtn
+    <button
+      className={styles.chevronBtn}
       type="button"
       aria-label={label}
       onPointerDown={handleDown}
@@ -219,13 +94,13 @@ function ChevronButton({
       onClick={handleClick}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      $hover={hover}
-      $pressed={pressed}
-      $reduced={reduced}
-      $large={!!large}
+      data-hover={hover || undefined}
+      data-pressed={pressed || undefined}
+      data-reduced={reduced || undefined}
+      data-large={large || undefined}
     >
       {dir === 'up' ? <ChevronUp size={large ? 14 : 11} /> : <ChevronDown size={large ? 14 : 11} />}
-    </ChevronBtn>
+    </button>
   );
 }
 
@@ -339,12 +214,15 @@ export function SliceScrubber({
   const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation();
 
   return (
-    <ScrubberContainer
+    // biome-ignore lint/a11y/useKeyWithClickEvents: the handlers only stop pointer events reaching the panel; the slider inside takes the keys
+    <div
+      className={styles.scrubber}
+      style={{ '--scrub-accent': accent } as CSSProperties}
       data-testid={`scrubber-${axis}`}
-      $visible={visible}
-      $reduced={reduced}
-      $inline={inline}
-      $large={large}
+      data-visible={visible || undefined}
+      data-reduced={reduced || undefined}
+      data-inline={inline || undefined}
+      data-large={large || undefined}
       onPointerDown={handleContainerPointerDown}
       onClick={handleContainerClick}
     >
@@ -375,18 +253,18 @@ export function SliceScrubber({
         }}
       >
         {/* TICK SHEET */}
-        <TickSheet aria-hidden />
+        <div className={styles.tickSheet} aria-hidden />
         {/* RAIL */}
-        <RailLine aria-hidden />
+        <div className={styles.railLine} aria-hidden />
         {/* FILL */}
-        <FillBar aria-hidden $accent={accent} style={{ height: `${fillHeight}px` }} />
+        <div className={styles.fillBar} aria-hidden style={{ height: `${fillHeight}px` }} />
         {/* THUMB */}
-        <ThumbPill aria-hidden $accent={accent} style={{ top: `${thumbY}px` }}>
+        <div className={styles.thumbPill} aria-hidden style={{ top: `${thumbY}px` }}>
           {slice}
-        </ThumbPill>
+        </div>
       </div>
 
       <ChevronButton dir="down" label="Previous slice" large={large} onStep={step} />
-    </ScrubberContainer>
+    </div>
   );
 }

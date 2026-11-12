@@ -1,0 +1,57 @@
+.bar {
+  position: absolute;
+  top: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--pmri-z-panel-chrome);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 40%;
+  padding: 8px 8px 8px 14px;
+  background: var(--pmri-surface-glass);
+  border: 1px solid var(--pmri-rule-2);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.65);
+}
+[data-layout="mobile"] .bar {
+  /* Full width, below the corner chrome: its 12px inset + the 50px toolbar
+  buttons (14px padding either side of a 20px icon, 1px borders) + 8px. */
+  top: 70px;
+  left: 12px;
+  right: 12px;
+  transform: none;
+  max-width: none;
+}
+
+.message {
+  font-family: var(--pmri-mono);
+  font-size: 11px;
+  color: var(--pmri-rose);
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  margin: 0;
+}
+
+.dismissBtn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  color: var(--pmri-ink-3);
+  line-height: 0;
+  margin-top: 1px;
+}
+.dismissBtn:hover {
+  color: var(--pmri-ink);
+}
+[data-layout="mobile"] .dismissBtn {
+  /* The 44px touch target the stage chrome beside it uses. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  margin: -8px -8px -8px 0;
+}

@@ -1,21 +1,20 @@
 import { PLANE_CROSSHAIR_AXES } from '@/constants';
 import { axisColor, axisGlow } from '@/hooks/useSlicePanelCore';
-import type { SlicePlane } from '@/types';
-import { memo } from 'react';
-import {
-  CrossCenter,
-  CrossDot,
-  CrossH,
-  CrossV,
-  CrosshairOverlay,
-  MEASURE_DOT_PX,
-  MEASURE_DOT_SHADOW,
-  MeasureDot,
-  MeasureLabel,
-  MeasureLine,
-} from './SlicePanel.styles';
+import type { Axis, SlicePlane } from '@/types';
+import { type CSSProperties, memo } from 'react';
+import styles from './SlicePanel.module.css';
+import { MEASURE_DOT_PX, MEASURE_DOT_SHADOW } from './SlicePanel.styles';
 
-const MEASURE_LINE_STROKE_STYLE: React.CSSProperties = { stroke: 'var(--measure)' };
+/** A crosshair line at `position`, coloured and glowing for its axis. */
+function crossStyle(axis: Axis, position: CSSProperties): CSSProperties {
+  return {
+    ...position,
+    '--cross-color': axisColor(axis),
+    '--cross-glow': axisGlow(axis),
+  } as CSSProperties;
+}
+
+const MEASURE_LINE_STROKE_STYLE: React.CSSProperties = { stroke: 'var(--pmri-measure)' };
 
 /**
  * Crosshair lines and measurement marks drawn over a slice canvas.
@@ -40,24 +39,25 @@ export const SliceCrosshair = memo(function SliceCrosshair({
   return (
     <>
       {cross && (
-        <CrosshairOverlay>
-          <CrossH
-            $color={axisColor(axes.h)}
-            $glow={axisGlow(axes.h)}
-            style={{ top: `${cross.fy * 100}%` }}
+        <div className={styles.crosshairOverlay}>
+          <div
+            className={styles.crossH}
+            style={crossStyle(axes.h, { top: `${cross.fy * 100}%` })}
           />
-          <CrossV
-            $color={axisColor(axes.v)}
-            $glow={axisGlow(axes.v)}
-            style={{ left: `${cross.fx * 100}%` }}
+          <div
+            className={styles.crossV}
+            style={crossStyle(axes.v, { left: `${cross.fx * 100}%` })}
           />
-          <CrossCenter style={{ left: `${cross.fx * 100}%`, top: `${cross.fy * 100}%` }}>
-            <CrossDot />
-          </CrossCenter>
-        </CrosshairOverlay>
+          <div
+            className={styles.crossCenter}
+            style={{ left: `${cross.fx * 100}%`, top: `${cross.fy * 100}%` }}
+          >
+            <span className={styles.crossDot} />
+          </div>
+        </div>
       )}
       {hasLine && (
-        <MeasureLine aria-hidden="true">
+        <svg className={styles.measureLine} aria-hidden="true">
           <line
             x1={`${dots[0].fx * 100}%`}
             y1={`${dots[0].fy * 100}%`}
@@ -67,14 +67,15 @@ export const SliceCrosshair = memo(function SliceCrosshair({
             strokeWidth="1.5"
             strokeDasharray="5 4"
             opacity="0.75"
-            filter="drop-shadow(0 0 4px var(--measure-glow))"
+            filter="drop-shadow(0 0 4px var(--pmri-measure-glow))"
           />
-        </MeasureLine>
+        </svg>
       )}
       {dots.map((dot, i) => (
         // Keyed by role (0 = from, 1 = to): coordinates collide when both
         // points coincide, which breaks reconciliation and leaks DOM nodes.
-        <MeasureDot
+        <div
+          className={styles.measureDot}
           // biome-ignore lint/suspicious/noArrayIndexKey: stable role-based key
           key={i}
           style={{
@@ -87,14 +88,15 @@ export const SliceCrosshair = memo(function SliceCrosshair({
         />
       ))}
       {hasLine && distanceMm !== null && distanceMm !== undefined && (
-        <MeasureLabel
+        <div
+          className={styles.measureLabel}
           style={{
             left: `${((dots[0].fx + dots[1].fx) / 2) * 100}%`,
             top: `${((dots[0].fy + dots[1].fy) / 2) * 100}%`,
           }}
         >
           {distanceMm.toFixed(1)} mm
-        </MeasureLabel>
+        </div>
       )}
     </>
   );

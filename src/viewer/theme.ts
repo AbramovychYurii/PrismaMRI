@@ -2,8 +2,8 @@ import type { AnnotationSeverity } from '@/types';
 
 /**
  * Colour tokens. Each becomes the CSS custom property of the same name in
- * kebab case (`panel2` → `--panel-2`) on the viewer's root, so every style
- * that reads `var(--…)` follows the theme.
+ * kebab case, prefixed (`panel2` → `--pmri-panel-2`), on the viewer's root,
+ * so every style that reads `var(--pmri-…)` follows the theme.
  */
 export interface ViewerColors {
   bg: string;
@@ -109,7 +109,7 @@ export function withAlpha(color: string, alpha: number): string {
 
 /** A theme accent at `alpha` opacity — follows the theme, unlike a baked rgba(). */
 export function accentAlpha(accent: 'amber' | 'violet' | 'azure' | 'teal', alpha: number): string {
-  return withAlpha(`var(--${accent})`, alpha);
+  return withAlpha(`var(--pmri-${accent})`, alpha);
 }
 
 const kebab = (key: string) => key.replace(/[A-Z0-9]/g, (c) => `-${c.toLowerCase()}`);
@@ -117,8 +117,8 @@ const kebab = (key: string) => key.replace(/[A-Z0-9]/g, (c) => `-${c.toLowerCase
 /** The theme as CSS custom properties, for the viewer's root and its portals. */
 export function themeCssVars(theme: ViewerTheme): Record<string, string> {
   const vars: Record<string, string> = {};
-  for (const [key, value] of Object.entries(theme.colors)) vars[`--${kebab(key)}`] = value;
-  for (const [key, value] of Object.entries(theme.fonts)) vars[`--${key}`] = value;
-  vars['--measure-glow'] = withAlpha(theme.colors.measure, 0.45);
+  for (const [key, value] of Object.entries(theme.colors)) vars[`--pmri-${kebab(key)}`] = value;
+  for (const [key, value] of Object.entries(theme.fonts)) vars[`--pmri-${key}`] = value;
+  vars['--pmri-measure-glow'] = withAlpha(theme.colors.measure, 0.45);
   return vars;
 }

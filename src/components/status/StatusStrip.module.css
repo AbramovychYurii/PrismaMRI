@@ -1,0 +1,48 @@
+.stripGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  align-items: center;
+}
+
+.runKey {
+  font-family: var(--pmri-mono);
+  font-size: 9.5px;
+  color: var(--pmri-ink-3);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-bottom: 3px;
+}
+
+.runVal {
+  font-family: var(--pmri-mono);
+  font-size: 12.5px;
+  color: var(--pmri-ink);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.runDim {
+  color: var(--pmri-ink-3);
+}
+
+.runCell {
+  padding: 6px 18px;
+  border-right: 1px solid var(--pmri-rule);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+}
+.runCell[data-last] {
+  border-right: none;
+}
+
+/* The measurement value, larger than its neighbours (after .runVal to win). */
+.measureVal {
+  font-size: 13px;
+  font-weight: 700;
+}

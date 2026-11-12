@@ -1,0 +1,107 @@
+.displayCellWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  flex: 1;
+}
+
+.sliderRowWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sliderLabelRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sliderName {
+  font-family: var(--pmri-serif);
+  font-size: 15px;
+  color: var(--pmri-ink);
+  letter-spacing: -0.005em;
+  line-height: 1;
+}
+
+.sliderValue {
+  font-family: var(--pmri-mono);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--pmri-ink);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+
+.huLabel {
+  font-family: var(--pmri-mono);
+  font-size: 10px;
+  color: var(--pmri-ink-3);
+  font-weight: 400;
+  margin-left: 4px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.sliderHint {
+  font-family: var(--pmri-sans);
+  font-size: 11.5px;
+  color: var(--pmri-ink-3);
+  line-height: 1.4;
+}
+
+/* W/L range input: --slider-accent and --slider-fill are set inline. */
+.wlSlider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 99px;
+  background: linear-gradient(
+    to right,
+    var(--slider-accent) 0%,
+    var(--slider-accent) var(--slider-fill),
+    var(--pmri-rule) var(--slider-fill),
+    var(--pmri-rule) 100%
+  );
+  cursor: ew-resize;
+}
+.wlSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 99px;
+  background: var(--slider-accent);
+  border: 2px solid var(--pmri-panel);
+  box-shadow: 0 0 0 1px var(--slider-accent), 0 0 6px
+    color-mix(in srgb, var(--slider-accent) 50%, transparent);
+  cursor: ew-resize;
+}
+.wlSlider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 99px;
+  background: var(--slider-accent);
+  border: 2px solid var(--pmri-panel);
+  cursor: ew-resize;
+}
+
+/* Larger, easier-to-hit thumb in the tabbed (touch) layout. */
+[data-layout="mobile"] .wlSlider {
+  height: 6px;
+  cursor: default;
+}
+[data-layout="mobile"] .wlSlider::-webkit-slider-thumb {
+  width: 26px;
+  height: 26px;
+  cursor: default;
+}
+[data-layout="mobile"] .wlSlider::-moz-range-thumb {
+  width: 26px;
+  height: 26px;
+  cursor: default;
+}
