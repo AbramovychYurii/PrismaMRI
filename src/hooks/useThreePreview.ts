@@ -127,7 +127,7 @@ function useSceneSync(previewRef: PreviewRef): void {
 
 /** Severity-coded finding markers and which one is emphasised. */
 function useAnnotationSync(previewRef: PreviewRef): void {
-  const aiAnnotations = useViewerStore((s) => s.aiAnnotations);
+  const annotations = useViewerStore((s) => s.annotations);
   const activeAnnotationId = useViewerStore((s) => s.activeAnnotationId);
   const prepared3D = useViewerStore((s) => s.prepared3D);
 
@@ -135,8 +135,8 @@ function useAnnotationSync(previewRef: PreviewRef): void {
   // so they have to be re-placed even when the list itself did not change.
   // biome-ignore lint/correctness/useExhaustiveDependencies: prepared3D re-triggers re-placement after setVolume
   useEffect(() => {
-    previewRef.current?.setAnnotations(aiAnnotations);
-  }, [aiAnnotations, prepared3D, previewRef]);
+    previewRef.current?.setAnnotations(annotations);
+  }, [annotations, prepared3D, previewRef]);
 
   useEffect(() => {
     previewRef.current?.setActiveAnnotation(activeAnnotationId);

@@ -1,4 +1,4 @@
-import { AnnotationOverlay } from '@/components/mcp/AnnotationOverlay';
+import { AnnotationOverlay } from '@/components/annotations/AnnotationOverlay';
 import { SliceCrosshair } from '@/components/rail/SliceCrosshair';
 import {
   ExportSliceButton,

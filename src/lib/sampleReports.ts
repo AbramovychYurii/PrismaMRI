@@ -15,12 +15,12 @@
  *  3. Add a new entry below with the recorded annotations array.
  */
 
-import type { AiAnnotation } from '@/types';
+import type { Annotation } from '@/types';
 
 /** Annotations recorded for a specific demo volume. */
 export interface SampleReport {
   /** Annotations to load when the button is clicked. */
-  annotations: Omit<AiAnnotation, 'volumeId'>[];
+  annotations: Omit<Annotation, 'volumeId'>[];
 }
 
 /**

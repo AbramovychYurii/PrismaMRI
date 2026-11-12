@@ -15,7 +15,7 @@ import {
 } from '@/lib/volume/three-preview/volume-shader';
 import type {
   ActiveMeasurement,
-  AiAnnotation,
+  Annotation,
   AnnotationSeverity,
   PlanesMode,
   PreparedVolumeFor3D,
@@ -65,7 +65,7 @@ export class ThreePreview {
   private colormapPreset: RenderPreset | null = null;
   private sourceDims: Vec3 = [1, 1, 1];
   /** Latest annotation list + active id, re-applied when a volume (re)loads. */
-  private _annotations: AiAnnotation[] = [];
+  private _annotations: Annotation[] = [];
   private _activeAnnotationId: string | null = null;
   private sceneSize = 200;
   private raf = 0;
@@ -311,7 +311,7 @@ export class ThreePreview {
     this.dirty = true;
   }
 
-  setAnnotations(list: AiAnnotation[]): void {
+  setAnnotations(list: Annotation[]): void {
     this._annotations = list;
     this.annotationMarkers.setAnnotations(list, this._spacing, this.sceneSize);
     this.annotationMarkers.setActive(this._activeAnnotationId);

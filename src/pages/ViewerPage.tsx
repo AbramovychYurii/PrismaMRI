@@ -1,12 +1,14 @@
 import { AppGrid } from '@/components/layout/AppGrid';
 import { AgentLockOverlay } from '@/components/mcp/AgentLockOverlay';
 import { ConnectConfirm } from '@/components/mcp/ConnectConfirm';
+import { ReportAction } from '@/components/mcp/ReportAction';
+import { SessionPanel } from '@/components/mcp/SessionPanel';
 import { KeyboardShortcutsModal } from '@/components/ui/KeyboardShortcutsModal';
 import { useViewerActions } from '@/hooks/ViewerActionsContext';
 import * as volumeDb from '@/lib/volumeDb';
-import { useAgentStore } from '@/store';
-import { useViewerStore } from '@/viewer';
-import { useEffect, useRef, useState } from 'react';
+import { appViewer, useAgentStore } from '@/store';
+import { ViewerProvider, type ViewerSlots, useViewerStore } from '@/viewer';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 
@@ -23,6 +25,21 @@ const RestoreScreen = styled.div`
   text-transform: uppercase;
 `;
 
+/**
+ * What PrismaMRI adds to the viewer: the agent panel and the PDF report.
+ * Given here rather than at the app root so they load with the viewer chunk,
+ * not with the import screen.
+ */
+const APP_SLOTS: ViewerSlots = {
+  stageOverlay: <SessionPanel />,
+  annotationActions: (context) => <ReportAction {...context} />,
+  annotationHint: (
+    <>
+      Click <strong>REPORT</strong> to open the export dialog
+    </>
+  ),
+};
+
 export function ViewerPage() {
   const volumeLoaded = useViewerStore((s) => s.volume !== null);
   const mcpConnected = useAgentStore((s) => s.mcpConnected);
@@ -31,6 +48,7 @@ export function ViewerPage() {
   const setLoading = useViewerStore((s) => s.setLoading);
   const { showShortcuts, setShowShortcuts } = useViewerActions();
   const navigate = useNavigate();
+  const exitToImport = useCallback(() => navigate('/'), [navigate]);
 
   // Clear the loading flag once the viewer takes over. loadFromSource
   // deliberately leaves it true through the route swap so the example
@@ -91,7 +109,9 @@ export function ViewerPage() {
 
   return (
     <>
-      <AppGrid />
+      <ViewerProvider viewer={appViewer} slots={APP_SLOTS} onExit={exitToImport}>
+        <AppGrid />
+      </ViewerProvider>
       {showShortcuts && <KeyboardShortcutsModal onClose={() => setShowShortcuts(false)} />}
       {showConfirm && <ConnectConfirm onClose={() => setShowConfirm(false)} />}
       <AgentLockOverlay />

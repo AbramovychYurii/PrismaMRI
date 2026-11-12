@@ -1,10 +1,9 @@
-import { AnnotationHud } from '@/components/mcp/AnnotationHud';
-import { SessionPanel } from '@/components/mcp/SessionPanel';
+import { AnnotationHud } from '@/components/annotations/AnnotationHud';
 import { StageAlert } from '@/components/stage/StageAlert';
 import { StageSeriesSelect } from '@/components/stage/StageSeriesSelect';
 import { ToolbarPill } from '@/components/stage/ToolbarPill';
 import { useThreePreview } from '@/hooks/useThreePreview';
-import { useViewerStore } from '@/viewer';
+import { useViewerHost, useViewerStore } from '@/viewer';
 import { useEffect, useRef } from 'react';
 import styled, { css } from 'styled-components';
 
@@ -102,6 +101,7 @@ export function Stage() {
   const toggleToolbar = useViewerStore((s) => s.toggleToolbar);
   const focus = useViewerStore((s) => s.toolbar.focus);
   const hasVolume = useViewerStore((s) => s.prepared3D !== null);
+  const { slots } = useViewerHost();
 
   // Focus mode is left by its own button, which is not shown without a 3-D
   // view — and the mode is kept across reloads — so leave it here instead of
@@ -141,10 +141,10 @@ export function Stage() {
       <StageAlert />
       <ToolbarPill previewRef={previewRef} has3D={status !== 'unavailable'} />
       <AnnotationHud />
-      {/* Hide the AI Agent FAB in focus mode — it's part of the chrome the
-          user explicitly asked to mute.  Unmounting also collapses any
-          expanded panel state cleanly on re-entry. */}
-      {!focus && <SessionPanel />}
+      {/* The host's overlay (PrismaMRI: the AI agent button) hides in focus
+          mode — it's part of the chrome the user asked to mute. Unmounting
+          also collapses any expanded panel state cleanly on re-entry. */}
+      {!focus && slots.stageOverlay}
     </StageSection>
   );
 }

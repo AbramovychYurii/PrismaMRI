@@ -8,7 +8,7 @@
 import { PLANE_LABEL } from '@/constants';
 import { sliceNumber } from '@/lib/volume/plane';
 import { intensityUnit } from '@/lib/volume/units';
-import type { AiAnnotation, AnnotationSeverity, ParsedVolumeMeta, SlicePlane } from '@/types';
+import type { Annotation, AnnotationSeverity, ParsedVolumeMeta, SlicePlane } from '@/types';
 import jsPDF from 'jspdf';
 
 const PDF_LABEL: Record<AnnotationSeverity, string> = {
@@ -34,12 +34,12 @@ void hexToRgb; // used optionally; keep to avoid lint errors
 
 const planeName = (plane: SlicePlane) => PLANE_LABEL[plane].primary;
 
-const sliceNum = (a: AiAnnotation) => sliceNumber(a.voxel, a.plane);
+const sliceNum = (a: Annotation) => sliceNumber(a.voxel, a.plane);
 
 export interface ReportParams {
-  findings: AiAnnotation[];
+  findings: Annotation[];
   /** Original ordered list (used for finding index labels). */
-  allFindings: AiAnnotation[];
+  allFindings: Annotation[];
   scope: 'finding' | 'all';
   volumeMeta: ParsedVolumeMeta | null;
   scalarMin?: number;
@@ -107,7 +107,7 @@ function drawSeverityBadge(
 }
 
 /** Estimate card height without rendering (for page-break pre-check). */
-function estimateCardHeight(finding: AiAnnotation, thumb: { ar: number } | null): number {
+function estimateCardHeight(finding: Annotation, thumb: { ar: number } | null): number {
   const approxSummaryLines = finding.summary ? Math.ceil(finding.summary.length / 85) : 0;
   const summaryH = approxSummaryLines * 4.2;
   const certLine = finding.confidence != null ? 6 : 0; // single text line
@@ -119,7 +119,7 @@ function estimateCardHeight(finding: AiAnnotation, thumb: { ar: number } | null)
 /** Draw one finding card. Returns new Y after card. */
 function drawFindingCard(
   doc: jsPDF,
-  finding: AiAnnotation,
+  finding: Annotation,
   idx: number, // 1-based display index
   y: number,
   thumb: { data: string; ar: number } | null,

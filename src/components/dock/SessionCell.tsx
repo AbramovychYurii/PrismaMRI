@@ -1,6 +1,5 @@
-import { useViewerStore } from '@/viewer';
+import { useViewerHost, useViewerStore } from '@/viewer';
 import { ChevronLeft } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
 
 const BackButton = styled.button`
@@ -32,6 +31,13 @@ const Disclaimer = styled.div`
   line-height: 1.4;
   padding-top: 8px;
   border-top: 1px dashed var(--rule);
+
+  /* Alone when the host offers no way back. */
+  &:first-child {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+  }
 `;
 
 const DisclaimerBold = styled.b`
@@ -39,15 +45,17 @@ const DisclaimerBold = styled.b`
 `;
 
 export function SessionCell() {
-  const navigate = useNavigate();
+  const { onExit } = useViewerHost();
   const volume = useViewerStore((s) => s.volume);
 
   return (
     <>
-      <BackButton type="button" onClick={() => navigate('/')} disabled={!volume}>
-        <ChevronLeft size={13} />
-        Back to import
-      </BackButton>
+      {onExit && (
+        <BackButton type="button" onClick={onExit} disabled={!volume}>
+          <ChevronLeft size={13} />
+          Back to import
+        </BackButton>
+      )}
       <Disclaimer>
         <DisclaimerBold>Reference only.</DisclaimerBold> Not for diagnosis, treatment planning,
         measurements, or implant workflows.

@@ -1,4 +1,4 @@
-import type { AiAnnotation, AnnotationSeverity } from '@/types';
+import type { Annotation, AnnotationSeverity } from '@/types';
 import * as THREE from 'three';
 
 /** Sphere radius = sceneSize × this. */
@@ -34,7 +34,7 @@ export class AnnotationMarkers {
   constructor(private readonly colors: Readonly<Record<AnnotationSeverity, number>>) {}
 
   setAnnotations(
-    list: AiAnnotation[],
+    list: Annotation[],
     spacing: readonly [number, number, number],
     sceneSize: number,
   ): void {
