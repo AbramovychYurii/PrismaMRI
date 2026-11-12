@@ -267,7 +267,7 @@ export const TrayBtn = styled.button<{ $active?: boolean; $large?: boolean }>`
       color: var(--ink);
     }`}
 
-  @media (max-width: 767px) {
+  [data-layout='mobile'] & {
     width: 36px;
     height: 36px;
     border-radius: 6px;
@@ -280,11 +280,8 @@ export const FullscreenOverlay = styled.div<{ $isActive: boolean }>`
   &:focus-visible {
     outline-offset: -3px;
   }
-  position: fixed;
-  top: 56px;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  position: absolute;
+  inset: 0;
   z-index: var(--z-fullscreen);
   background: var(--surface-deep);
   overflow: hidden;

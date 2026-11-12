@@ -1,5 +1,5 @@
 import { BrandBlock } from '@/components/header/BrandBlock';
-import { RunStrip } from '@/components/header/RunStrip';
+import { StatusStrip } from '@/components/status/StatusStrip';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { accentRgba } from '@/constants';
 import { useViewerActions } from '@/hooks/ViewerActionsContext';
@@ -102,7 +102,7 @@ export function Header() {
   return (
     <StyledHeader>
       <BrandBlock />
-      <RunStrip />
+      <StatusStrip />
       {canInstall && (
         <HeaderSection>
           <Tooltip label="Install PrismaMRI as an app">

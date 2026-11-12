@@ -6,8 +6,8 @@ import { SessionPanel } from '@/components/mcp/SessionPanel';
 import { KeyboardShortcutsModal } from '@/components/ui/KeyboardShortcutsModal';
 import { useViewerActions } from '@/hooks/ViewerActionsContext';
 import * as volumeDb from '@/lib/volumeDb';
-import { appViewer, useAgentStore } from '@/store';
-import { ViewerProvider, type ViewerSlots, useViewerStore } from '@/viewer';
+import { useAgentStore } from '@/store';
+import { type ViewerSlots, useViewerStore } from '@/viewer';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
@@ -109,9 +109,7 @@ export function ViewerPage() {
 
   return (
     <>
-      <ViewerProvider viewer={appViewer} slots={APP_SLOTS} onExit={exitToImport}>
-        <AppGrid />
-      </ViewerProvider>
+      <AppGrid slots={APP_SLOTS} onExit={exitToImport} />
       {showShortcuts && <KeyboardShortcutsModal onClose={() => setShowShortcuts(false)} />}
       {showConfirm && <ConnectConfirm onClose={() => setShowConfirm(false)} />}
       <AgentLockOverlay />

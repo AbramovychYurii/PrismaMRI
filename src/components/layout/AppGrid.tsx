@@ -1,29 +1,32 @@
-import { Dock } from '@/components/dock/Dock';
+import { Viewer } from '@/components/Viewer';
 import { BrandBlock } from '@/components/header/BrandBlock';
 import { Header } from '@/components/header/Header';
-import { MobileControlsView } from '@/components/mobile/MobileControlsView';
-import { MobileTabBar } from '@/components/mobile/MobileTabBar';
-import { Rail } from '@/components/rail/Rail';
-import { SlicePanel } from '@/components/rail/SlicePanel';
-import { Stage } from '@/components/stage/Stage';
 import { Tooltip } from '@/components/ui/Tooltip';
-import { accentRgba, isSlicePlane } from '@/constants';
+import { accentRgba } from '@/constants';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { usePwaInstall } from '@/hooks/usePwaInstall';
-import { useViewerStore } from '@/viewer';
+import { type ViewerSlots, useViewer, useViewerStore } from '@/viewer';
 import { MonitorDown } from 'lucide-react';
 import styled from 'styled-components';
 
-const GridRoot = styled.div<{ $railOpen: boolean }>`
+/**
+ * Header above the viewer. In focus mode the header row folds away, so the
+ * stage fills the window as it did when the app and the viewer were one grid.
+ */
+const GridRoot = styled.div<{ $focus: boolean }>`
   position: relative;
   z-index: var(--z-layout);
   display: grid;
-  grid-template-columns: ${({ $railOpen }) => ($railOpen ? '1fr 360px' : '1fr 0px')};
-  grid-template-rows: 56px minmax(0, 1fr);
-  grid-template-areas: "header header" "stage rail";
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: ${({ $focus }) => ($focus ? '0' : '56px')} minmax(0, 1fr);
+  grid-template-areas: "header" "viewer";
   height: 100vh;
   width: 100vw;
-  gap: 0;
+`;
+
+const ViewerArea = styled.div`
+  grid-area: viewer;
+  min-height: 0;
 `;
 
 const MobileRoot = styled.div`
@@ -34,6 +37,11 @@ const MobileRoot = styled.div`
   overflow: hidden;
   position: relative;
   z-index: var(--z-layout);
+`;
+
+const MobileViewerArea = styled.div`
+  flex: 1;
+  min-height: 0;
 `;
 
 const MobileHeaderBar = styled.header`
@@ -87,37 +95,6 @@ const MobileLoadingBar = styled.div<{ $width: number }>`
   box-shadow: 0 0 6px ${accentRgba('amber', 0.6)};
 `;
 
-/** Content area between header and tab bar. */
-const MobileContent = styled.div`
-  flex: 1;
-  position: relative;
-  min-height: 0;
-  overflow: hidden;
-`;
-
-/** Wraps the 3D Stage. Always in the DOM to preserve the WebGL context. */
-const StageWrap = styled.div<{ $visible: boolean }>`
-  position: absolute;
-  inset: 0;
-  /* Use visibility (not display) so getBoundingClientRect keeps correct dims. */
-  visibility: ${({ $visible }) => ($visible ? 'visible' : 'hidden')};
-  pointer-events: ${({ $visible }) => ($visible ? 'auto' : 'none')};
-`;
-
-/** Full-bleed wrapper for a single slice panel on mobile. */
-const MobileSliceWrap = styled.div`
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-`;
-
-/** Scrollable container for the controls tab. */
-const MobileControlsWrap = styled.div`
-  position: absolute;
-  inset: 0;
-`;
-
 function MobileHeader() {
   const loadingPercent = useViewerStore((s) => (s.loading.active ? s.loading.percent : null));
   const { canInstall, install } = usePwaInstall();
@@ -137,19 +114,36 @@ function MobileHeader() {
   );
 }
 
-export function AppGrid() {
+interface AppGridProps {
+  slots: ViewerSlots;
+  onExit: () => void;
+}
+
+/**
+ * The app's shell around the viewer: its header (brand, run strip, install,
+ * help) on top, the viewer below. The app fills the window, so the viewer's
+ * layout follows the window's width and its shortcuts listen on the window.
+ */
+export function AppGrid({ slots, onExit }: AppGridProps) {
+  const viewer = useViewer();
   const isMobile = useIsMobile();
-  const railOpen = useViewerStore((s) => s.toolbar.rail);
-  const mobileTab = useViewerStore((s) => s.mobileTab);
-  const volumeLoaded = useViewerStore((s) => s.volume !== null);
+  const focus = useViewerStore((s) => s.toolbar.focus);
+
+  const content = (
+    <Viewer
+      viewer={viewer}
+      layout={isMobile ? 'mobile' : 'desktop'}
+      keyboardTarget={window}
+      slots={slots}
+      onExit={onExit}
+    />
+  );
 
   if (!isMobile) {
     return (
-      <GridRoot className="console" $railOpen={railOpen}>
-        <Header />
-        <Stage />
-        <Rail />
-        <Dock />
+      <GridRoot className="console" $focus={focus}>
+        {!focus && <Header />}
+        <ViewerArea>{content}</ViewerArea>
       </GridRoot>
     );
   }
@@ -157,30 +151,7 @@ export function AppGrid() {
   return (
     <MobileRoot>
       <MobileHeader />
-
-      <MobileContent>
-        {/* Stage stays mounted at all times to preserve the WebGL/Three.js context. */}
-        <StageWrap $visible={mobileTab === '3d'}>
-          <Stage />
-        </StageWrap>
-
-        {/* isSlicePlane narrows mobileTab → SlicePlane for the SlicePanel prop. */}
-        {isSlicePlane(mobileTab) && (
-          <MobileSliceWrap>
-            <SlicePanel plane={mobileTab} />
-          </MobileSliceWrap>
-        )}
-
-        {/* Controls view — replaces the Dock on mobile. */}
-        {mobileTab === 'controls' && (
-          <MobileControlsWrap>
-            <MobileControlsView />
-          </MobileControlsWrap>
-        )}
-      </MobileContent>
-
-      {/* Tab bar only shown while viewing a loaded volume. */}
-      {volumeLoaded && <MobileTabBar />}
+      <MobileViewerArea>{content}</MobileViewerArea>
     </MobileRoot>
   );
 }

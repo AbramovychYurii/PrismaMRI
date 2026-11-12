@@ -70,7 +70,7 @@ export const Card = styled.div`
   left: ${SIDE_OFFSET}px;
   z-index: var(--z-modal);
   width: 360px;
-  max-width: calc(100vw - ${SIDE_OFFSET * 2}px);
+  max-width: calc(100% - ${SIDE_OFFSET * 2}px);
   background: rgba(16, 14, 10, 0.97);
   border: 1px solid var(--rule-2);
   border-radius: 12px;
@@ -82,15 +82,13 @@ export const Card = styled.div`
   flex-direction: row;
   animation: ${slideDown} 200ms cubic-bezier(0.22, 1, 0.36, 1);
 
-  @media (max-width: 767px) {
-    width: calc(100vw - ${MOBILE_SIDE * 2}px);
+  [data-layout='mobile'] & {
+    width: calc(100% - ${MOBILE_SIDE * 2}px);
     top: ${MOBILE_TOP}px;
     left: ${MOBILE_SIDE}px;
-    /*
-     * Constrain to available viewport: full height minus header (48px),
-     * tab bar (56px), card top offset (12px) and bottom gap (12px).
-     */
-    max-height: calc(100dvh - 128px);
+    /* Constrain to the stage: its height minus the card's top offset and a
+       matching bottom gap. */
+    max-height: calc(100% - ${MOBILE_TOP}px - 12px);
   }
 `;
 
@@ -110,7 +108,7 @@ export const Body = styled.div`
   flex-direction: column;
   gap: 9px;
 
-  @media (max-width: 767px) {
+  [data-layout='mobile'] & {
     /* Allow vertical scroll when card height is capped. */
     overflow-x: hidden;
     overflow-y: auto;
@@ -124,7 +122,7 @@ export const TopRow = styled.div`
   align-items: center;
   gap: 9px;
 
-  @media (max-width: 767px) {
+  [data-layout='mobile'] & {
     position: sticky;
     top: 0;
     background: rgba(16, 14, 10, 0.97);
@@ -257,7 +255,7 @@ export const Footer = styled.div`
   justify-content: space-between;
   gap: 4px;
 
-  @media (max-width: 767px) {
+  [data-layout='mobile'] & {
     position: sticky;
     bottom: 0;
     background: rgba(16, 14, 10, 0.97);
@@ -305,7 +303,7 @@ export const HintText = styled.p`
     letter-spacing: 0.1em;
   }
 
-  @media (max-width: 767px) {
+  [data-layout='mobile'] & {
     left: ${MOBILE_SIDE}px;
   }
 `;
@@ -399,7 +397,7 @@ export const PillWrap = styled.div<{ $entrance: boolean }>`
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.55);
   }
 
-  @media (max-width: 767px) {
+  [data-layout='mobile'] & {
     top: ${MOBILE_TOP - 0.8}px;
     left: ${MOBILE_SIDE - 0.8}px;
   }

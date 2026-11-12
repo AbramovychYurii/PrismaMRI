@@ -7,8 +7,9 @@ import { useViewerHost, useViewerStore } from '@/viewer';
 import { useEffect, useRef } from 'react';
 import styled, { css } from 'styled-components';
 
+/** Focus mode fills the viewer — the host decides whether that is the window. */
 const focusedStyles = css`
-  position: fixed;
+  position: absolute;
   inset: 0;
   z-index: var(--z-stage);
   background: radial-gradient(
@@ -30,7 +31,7 @@ const normalStyles = css`
   overflow: hidden;
   border-right: 1px solid var(--rule);
 
-  @media (max-width: 767px) {
+  [data-layout='mobile'] & {
     /* StageWrap is position:absolute;inset:0 — child needs explicit height to fill it. */
     height: 100%;
     border-right: none;

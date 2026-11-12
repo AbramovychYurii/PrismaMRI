@@ -2,10 +2,9 @@ import { StageMenu } from '@/components/stage/StageMenu';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { accentRgba } from '@/constants';
 import { useHover } from '@/hooks/useHover';
-import { useIsMobile } from '@/hooks/useIsMobile';
 import type { ThreePreview } from '@/lib/volume/three-preview';
 import type { PlanesMode, ToolbarState } from '@/types';
-import { useViewerStore } from '@/viewer';
+import { useViewerLayout, useViewerStore } from '@/viewer';
 import { Maximize2, PanelRight } from 'lucide-react';
 import styled from 'styled-components';
 
@@ -112,7 +111,7 @@ const PillWrap = styled.div`
   gap: 8px;
   z-index: var(--z-panel-chrome);
 
-  @media (max-width: 767px) {
+  [data-layout='mobile'] & {
     top: 12px;
     right: 12px;
     gap: 6px;
@@ -138,7 +137,7 @@ const ToolBtn = styled.button<{ $on: boolean; $hover: boolean }>`
   transition: 120ms;
   -webkit-tap-highlight-color: transparent;
 
-  @media (max-width: 767px) {
+  [data-layout='mobile'] & {
     /* Ensure minimum 44×44 px touch target. */
     padding: 14px 14px;
     min-width: 44px;
@@ -238,7 +237,7 @@ interface ToolbarPillProps {
 }
 
 export function ToolbarPill({ previewRef, has3D = true }: ToolbarPillProps) {
-  const isMobile = useIsMobile();
+  const isMobile = useViewerLayout() === 'mobile';
   const visible = BUTTONS.filter(
     (b) => !(isMobile && b.mobileHidden) && (has3D || b.id === 'rail'),
   );

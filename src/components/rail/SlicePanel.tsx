@@ -11,7 +11,6 @@ import { SliceScrubber } from '@/components/rail/SliceScrubber';
 import { PLANE_FOOTER } from '@/constants';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
 import { useHalfSlabs } from '@/hooks/useHalfSlabs';
-import { useIsMobile } from '@/hooks/useIsMobile';
 import { useSlicePanelCore } from '@/hooks/useSlicePanelCore';
 import {
   useCrosshairClick,
@@ -20,7 +19,7 @@ import {
 } from '@/hooks/useSlicePanelGestures';
 import { useSlicePanelKeys } from '@/hooks/useSlicePanelKeys';
 import type { SlicePlane } from '@/types';
-import { usePortalContainer, useViewerStore } from '@/viewer';
+import { useViewerEnvironment, useViewerLayout, useViewerStore } from '@/viewer';
 import { ChevronsUpDown, Maximize2, Minimize2 } from 'lucide-react';
 import { useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -37,7 +36,9 @@ import {
 } from './SlicePanel.styles';
 
 function ExpandedSlicePanel({ plane }: { plane: SlicePlane }) {
-  const portalContainer = usePortalContainer();
+  // Drawn inside the viewer, over its stage and rail — not over the host page.
+  const { rootElement, portalContainer } = useViewerEnvironment();
+  const container = rootElement ?? portalContainer;
   const slabMm = useViewerStore((s) => s.slabMm);
   const halfSlabs = useHalfSlabs(plane, slabMm);
   const setExpandedPlane = useViewerStore((s) => s.setExpandedPlane);
@@ -61,13 +62,14 @@ function ExpandedSlicePanel({ plane }: { plane: SlicePlane }) {
     overlay?.focus();
     return () => {
       const active = document.activeElement;
-      if (active === document.body || overlay?.contains(active)) {
+      if (active === document.body || active === container || overlay?.contains(active)) {
+        // Within this viewer only — another viewer on the page has its own panels.
         requestAnimationFrame(() =>
-          document.querySelector<HTMLElement>(`[data-slice-panel="${plane}"]`)?.focus(),
+          container.querySelector<HTMLElement>(`[data-slice-panel="${plane}"]`)?.focus(),
         );
       }
     };
-  }, [plane]);
+  }, [plane, container]);
   useEscapeKey(onClose);
 
   return createPortal(
@@ -137,12 +139,12 @@ function ExpandedSlicePanel({ plane }: { plane: SlicePlane }) {
 
       <MeasureContextMenu measure={measure} onSnapToView={core.onSnapToView} />
     </FullscreenOverlay>,
-    portalContainer,
+    container,
   );
 }
 
 function RailSlicePanel({ plane }: { plane: SlicePlane }) {
-  const isMobile = useIsMobile();
+  const isMobile = useViewerLayout() === 'mobile';
   const slabMm = useViewerStore((s) => s.slabMm);
   const halfSlabs = useHalfSlabs(plane, slabMm);
   const setExpandedPlane = useViewerStore((s) => s.setExpandedPlane);

@@ -28,7 +28,7 @@ const Bar = styled.div`
   border-radius: 8px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.65);
 
-  @media (max-width: 767px) {
+  [data-layout='mobile'] & {
     /* Full width, below the corner chrome: its 12px inset + the 50px toolbar
        buttons (14px padding either side of a 20px icon, 1px borders) + 8px. */
     top: 70px;
@@ -61,7 +61,7 @@ const DismissBtn = styled.button`
     color: var(--ink);
   }
 
-  @media (max-width: 767px) {
+  [data-layout='mobile'] & {
     /* The 44px touch target the stage chrome beside it uses. */
     display: inline-flex;
     align-items: center;
