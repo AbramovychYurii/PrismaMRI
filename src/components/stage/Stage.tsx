@@ -4,7 +4,7 @@ import { StageAlert } from '@/components/stage/StageAlert';
 import { StageSeriesSelect } from '@/components/stage/StageSeriesSelect';
 import { ToolbarPill } from '@/components/stage/ToolbarPill';
 import { useThreePreview } from '@/hooks/useThreePreview';
-import { useVolumeStore } from '@/store';
+import { useViewerStore } from '@/viewer';
 import { useEffect, useRef } from 'react';
 import styled, { css } from 'styled-components';
 
@@ -99,9 +99,9 @@ const NoVolumePlaceholder = styled.div`
 export function Stage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { previewRef, status } = useThreePreview(canvasRef);
-  const toggleToolbar = useVolumeStore((s) => s.toggleToolbar);
-  const focus = useVolumeStore((s) => s.toolbar.focus);
-  const hasVolume = useVolumeStore((s) => s.prepared3D !== null);
+  const toggleToolbar = useViewerStore((s) => s.toggleToolbar);
+  const focus = useViewerStore((s) => s.toolbar.focus);
+  const hasVolume = useViewerStore((s) => s.prepared3D !== null);
 
   // Focus mode is left by its own button, which is not shown without a 3-D
   // view — and the mode is kept across reloads — so leave it here instead of

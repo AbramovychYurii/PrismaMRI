@@ -1,5 +1,5 @@
 import { intensityUnit } from '@/lib/volume/units';
-import { useVolumeStore } from '@/store';
+import { useViewerStore } from '@/viewer';
 import styled from 'styled-components';
 
 const StripGrid = styled.div`
@@ -70,8 +70,8 @@ function RunCell({
 }
 
 export function RunStrip() {
-  const volume = useVolumeStore((s) => s.volume);
-  const measurement = useVolumeStore((s) => s.measurement);
+  const volume = useViewerStore((s) => s.volume);
+  const measurement = useViewerStore((s) => s.measurement);
   const meta = volume?.meta;
   const dims = meta?.dims;
   const spacing = meta?.spacing;

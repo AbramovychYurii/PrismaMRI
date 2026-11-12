@@ -1,5 +1,5 @@
 import { ACCENT_VAR, AXIS_ACCENT, type Axis } from '@/constants';
-import { useVolumeStore } from '@/store';
+import { useViewerStore } from '@/viewer';
 import styled from 'styled-components';
 
 const CursorSection = styled.div`
@@ -63,7 +63,7 @@ const TipKey = styled.b`
 const AXES: Axis[] = ['x', 'y', 'z'];
 
 export function NavigationCell() {
-  const cursor = useVolumeStore((s) => s.cursor);
+  const cursor = useViewerStore((s) => s.cursor);
 
   return (
     <>

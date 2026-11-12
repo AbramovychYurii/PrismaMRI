@@ -7,7 +7,7 @@
 
 import { useViewerActions } from '@/hooks/ViewerActionsContext';
 import type { SeriesChoice } from '@/lib/import/types';
-import { useVolumeStore } from '@/store';
+import { useViewerStore } from '@/viewer';
 import { ChevronDown, Layers } from 'lucide-react';
 import styled from 'styled-components';
 
@@ -94,9 +94,9 @@ function optionLabel(s: SeriesChoice): string {
 }
 
 export function StageSeriesSelect() {
-  const seriesList = useVolumeStore((s) => s.seriesList);
-  const activeSeriesKey = useVolumeStore((s) => s.activeSeriesKey);
-  const loading = useVolumeStore((s) => s.loading.active);
+  const seriesList = useViewerStore((s) => s.seriesList);
+  const activeSeriesKey = useViewerStore((s) => s.activeSeriesKey);
+  const loading = useViewerStore((s) => s.loading.active);
   const { switchSeries } = useViewerActions();
 
   if (!seriesList || seriesList.length <= 1) return null;

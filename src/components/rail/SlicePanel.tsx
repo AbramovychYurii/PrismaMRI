@@ -19,8 +19,8 @@ import {
   useSliceSwipe,
 } from '@/hooks/useSlicePanelGestures';
 import { useSlicePanelKeys } from '@/hooks/useSlicePanelKeys';
-import { useVolumeStore } from '@/store/volumeStore';
 import type { SlicePlane } from '@/types';
+import { usePortalContainer, useViewerStore } from '@/viewer';
 import { ChevronsUpDown, Maximize2, Minimize2 } from 'lucide-react';
 import { useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -37,9 +37,10 @@ import {
 } from './SlicePanel.styles';
 
 function ExpandedSlicePanel({ plane }: { plane: SlicePlane }) {
-  const slabMm = useVolumeStore((s) => s.slabMm);
+  const portalContainer = usePortalContainer();
+  const slabMm = useViewerStore((s) => s.slabMm);
   const halfSlabs = useHalfSlabs(plane, slabMm);
-  const setExpandedPlane = useVolumeStore((s) => s.setExpandedPlane);
+  const setExpandedPlane = useViewerStore((s) => s.setExpandedPlane);
   const core = useSlicePanelCore(plane, halfSlabs);
   const { idx, total, scrubVisible, setScrubVisible, onScrub } = core.slice;
   const { isActive, measure } = core;
@@ -136,15 +137,15 @@ function ExpandedSlicePanel({ plane }: { plane: SlicePlane }) {
 
       <MeasureContextMenu measure={measure} onSnapToView={core.onSnapToView} />
     </FullscreenOverlay>,
-    document.body,
+    portalContainer,
   );
 }
 
 function RailSlicePanel({ plane }: { plane: SlicePlane }) {
   const isMobile = useIsMobile();
-  const slabMm = useVolumeStore((s) => s.slabMm);
+  const slabMm = useViewerStore((s) => s.slabMm);
   const halfSlabs = useHalfSlabs(plane, slabMm);
-  const setExpandedPlane = useVolumeStore((s) => s.setExpandedPlane);
+  const setExpandedPlane = useViewerStore((s) => s.setExpandedPlane);
 
   const core = useSlicePanelCore(plane, halfSlabs);
   const { canvasRef } = core.frame;
@@ -253,7 +254,7 @@ function RailSlicePanel({ plane }: { plane: SlicePlane }) {
  * subscriptions. Switching on the store means only the visible one exists.
  */
 export function SlicePanel({ plane }: { plane: SlicePlane }) {
-  const expandedPlane = useVolumeStore((s) => s.expandedPlane);
+  const expandedPlane = useViewerStore((s) => s.expandedPlane);
   return expandedPlane === plane ? (
     <ExpandedSlicePanel plane={plane} />
   ) : (

@@ -18,7 +18,8 @@
 import { LOCAL_PORTS } from '@/lib/mcp/constants';
 import { EXAMPLE_PROMPT } from '@/lib/mcp/example-prompt';
 import { getSampleReport } from '@/lib/sampleReports';
-import { useVolumeStore } from '@/store/volumeStore';
+import { useAgentStore } from '@/store';
+import { useViewerStore } from '@/viewer';
 import {
   Bot,
   Check,
@@ -178,12 +179,12 @@ const PORT_VALUE_INLINE_STYLE: React.CSSProperties = { fontSize: 10.5, opacity: 
 const STRONG_INK2_STYLE: React.CSSProperties = { color: 'var(--ink-2)' };
 
 export function SessionPanel() {
-  const mcpConnected = useVolumeStore((s) => s.mcpConnected);
-  const agentWorking = useVolumeStore((s) => s.agentSessionActive);
-  const localPort = useVolumeStore((s) => s.localPort);
-  const dockOpen = useVolumeStore((s) => s.toolbar.dock);
-  const activeVolumeId = useVolumeStore((s) => s.activeVolumeId);
-  const setAiAnnotations = useVolumeStore((s) => s.setAiAnnotations);
+  const mcpConnected = useAgentStore((s) => s.mcpConnected);
+  const agentWorking = useAgentStore((s) => s.agentSessionActive);
+  const localPort = useAgentStore((s) => s.localPort);
+  const dockOpen = useViewerStore((s) => s.toolbar.dock);
+  const activeVolumeId = useViewerStore((s) => s.activeVolumeId);
+  const setAiAnnotations = useViewerStore((s) => s.setAiAnnotations);
   // Prefer the store's localPort over isLocalMode() — localPort is set only when
   // the bridge actually connected directly to 127.0.0.1 (covers both PWA standalone
   // and localhost dev-server cases that isLocalMode() would miss).

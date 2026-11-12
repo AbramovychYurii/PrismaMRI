@@ -8,7 +8,7 @@
  * style (ImportOverlay's ErrorMsg); the dismiss button is ConfirmModal's.
  */
 
-import { useVolumeStore } from '@/store/volumeStore';
+import { useViewerStore } from '@/viewer';
 import { X } from 'lucide-react';
 import styled from 'styled-components';
 
@@ -73,8 +73,8 @@ const DismissBtn = styled.button`
 `;
 
 export function StageAlert() {
-  const error = useVolumeStore((s) => s.error);
-  const setError = useVolumeStore((s) => s.setError);
+  const error = useViewerStore((s) => s.error);
+  const setError = useViewerStore((s) => s.setError);
   if (!error) return null;
 
   return (

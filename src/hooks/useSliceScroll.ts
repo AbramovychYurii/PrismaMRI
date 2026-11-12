@@ -1,12 +1,17 @@
 import { clamp } from '@/lib/volume/math';
 import { sliceAxis, sliceCount } from '@/lib/volume/plane';
-import { useVolumeStore } from '@/store/volumeStore';
 import type { SlicePlane } from '@/types';
+import {
+  type ViewerStore,
+  useViewerEnvironment,
+  useViewerStore,
+  useViewerStoreApi,
+} from '@/viewer';
 import { useCallback, useEffect, useRef } from 'react';
 
 /** Moves the cursor `steps` slices along `plane`. Returns false when no volume is open. */
-function stepSlice(plane: SlicePlane, steps: number): boolean {
-  const { volume, cursor, setCursor } = useVolumeStore.getState();
+function stepSlice(store: ViewerStore, plane: SlicePlane, steps: number): boolean {
+  const { volume, cursor, setCursor } = store.getState();
   if (!volume || !cursor) return false;
   const axis = sliceAxis(plane);
   const next = clamp(cursor[axis] + steps, 0, sliceCount(volume.meta.dims, plane) - 1);
@@ -45,6 +50,7 @@ export function stepsFromWheelDelta(
  * threshold exactly once instead of ping-ponging.
  */
 export function useSliceScroll(plane: SlicePlane) {
+  const store = useViewerStoreApi();
   const accumulated = useRef(0);
   const rafId = useRef<number | null>(null);
 
@@ -68,11 +74,18 @@ export function useSliceScroll(plane: SlicePlane) {
 
         // Keep only the sub-step remainder, so movement ends when the wheel does.
         accumulated.current = remainder;
-        if (!stepSlice(plane, steps)) accumulated.current = 0;
+        if (!stepSlice(store, plane, steps)) accumulated.current = 0;
       });
     },
-    [plane],
+    [store, plane],
   );
+}
+
+/** Adds a keydown listener to `target`; returns the matching cleanup. */
+function listenForKeys(target: EventTarget, onKey: (e: KeyboardEvent) => void): () => void {
+  const listener = (e: Event) => onKey(e as KeyboardEvent);
+  target.addEventListener('keydown', listener);
+  return () => target.removeEventListener('keydown', listener);
 }
 
 const PLANE_FOCUS_KEYS: Record<string, SlicePlane> = {
@@ -87,32 +100,37 @@ const PLANE_FOCUS_KEYS: Record<string, SlicePlane> = {
  * left alone.
  */
 export function usePlaneFocusKeys(): void {
+  const store = useViewerStoreApi();
+  const { keyboardTarget } = useViewerEnvironment();
+
   useEffect(() => {
+    if (!keyboardTarget) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
       const plane = PLANE_FOCUS_KEYS[e.key];
       if (!plane) return;
-      const { volume, setActivePlane } = useVolumeStore.getState();
+      const { volume, setActivePlane } = store.getState();
       if (!volume) return;
       e.preventDefault();
       setActivePlane(plane);
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
+    return listenForKeys(keyboardTarget, onKey);
+  }, [store, keyboardTarget]);
 }
 
 const CONTROLS_WITH_ARROWS =
   'input, textarea, select, [role="slider"], [role="menu"], [role="tablist"], [role="listbox"]';
 
-/** Global ↑/↓ stepping of the active plane by ±1 slice. */
+/** ↑/↓ stepping of the active plane by ±1 slice, wherever the viewer listens for keys. */
 export function useActivePlaneKeys(): void {
-  const activePlane = useVolumeStore((s) => s.activePlane);
+  const store = useViewerStoreApi();
+  const { keyboardTarget } = useViewerEnvironment();
+  const activePlane = useViewerStore((s) => s.activePlane);
 
   useEffect(() => {
-    if (!activePlane) return;
+    if (!activePlane || !keyboardTarget) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
       // Modified arrows belong to others (Shift moves the crosshair in a
@@ -120,12 +138,11 @@ export function useActivePlaneKeys(): void {
       // that have a meaning of their own there — a range input, a menu, tabs.
       if (e.shiftKey || e.altKey || e.metaKey || e.ctrlKey || e.defaultPrevented) return;
       if (e.target instanceof Element && e.target.closest(CONTROLS_WITH_ARROWS)) return;
-      const { volume, cursor } = useVolumeStore.getState();
+      const { volume, cursor } = store.getState();
       if (!volume || !cursor) return;
       e.preventDefault();
-      stepSlice(activePlane, e.key === 'ArrowUp' ? 1 : -1);
+      stepSlice(store, activePlane, e.key === 'ArrowUp' ? 1 : -1);
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [activePlane]);
+    return listenForKeys(keyboardTarget, onKey);
+  }, [store, keyboardTarget, activePlane]);
 }

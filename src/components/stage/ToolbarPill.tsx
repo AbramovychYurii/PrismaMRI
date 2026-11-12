@@ -4,8 +4,8 @@ import { accentRgba } from '@/constants';
 import { useHover } from '@/hooks/useHover';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import type { ThreePreview } from '@/lib/volume/three-preview';
-import { useVolumeStore } from '@/store';
 import type { PlanesMode, ToolbarState } from '@/types';
+import { useViewerStore } from '@/viewer';
 import { Maximize2, PanelRight } from 'lucide-react';
 import styled from 'styled-components';
 
@@ -154,8 +154,8 @@ const PLANES_TIP: Record<PlanesMode, string> = {
 };
 
 function PlanesButton() {
-  const mode = useVolumeStore((s) => s.toolbar.planes);
-  const cyclePlanesMode = useVolumeStore((s) => s.cyclePlanesMode);
+  const mode = useViewerStore((s) => s.toolbar.planes);
+  const cyclePlanesMode = useViewerStore((s) => s.cyclePlanesMode);
   const { hover, onMouseEnter, onMouseLeave } = useHover();
 
   const on = mode !== 'off';
@@ -183,8 +183,8 @@ function PlanesButton() {
 }
 
 function ClipButton() {
-  const on = useVolumeStore((s) => s.toolbar.clip);
-  const toggle = useVolumeStore((s) => s.toggleToolbar);
+  const on = useViewerStore((s) => s.toolbar.clip);
+  const toggle = useViewerStore((s) => s.toggleToolbar);
   const { hover, onMouseEnter, onMouseLeave } = useHover();
 
   return (
@@ -205,8 +205,8 @@ function ClipButton() {
 }
 
 function ToolButton({ btn }: { btn: ToolbarButton }) {
-  const on = useVolumeStore((s) => s.toolbar[btn.id]);
-  const toggle = useVolumeStore((s) => s.toggleToolbar);
+  const on = useViewerStore((s) => s.toolbar[btn.id]);
+  const toggle = useViewerStore((s) => s.toggleToolbar);
   const { hover, onMouseEnter, onMouseLeave } = useHover();
 
   return (

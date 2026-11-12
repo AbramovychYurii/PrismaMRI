@@ -6,8 +6,8 @@
 
 import { SEVERITY_HEX } from '@/constants';
 import { sliceIndex } from '@/lib/volume/plane';
-import { useVolumeStore } from '@/store/volumeStore';
 import type { AiAnnotation, SlicePlane } from '@/types';
+import { useViewerStore } from '@/viewer';
 import { memo, useMemo } from 'react';
 import styled from 'styled-components';
 
@@ -113,10 +113,10 @@ export function AnnotationOverlay({
   plane: SlicePlane;
   halfSlabs?: number;
 }) {
-  const annotations = useVolumeStore((s) => s.aiAnnotations);
-  const cursor = useVolumeStore((s) => s.cursor);
-  const activeId = useVolumeStore((s) => s.activeAnnotationId);
-  const focusAnnotation = useVolumeStore((s) => s.focusAnnotation);
+  const annotations = useViewerStore((s) => s.aiAnnotations);
+  const cursor = useViewerStore((s) => s.cursor);
+  const activeId = useViewerStore((s) => s.activeAnnotationId);
+  const focusAnnotation = useViewerStore((s) => s.focusAnnotation);
 
   // Reveal markers on the exact slice ±1, widening with the active slab.
   const tol = Math.max(halfSlabs, 1);

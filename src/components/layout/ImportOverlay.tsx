@@ -13,7 +13,7 @@ import { APP_NAME } from '@/constants';
 import { useViewerActions } from '@/hooks/ViewerActionsContext';
 import { type FsEntry, collectFilesFromEntry } from '@/lib/import/scan-folder';
 import { loadViewerPage } from '@/pages/loadViewerPage';
-import { useVolumeStore } from '@/store';
+import { useViewerStore } from '@/viewer';
 import { FolderOpen, Github } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
@@ -91,8 +91,8 @@ const FOLDER_OPEN_ICON_STYLE: React.CSSProperties = {
 
 export function ImportOverlay() {
   const [hover, setHover] = useState(false);
-  const error = useVolumeStore((s) => s.error);
-  const loading = useVolumeStore((s) => s.loading);
+  const error = useViewerStore((s) => s.error);
+  const loading = useViewerStore((s) => s.loading);
   const { openFiles, openFolder, openFile, cancelLoad, pendingSeries, resolveSeriesChoice } =
     useViewerActions();
 

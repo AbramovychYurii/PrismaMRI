@@ -10,7 +10,6 @@ import {
   volumeCenter,
 } from '@/lib/volume/plane';
 import { extractSliceGrayImage } from '@/lib/volume/slices';
-import { useVolumeStore } from '@/store/volumeStore';
 import type {
   AiAnnotation,
   LoadedVolume,
@@ -18,6 +17,8 @@ import type {
   SlicePlane,
   VolumeCursor,
 } from '@/types';
+import type { Viewer } from '@/viewer';
+import type { ViewerStoreState } from '@/viewer/store';
 
 import { captureCanvas, renderSliceForMcp, waitForPaint } from './canvas-utils';
 import { MCP_JPEG_QUALITY, MCP_MAX_EDGE, WL_PRESETS } from './constants';
@@ -40,19 +41,20 @@ export interface HandlerContext {
   msg: HandlerMessage;
   ok: (data?: unknown) => void;
   fail: (error: string) => void;
+  /** The viewer the command acts on. */
+  viewer: Viewer;
 }
 
 export type Handler = (ctx: HandlerContext) => void | Promise<void>;
 
-type VolumeStoreState = ReturnType<typeof useVolumeStore.getState>;
-type LoadedState = VolumeStoreState & { volume: LoadedVolume; cursor: VolumeCursor };
+type LoadedState = ViewerStoreState & { volume: LoadedVolume; cursor: VolumeCursor };
 
 /**
  * Reports "No volume loaded" and returns null unless a volume is open. The
  * store only ever sets a cursor alongside a volume, so both are narrowed here.
  */
-function requireLoaded(fail: (error: string) => void): LoadedState | null {
-  const state = useVolumeStore.getState();
+function requireLoaded(viewer: Viewer, fail: (error: string) => void): LoadedState | null {
+  const state = viewer.store.getState();
   if (!state.volume || !state.cursor) {
     fail('No volume loaded');
     return null;
@@ -84,8 +86,8 @@ function sliceImagesAt(state: LoadedState, cursor: VolumeCursor) {
   return { coronal: render('coronal'), sagittal: render('sagittal'), axial: render('axial') };
 }
 
-const handleGetState: Handler = ({ ok }) => {
-  const { volume, cursor, wl, renderPreset } = useVolumeStore.getState();
+const handleGetState: Handler = ({ ok, viewer }) => {
+  const { volume, cursor, wl, renderPreset } = viewer.store.getState();
   const dims = volume?.meta.dims ?? null;
   ok({
     volumeLoaded: volume !== null,
@@ -99,8 +101,8 @@ const handleGetState: Handler = ({ ok }) => {
   });
 };
 
-const handleOverview: Handler = ({ ok, fail }) => {
-  const state = requireLoaded(fail);
+const handleOverview: Handler = ({ ok, fail, viewer }) => {
+  const state = requireLoaded(viewer, fail);
   if (!state) return;
 
   const { dims, spacing, modality, scanner, protocol } = state.volume.meta;
@@ -124,8 +126,8 @@ const handleOverview: Handler = ({ ok, fail }) => {
   });
 };
 
-const handleNavigate: Handler = ({ msg, ok, fail }) => {
-  const state = requireLoaded(fail);
+const handleNavigate: Handler = ({ msg, ok, fail, viewer }) => {
+  const state = requireLoaded(viewer, fail);
   if (!state) return;
   const plane = requirePlane(msg);
   const slice = requireNumber(msg, 'slice');
@@ -134,8 +136,8 @@ const handleNavigate: Handler = ({ msg, ok, fail }) => {
   ok();
 };
 
-const handleStep: Handler = ({ msg, ok, fail }) => {
-  const state = requireLoaded(fail);
+const handleStep: Handler = ({ msg, ok, fail, viewer }) => {
+  const state = requireLoaded(viewer, fail);
   if (!state) return;
   const plane = requirePlane(msg);
   const steps = requireNumber(msg, 'steps');
@@ -148,24 +150,24 @@ const handleStep: Handler = ({ msg, ok, fail }) => {
   ok({ slice: sliceNumber(next, plane), total: sliceCount(dims, plane) });
 };
 
-const handleNavigateCenter: Handler = ({ ok, fail }) => {
-  const state = requireLoaded(fail);
+const handleNavigateCenter: Handler = ({ ok, fail, viewer }) => {
+  const state = requireLoaded(viewer, fail);
   if (!state) return;
   const center = volumeCenter(state.volume.meta.dims);
   state.setCursor(center);
   ok({ sliceIndices: sliceNumbers(center) });
 };
 
-const handleSetWl: Handler = ({ msg, ok }) => {
+const handleSetWl: Handler = ({ msg, ok, viewer }) => {
   const wl = { window: requireNumber(msg, 'window'), level: requireNumber(msg, 'level') };
-  const { setWL, setWLDraft } = useVolumeStore.getState();
+  const { setWL, setWLDraft } = viewer.store.getState();
   setWL(wl);
   setWLDraft(wl);
   ok();
 };
 
-const handleApplyWlPreset: Handler = ({ msg, ok, fail }) => {
-  const state = requireLoaded(fail);
+const handleApplyWlPreset: Handler = ({ msg, ok, fail, viewer }) => {
+  const state = requireLoaded(viewer, fail);
   if (!state) return;
   // Named rather than defaulted: silently applying full_range for a typo left
   // the agent reasoning about contrast it never asked for.
@@ -178,7 +180,7 @@ const handleApplyWlPreset: Handler = ({ msg, ok, fail }) => {
   ok(wl);
 };
 
-const handleSetPreset: Handler = ({ msg, ok, fail }) => {
+const handleSetPreset: Handler = ({ msg, ok, fail, viewer }) => {
   if (msg.preset === 'tissue') {
     fail(
       '"tissue" preset is not available via MCP — ' +
@@ -187,31 +189,31 @@ const handleSetPreset: Handler = ({ msg, ok, fail }) => {
     );
     return;
   }
-  useVolumeStore.getState().setRenderPreset(requireOneOf(msg, 'preset', ['mip', 'bone'] as const));
+  viewer.store.getState().setRenderPreset(requireOneOf(msg, 'preset', ['mip', 'bone'] as const));
   ok();
 };
 
 const MAX_SLAB_MM = 50;
 
-const handleSetSlabMm: Handler = ({ msg, ok, fail }) => {
+const handleSetSlabMm: Handler = ({ msg, ok, fail, viewer }) => {
   const requested = Number(msg.slab_mm);
   if (!Number.isFinite(requested) || requested < 0) {
     fail('slab_mm must be a non-negative number');
     return;
   }
   const slabMm = Math.min(MAX_SLAB_MM, requested);
-  useVolumeStore.getState().setSlabMm(slabMm);
+  viewer.store.getState().setSlabMm(slabMm);
   ok({ slabMm });
 };
 
-const handleCaptureSlice: Handler = async ({ msg, ok, fail }) => {
+const handleCaptureSlice: Handler = async ({ msg, ok, fail, viewer }) => {
   const plane = requirePlane(msg);
   const slabMm = optionalNumber(msg, 'slab_mm', 0);
 
   // A slab renders straight from the voxel buffer: sharper than a canvas grab
   // and independent of the panel's own slab setting.
   if (slabMm > 0) {
-    const state = requireLoaded(fail);
+    const state = requireLoaded(viewer, fail);
     if (!state) return;
     const { volume, cursor, wl } = state;
     const half = slabHalfSlices(plane, slabMm, volume.meta.spacing);
@@ -220,7 +222,7 @@ const handleCaptureSlice: Handler = async ({ msg, ok, fail }) => {
     return;
   }
 
-  const canvas = useVolumeStore.getState().canvasRefs[plane];
+  const canvas = viewer.surfaces.canvas(plane);
   if (!canvas) {
     fail(`Canvas for ${plane} not available`);
     return;
@@ -229,8 +231,8 @@ const handleCaptureSlice: Handler = async ({ msg, ok, fail }) => {
   ok({ imageData: captureCanvas(canvas) });
 };
 
-const handleCapture3d: Handler = async ({ ok, fail }) => {
-  const preview = useVolumeStore.getState().previewInstance;
+const handleCapture3d: Handler = async ({ ok, fail, viewer }) => {
+  const preview = viewer.surfaces.preview();
   if (!preview) {
     fail('3-D view not ready');
     return;
@@ -239,8 +241,8 @@ const handleCapture3d: Handler = async ({ ok, fail }) => {
   ok({ imageData: preview.captureJpeg(MCP_MAX_EDGE, MCP_JPEG_QUALITY) });
 };
 
-const handleCaptureAll: Handler = ({ ok, fail }) => {
-  const state = requireLoaded(fail);
+const handleCaptureAll: Handler = ({ ok, fail, viewer }) => {
+  const state = requireLoaded(viewer, fail);
   if (!state) return;
   ok(sliceImagesAt(state, state.cursor));
 };
@@ -248,8 +250,8 @@ const handleCaptureAll: Handler = ({ ok, fail }) => {
 /** Slab thickness for the overview grid — improves lesion visibility without hiding margins. */
 const OVERVIEW_GRID_SLAB_MM = 3;
 
-const handleOverviewGrid: Handler = ({ msg, ok, fail }) => {
-  const state = requireLoaded(fail);
+const handleOverviewGrid: Handler = ({ msg, ok, fail, viewer }) => {
+  const state = requireLoaded(viewer, fail);
   if (!state) return;
   const plane = requirePlane(msg);
   // The range the MCP tool advertises (and the radiology skill asks for, 6).
@@ -268,8 +270,8 @@ const handleOverviewGrid: Handler = ({ msg, ok, fail }) => {
   ok({ images, indices, total });
 };
 
-const handleAddAnnotation: Handler = ({ msg, ok, fail }) => {
-  const state = requireLoaded(fail);
+const handleAddAnnotation: Handler = ({ msg, ok, fail, viewer }) => {
+  const state = requireLoaded(viewer, fail);
   if (!state) return;
 
   const plane = requirePlane(msg);
@@ -299,9 +301,9 @@ const handleAddAnnotation: Handler = ({ msg, ok, fail }) => {
   ok({ id: annotation.id });
 };
 
-const handleRemoveAnnotation: Handler = ({ msg, ok, fail }) => {
+const handleRemoveAnnotation: Handler = ({ msg, ok, fail, viewer }) => {
   const removeId = requireString(msg, 'id');
-  const state = useVolumeStore.getState();
+  const state = viewer.store.getState();
   if (!state.aiAnnotations.some((a) => a.id === removeId)) {
     fail(`Annotation ${removeId} not found`);
     return;
@@ -310,8 +312,8 @@ const handleRemoveAnnotation: Handler = ({ msg, ok, fail }) => {
   ok();
 };
 
-const handleListAnnotations: Handler = ({ ok }) => {
-  const annotations = useVolumeStore.getState().aiAnnotations.map((a) => ({
+const handleListAnnotations: Handler = ({ ok, viewer }) => {
+  const annotations = viewer.store.getState().aiAnnotations.map((a) => ({
     id: a.id,
     plane: a.plane,
     voxel: a.voxel,
@@ -322,13 +324,13 @@ const handleListAnnotations: Handler = ({ ok }) => {
   ok({ annotations, count: annotations.length });
 };
 
-const handleClearAnnotations: Handler = ({ ok }) => {
-  useVolumeStore.getState().clearAiAnnotations();
+const handleClearAnnotations: Handler = ({ ok, viewer }) => {
+  viewer.store.getState().clearAiAnnotations();
   ok();
 };
 
-const handleSetMeasurement: Handler = ({ msg, ok, fail }) => {
-  const state = requireLoaded(fail);
+const handleSetMeasurement: Handler = ({ msg, ok, fail, viewer }) => {
+  const state = requireLoaded(viewer, fail);
   if (!state) return;
   const dims = state.volume.meta.dims;
 
@@ -351,11 +353,11 @@ const handleSetMeasurement: Handler = ({ msg, ok, fail }) => {
   // Setting `from` wipes any prior `to`, so the pair always lands atomically.
   state.setMeasurementFrom(from);
   state.setMeasurementTo(to);
-  ok({ from, to, distanceMm: useVolumeStore.getState().measurement?.distanceMm ?? null });
+  ok({ from, to, distanceMm: viewer.store.getState().measurement?.distanceMm ?? null });
 };
 
-const handleGetMeasurement: Handler = ({ ok }) => {
-  const measurement = useVolumeStore.getState().measurement;
+const handleGetMeasurement: Handler = ({ ok, viewer }) => {
+  const measurement = viewer.store.getState().measurement;
   ok({
     hasMeasurement: measurement !== null,
     from: measurement?.from ?? null,
@@ -364,8 +366,8 @@ const handleGetMeasurement: Handler = ({ ok }) => {
   });
 };
 
-const handleClearMeasurement: Handler = ({ ok }) => {
-  useVolumeStore.getState().clearMeasurement();
+const handleClearMeasurement: Handler = ({ ok, viewer }) => {
+  viewer.store.getState().clearMeasurement();
   ok();
 };
 

@@ -9,7 +9,7 @@
  * popup.  The agent was admitted once it supplied the correct session UUID.
  */
 
-import { useVolumeStore } from '@/store/volumeStore';
+import { useAgentStore } from '@/store';
 import { Bot, ShieldCheck } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import styled, { keyframes } from 'styled-components';
@@ -149,7 +149,7 @@ const CAPABILITIES = [
 ];
 
 export function ConnectConfirm({ onClose }: { onClose: () => void }) {
-  const mcpConnected = useVolumeStore((s) => s.mcpConnected);
+  const mcpConnected = useAgentStore((s) => s.mcpConnected);
   const confirmRef = useRef<HTMLButtonElement>(null);
 
   // Auto-focus the confirm button for keyboard accessibility.

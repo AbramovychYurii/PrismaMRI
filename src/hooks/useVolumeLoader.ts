@@ -4,7 +4,7 @@ import { fromFileList } from '@/lib/import/scan-folder';
 import type { ImportSource, SeriesChoice } from '@/lib/import/types';
 import { loadVolumeInWorker } from '@/lib/import/volume-client';
 import * as volumeDb from '@/lib/volumeDb';
-import { useVolumeStore } from '@/store';
+import { useViewerStore, useViewerStoreApi } from '@/viewer';
 import { useCallback, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
@@ -19,11 +19,12 @@ export const isAbort = (err: unknown) => err instanceof DOMException && err.name
  * series switching, loading examples by URL, and the IndexedDB cache write.
  */
 export function useVolumeLoader() {
-  const setLoading = useVolumeStore((s) => s.setLoading);
-  const setError = useVolumeStore((s) => s.setError);
-  const setVolume = useVolumeStore((s) => s.setVolume);
-  const setSeriesContext = useVolumeStore((s) => s.setSeriesContext);
-  const clearSeriesContext = useVolumeStore((s) => s.clearSeriesContext);
+  const store = useViewerStoreApi();
+  const setLoading = useViewerStore((s) => s.setLoading);
+  const setError = useViewerStore((s) => s.setError);
+  const setVolume = useViewerStore((s) => s.setVolume);
+  const setSeriesContext = useViewerStore((s) => s.setSeriesContext);
+  const clearSeriesContext = useViewerStore((s) => s.clearSeriesContext);
   const navigate = useNavigate();
 
   const abortRef = useRef<AbortController | null>(null);
@@ -165,11 +166,11 @@ export function useVolumeLoader() {
    */
   const switchSeries = useCallback(
     (key: string) => {
-      const { seriesSource, seriesList, activeSeriesKey } = useVolumeStore.getState();
+      const { seriesSource, seriesList, activeSeriesKey } = store.getState();
       if (!seriesSource || !seriesList || key === activeSeriesKey) return;
       void loadFromSource(seriesSource, key, seriesList);
     },
-    [loadFromSource],
+    [store, loadFromSource],
   );
 
   /** Cancels the series picker if it is open, otherwise aborts the worker. */

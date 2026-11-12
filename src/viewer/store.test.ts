@@ -1,12 +1,9 @@
-/**
- * @vitest-environment happy-dom
- *
- * The measurement distance is the one number in this app a person might read
- * and act on, so it gets its own file. happy-dom is needed only because the store
- * persists UI state to sessionStorage — the arithmetic under test is pure.
- */
-import { useVolumeStore } from '@/store/volumeStore';
 import type { LoadedVolume, Vec3 } from '@/types';
+/**
+ * The measurement distance is the one number in this app a person might read
+ * and act on, so it gets its own tests.
+ */
+import { type ViewerStore, createViewerStore } from '@/viewer/store';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 function volumeWithSpacing(spacing: Vec3): LoadedVolume {
@@ -22,15 +19,17 @@ function volumeWithSpacing(spacing: Vec3): LoadedVolume {
 
 /** Distance in mm between two voxels under the given spacing. */
 function measure(spacing: Vec3 | null, from: Vec3, to: Vec3): number | null {
-  useVolumeStore.setState({ volume: spacing ? volumeWithSpacing(spacing) : null });
-  const { setMeasurementFrom, setMeasurementTo } = useVolumeStore.getState();
+  store.setState({ volume: spacing ? volumeWithSpacing(spacing) : null });
+  const { setMeasurementFrom, setMeasurementTo } = store.getState();
   setMeasurementFrom({ x: from[0], y: from[1], z: from[2] });
   setMeasurementTo({ x: to[0], y: to[1], z: to[2] });
-  return useVolumeStore.getState().measurement?.distanceMm ?? null;
+  return store.getState().measurement?.distanceMm ?? null;
 }
 
+let store: ViewerStore;
+
 beforeEach(() => {
-  useVolumeStore.setState({ measurement: null, volume: null });
+  store = createViewerStore();
 });
 
 describe('measurement distance', () => {
@@ -69,53 +68,53 @@ describe('measurement distance', () => {
 
 describe('measurement lifecycle', () => {
   it('leaves the distance unresolved until the second point lands', () => {
-    useVolumeStore.setState({ volume: volumeWithSpacing([1, 1, 1]) });
-    useVolumeStore.getState().setMeasurementFrom({ x: 0, y: 0, z: 0 });
-    const m = useVolumeStore.getState().measurement;
+    store.setState({ volume: volumeWithSpacing([1, 1, 1]) });
+    store.getState().setMeasurementFrom({ x: 0, y: 0, z: 0 });
+    const m = store.getState().measurement;
     expect(m?.from).toEqual({ x: 0, y: 0, z: 0 });
     expect(m?.to).toBeNull();
     expect(m?.distanceMm).toBeNull();
   });
 
   it('ignores a second point when no first point was placed', () => {
-    useVolumeStore.setState({ volume: volumeWithSpacing([1, 1, 1]), measurement: null });
-    useVolumeStore.getState().setMeasurementTo({ x: 5, y: 5, z: 5 });
-    expect(useVolumeStore.getState().measurement).toBeNull();
+    store.setState({ volume: volumeWithSpacing([1, 1, 1]), measurement: null });
+    store.getState().setMeasurementTo({ x: 5, y: 5, z: 5 });
+    expect(store.getState().measurement).toBeNull();
   });
 
   it('starts a fresh measurement rather than extending the old one', () => {
-    useVolumeStore.setState({ volume: volumeWithSpacing([1, 1, 1]) });
-    const { setMeasurementFrom, setMeasurementTo } = useVolumeStore.getState();
+    store.setState({ volume: volumeWithSpacing([1, 1, 1]) });
+    const { setMeasurementFrom, setMeasurementTo } = store.getState();
     setMeasurementFrom({ x: 0, y: 0, z: 0 });
     setMeasurementTo({ x: 3, y: 4, z: 0 });
     setMeasurementFrom({ x: 1, y: 1, z: 1 });
-    const m = useVolumeStore.getState().measurement;
+    const m = store.getState().measurement;
     expect(m?.from).toEqual({ x: 1, y: 1, z: 1 });
     expect(m?.to).toBeNull();
     expect(m?.distanceMm).toBeNull();
   });
 
   it('clears completely', () => {
-    useVolumeStore.setState({ volume: volumeWithSpacing([1, 1, 1]) });
-    const { setMeasurementFrom, setMeasurementTo, clearMeasurement } = useVolumeStore.getState();
+    store.setState({ volume: volumeWithSpacing([1, 1, 1]) });
+    const { setMeasurementFrom, setMeasurementTo, clearMeasurement } = store.getState();
     setMeasurementFrom({ x: 0, y: 0, z: 0 });
     setMeasurementTo({ x: 1, y: 1, z: 1 });
     clearMeasurement();
-    expect(useVolumeStore.getState().measurement).toBeNull();
+    expect(store.getState().measurement).toBeNull();
   });
 });
 
 describe('cursor clamping', () => {
   it('never lets the cursor leave the volume', () => {
-    useVolumeStore.setState({ volume: volumeWithSpacing([1, 1, 1]) }); // dims 2×2×2
-    const { setCursor } = useVolumeStore.getState();
+    store.setState({ volume: volumeWithSpacing([1, 1, 1]) }); // dims 2×2×2
+    const { setCursor } = store.getState();
     setCursor({ x: 99, y: -4, z: 1 });
-    expect(useVolumeStore.getState().cursor).toEqual({ x: 1, y: 0, z: 1 });
+    expect(store.getState().cursor).toEqual({ x: 1, y: 0, z: 1 });
   });
 
   it('passes the cursor through untouched when no volume is open', () => {
-    useVolumeStore.setState({ volume: null });
-    useVolumeStore.getState().setCursor({ x: 99, y: -4, z: 1 });
-    expect(useVolumeStore.getState().cursor).toEqual({ x: 99, y: -4, z: 1 });
+    store.setState({ volume: null });
+    store.getState().setCursor({ x: 99, y: -4, z: 1 });
+    expect(store.getState().cursor).toEqual({ x: 99, y: -4, z: 1 });
   });
 });

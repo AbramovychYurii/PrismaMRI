@@ -1,8 +1,7 @@
-import type { AnnotationSeverity, SlicePlane } from '@/types';
+import type { AnnotationSeverity, Axis, SlicePlane } from '@/types';
 
 export const APP_NAME = 'PrismaMRI';
 
-export const MAX_3D_TEXTURE_EDGE = 512;
 export const WL_DEBOUNCE_MS = 96;
 
 /**
@@ -46,7 +45,7 @@ export function accentRgba(accent: Accent, alpha: number): string {
   return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
 }
 
-export type Axis = 'x' | 'y' | 'z';
+export type { Axis };
 
 /** Axis → accent: X = amber, Y = violet, Z = azure. */
 export const AXIS_ACCENT: Record<Axis, Accent> = {

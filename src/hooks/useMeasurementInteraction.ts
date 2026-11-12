@@ -1,7 +1,7 @@
 import { type LetterboxRect, pointerToImageFrac } from '@/lib/volume/letterbox';
 import { fracToVoxel, sliceIndex, voxelToFrac } from '@/lib/volume/plane';
-import { useVolumeStore } from '@/store';
 import type { ActiveMeasurement, MeasurementPoint, SlicePlane, VolumeCursor } from '@/types';
+import { useViewerStore } from '@/viewer';
 import { useCallback, useMemo, useState } from 'react';
 
 type PointerLike = { clientX: number; clientY: number };
@@ -42,10 +42,10 @@ export function useMeasurementInteraction(
   dims: Dims | undefined,
   cursor: VolumeCursor | null,
 ) {
-  const measurement = useVolumeStore((s) => s.measurement);
-  const setMeasurementFrom = useVolumeStore((s) => s.setMeasurementFrom);
-  const setMeasurementTo = useVolumeStore((s) => s.setMeasurementTo);
-  const clearMeasurement = useVolumeStore((s) => s.clearMeasurement);
+  const measurement = useViewerStore((s) => s.measurement);
+  const setMeasurementFrom = useViewerStore((s) => s.setMeasurementFrom);
+  const setMeasurementTo = useViewerStore((s) => s.setMeasurementTo);
+  const clearMeasurement = useViewerStore((s) => s.clearMeasurement);
 
   const [menu, setMenu] = useState<MenuState | null>(null);
 
