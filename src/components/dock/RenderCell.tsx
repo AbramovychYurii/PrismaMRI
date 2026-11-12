@@ -1,7 +1,7 @@
 import { Tooltip } from '@/components/ui/Tooltip';
 import { useHover } from '@/hooks/useHover';
-import { useVolumeStore } from '@/store';
 import type { RenderPreset } from '@/types';
+import { useViewerStore } from '@/viewer';
 import { Info } from 'lucide-react';
 import styled from 'styled-components';
 
@@ -150,10 +150,10 @@ function PresetButton({
 }
 
 export function RenderCell() {
-  const renderPreset = useVolumeStore((s) => s.renderPreset);
-  const setRenderPreset = useVolumeStore((s) => s.setRenderPreset);
-  const slabMm = useVolumeStore((s) => s.slabMm);
-  const setSlabMm = useVolumeStore((s) => s.setSlabMm);
+  const renderPreset = useViewerStore((s) => s.renderPreset);
+  const setRenderPreset = useViewerStore((s) => s.setRenderPreset);
+  const slabMm = useViewerStore((s) => s.slabMm);
+  const setSlabMm = useViewerStore((s) => s.setSlabMm);
 
   return (
     <Wrap>

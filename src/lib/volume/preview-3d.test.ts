@@ -1,5 +1,4 @@
-import { MAX_3D_TEXTURE_EDGE } from '@/constants';
-import { prepareVolumeFor3D } from '@/lib/volume/preview-3d';
+import { MAX_3D_TEXTURE_EDGE, prepareVolumeFor3D } from '@/lib/volume/preview-3d';
 import type { LoadedVolume, Vec3 } from '@/types';
 import { describe, expect, it } from 'vitest';
 

@@ -10,7 +10,7 @@ import { Tooltip } from '@/components/ui/Tooltip';
 import { accentRgba, isSlicePlane } from '@/constants';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { usePwaInstall } from '@/hooks/usePwaInstall';
-import { useVolumeStore } from '@/store';
+import { useViewerStore } from '@/viewer';
 import { MonitorDown } from 'lucide-react';
 import styled from 'styled-components';
 
@@ -119,7 +119,7 @@ const MobileControlsWrap = styled.div`
 `;
 
 function MobileHeader() {
-  const loadingPercent = useVolumeStore((s) => (s.loading.active ? s.loading.percent : null));
+  const loadingPercent = useViewerStore((s) => (s.loading.active ? s.loading.percent : null));
   const { canInstall, install } = usePwaInstall();
   return (
     <MobileHeaderBar>
@@ -139,9 +139,9 @@ function MobileHeader() {
 
 export function AppGrid() {
   const isMobile = useIsMobile();
-  const railOpen = useVolumeStore((s) => s.toolbar.rail);
-  const mobileTab = useVolumeStore((s) => s.mobileTab);
-  const volumeLoaded = useVolumeStore((s) => s.volume !== null);
+  const railOpen = useViewerStore((s) => s.toolbar.rail);
+  const mobileTab = useViewerStore((s) => s.mobileTab);
+  const volumeLoaded = useViewerStore((s) => s.volume !== null);
 
   if (!isMobile) {
     return (

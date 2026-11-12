@@ -1,5 +1,4 @@
-import { SEVERITY_HEX_NUM } from '@/constants';
-import type { AiAnnotation } from '@/types';
+import type { AiAnnotation, AnnotationSeverity } from '@/types';
 import * as THREE from 'three';
 
 /** Sphere radius = sceneSize × this. */
@@ -31,6 +30,9 @@ export class AnnotationMarkers {
   readonly group = new THREE.Group();
   private markers = new Map<string, Marker>();
 
+  /** @param colors marker colour per severity, as 0xRRGGBB. */
+  constructor(private readonly colors: Readonly<Record<AnnotationSeverity, number>>) {}
+
   setAnnotations(
     list: AiAnnotation[],
     spacing: readonly [number, number, number],
@@ -41,7 +43,7 @@ export class AnnotationMarkers {
     const radius = sceneSize * RADIUS_FACTOR;
 
     for (const a of list) {
-      const color = new THREE.Color(SEVERITY_HEX_NUM[a.severity]);
+      const color = new THREE.Color(this.colors[a.severity]);
       const pos = new THREE.Vector3(a.voxel.x * sx, a.voxel.y * sy, a.voxel.z * sz);
 
       const core = new THREE.Mesh(

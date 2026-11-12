@@ -1,5 +1,5 @@
 import { WL_DEBOUNCE_MS } from '@/constants';
-import { useVolumeStore } from '@/store/volumeStore';
+import { useViewerStore } from '@/viewer';
 import { useEffect, useRef } from 'react';
 
 /**
@@ -8,8 +8,8 @@ import { useEffect, useRef } from 'react';
  * enough to feel live, slow enough to avoid recomputing every pointer frame.
  */
 export function useWindowLevel(): void {
-  const wlDraft = useVolumeStore((s) => s.wlDraft);
-  const setWL = useVolumeStore((s) => s.setWL);
+  const wlDraft = useViewerStore((s) => s.wlDraft);
+  const setWL = useViewerStore((s) => s.setWL);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {

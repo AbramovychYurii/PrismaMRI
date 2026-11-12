@@ -4,7 +4,8 @@ import { ConnectConfirm } from '@/components/mcp/ConnectConfirm';
 import { KeyboardShortcutsModal } from '@/components/ui/KeyboardShortcutsModal';
 import { useViewerActions } from '@/hooks/ViewerActionsContext';
 import * as volumeDb from '@/lib/volumeDb';
-import { useVolumeStore } from '@/store/volumeStore';
+import { useAgentStore } from '@/store';
+import { useViewerStore } from '@/viewer';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
@@ -23,11 +24,11 @@ const RestoreScreen = styled.div`
 `;
 
 export function ViewerPage() {
-  const volumeLoaded = useVolumeStore((s) => s.volume !== null);
-  const mcpConnected = useVolumeStore((s) => s.mcpConnected);
-  const restoreVolume = useVolumeStore((s) => s.restoreVolume);
-  const loadingActive = useVolumeStore((s) => s.loading.active);
-  const setLoading = useVolumeStore((s) => s.setLoading);
+  const volumeLoaded = useViewerStore((s) => s.volume !== null);
+  const mcpConnected = useAgentStore((s) => s.mcpConnected);
+  const restoreVolume = useViewerStore((s) => s.restoreVolume);
+  const loadingActive = useViewerStore((s) => s.loading.active);
+  const setLoading = useViewerStore((s) => s.setLoading);
   const { showShortcuts, setShowShortcuts } = useViewerActions();
   const navigate = useNavigate();
 

@@ -20,8 +20,8 @@ import { AuroraSparkles } from '@/components/ui/AuroraSparkles';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import { PLANE_LABEL, SEVERITY_HEX, SEVERITY_LABEL, SEVERITY_RANK } from '@/constants';
 import { sliceNumber } from '@/lib/volume/plane';
-import { useVolumeStore } from '@/store/volumeStore';
 import type { AiAnnotation, SlicePlane, VolumeCursor } from '@/types';
+import { useViewerStore } from '@/viewer';
 import { ChevronLeft, ChevronRight, FileText, Sparkles, Trash2, X } from 'lucide-react';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -105,11 +105,11 @@ const ENTRANCE_DURATION_MS = 1400;
 const COUNT_UP_DURATION_MS = 520;
 
 export function AnnotationHud() {
-  const annotations = useVolumeStore((s) => s.aiAnnotations);
-  const activeId = useVolumeStore((s) => s.activeAnnotationId);
-  const focusAnnotation = useVolumeStore((s) => s.focusAnnotation);
-  const setActiveAnnotation = useVolumeStore((s) => s.setActiveAnnotation);
-  const removeAiAnnotation = useVolumeStore((s) => s.removeAiAnnotation);
+  const annotations = useViewerStore((s) => s.aiAnnotations);
+  const activeId = useViewerStore((s) => s.activeAnnotationId);
+  const focusAnnotation = useViewerStore((s) => s.focusAnnotation);
+  const setActiveAnnotation = useViewerStore((s) => s.setActiveAnnotation);
+  const removeAiAnnotation = useViewerStore((s) => s.removeAiAnnotation);
 
   const [open, setOpen] = useState(false);
   const [confirmDismiss, setConfirmDismiss] = useState(false);

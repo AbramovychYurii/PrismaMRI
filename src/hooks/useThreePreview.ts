@@ -1,6 +1,7 @@
+import { SEVERITY_HEX_NUM } from '@/constants';
 import { ThreePreview } from '@/lib/volume/three-preview';
-import { useVolumeStore } from '@/store';
 import type { SlicePlane } from '@/types';
+import { useViewerStore, useViewerStoreApi, useViewerSurfaces } from '@/viewer';
 import { useEffect, useRef, useState } from 'react';
 
 /** Fallback plane when no panel has been clicked yet. */
@@ -33,7 +34,7 @@ export type PreviewStatus = 'ready' | 'unavailable' | 'context-lost';
  */
 function usePreviewInstance(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   const previewRef = useRef<ThreePreview | null>(null);
-  const setPreviewInstance = useVolumeStore((s) => s.setPreviewInstance);
+  const surfaces = useViewerSurfaces();
   const [status, setStatus] = useState<PreviewStatus>('ready');
 
   useEffect(() => {
@@ -41,7 +42,7 @@ function usePreviewInstance(canvasRef: React.RefObject<HTMLCanvasElement | null>
     if (!canvas) return;
     let preview: ThreePreview;
     try {
-      preview = new ThreePreview(canvas);
+      preview = new ThreePreview(canvas, { severityColors: SEVERITY_HEX_NUM });
     } catch (err) {
       console.warn('[3d] WebGL 2 is unavailable:', err);
       setStatus('unavailable');
@@ -51,7 +52,7 @@ function usePreviewInstance(canvasRef: React.RefObject<HTMLCanvasElement | null>
     setStatus('ready');
     previewRef.current = preview;
     // Expose the instance so the MCP bridge can capture it + drive markers.
-    setPreviewInstance(preview);
+    surfaces.setPreview(preview);
 
     const ro = new ResizeObserver(() => preview.resize());
     ro.observe(canvas);
@@ -60,26 +61,27 @@ function usePreviewInstance(canvasRef: React.RefObject<HTMLCanvasElement | null>
       ro.disconnect();
       preview.dispose();
       previewRef.current = null;
-      setPreviewInstance(null);
+      surfaces.setPreview(null);
     };
-  }, [canvasRef, setPreviewInstance]);
+  }, [canvasRef, surfaces]);
 
   return { previewRef, status };
 }
 
 /** Everything that only means something once a volume is loaded. */
 function useVolumeSync(previewRef: PreviewRef): void {
-  const prepared3D = useVolumeStore((s) => s.prepared3D);
-  const wlDraft = useVolumeStore((s) => s.wlDraft);
-  const renderPreset = useVolumeStore((s) => s.renderPreset);
+  const store = useViewerStoreApi();
+  const prepared3D = useViewerStore((s) => s.prepared3D);
+  const wlDraft = useViewerStore((s) => s.wlDraft);
+  const renderPreset = useViewerStore((s) => s.renderPreset);
 
   // Built with the preset the effect below is about to apply, read without
   // subscribing: a preset change must swap colormaps, not rebuild the mesh.
   useEffect(() => {
     if (prepared3D && previewRef.current) {
-      previewRef.current.setVolume(prepared3D, useVolumeStore.getState().renderPreset);
+      previewRef.current.setVolume(prepared3D, store.getState().renderPreset);
     }
-  }, [prepared3D, previewRef]);
+  }, [store, prepared3D, previewRef]);
 
   // Window/Level → 3-D contrast, live off the draft (cheap uniform update).
   useEffect(() => {
@@ -98,12 +100,12 @@ function useVolumeSync(previewRef: PreviewRef): void {
 
 /** Where we are looking: crosshair, slice planes, clipping, measurement line. */
 function useSceneSync(previewRef: PreviewRef): void {
-  const cursor = useVolumeStore((s) => s.cursor);
-  const planesMode = useVolumeStore((s) => s.toolbar.planes);
-  const activePlane = useVolumeStore((s) => s.activePlane);
-  const clipMode = useVolumeStore((s) => s.toolbar.clip);
-  const measurement = useVolumeStore((s) => s.measurement);
-  const spacing = useVolumeStore((s) => s.volume?.meta.spacing);
+  const cursor = useViewerStore((s) => s.cursor);
+  const planesMode = useViewerStore((s) => s.toolbar.planes);
+  const activePlane = useViewerStore((s) => s.activePlane);
+  const clipMode = useViewerStore((s) => s.toolbar.clip);
+  const measurement = useViewerStore((s) => s.measurement);
+  const spacing = useViewerStore((s) => s.volume?.meta.spacing);
 
   useEffect(() => {
     if (cursor && previewRef.current) previewRef.current.setCursor(cursor);
@@ -125,9 +127,9 @@ function useSceneSync(previewRef: PreviewRef): void {
 
 /** Severity-coded finding markers and which one is emphasised. */
 function useAnnotationSync(previewRef: PreviewRef): void {
-  const aiAnnotations = useVolumeStore((s) => s.aiAnnotations);
-  const activeAnnotationId = useVolumeStore((s) => s.activeAnnotationId);
-  const prepared3D = useVolumeStore((s) => s.prepared3D);
+  const aiAnnotations = useViewerStore((s) => s.aiAnnotations);
+  const activeAnnotationId = useViewerStore((s) => s.activeAnnotationId);
+  const prepared3D = useViewerStore((s) => s.prepared3D);
 
   // prepared3D is a trigger, not an input: a volume rebuild drops the markers,
   // so they have to be re-placed even when the list itself did not change.
@@ -148,9 +150,9 @@ function useAnnotationSync(previewRef: PreviewRef): void {
  * snapped to twice in a row, which a plain value would not re-trigger.
  */
 function useCameraCommands(previewRef: PreviewRef): void {
-  const snapSeq = useVolumeStore((s) => s.snapSeq);
-  const snapPlane = useVolumeStore((s) => s.snapPlane);
-  const railOpen = useVolumeStore((s) => s.toolbar.rail);
+  const snapSeq = useViewerStore((s) => s.snapSeq);
+  const snapPlane = useViewerStore((s) => s.snapPlane);
+  const railOpen = useViewerStore((s) => s.toolbar.rail);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: snapSeq is the trigger, snapPlane is its payload
   useEffect(() => {

@@ -1,5 +1,8 @@
 export type Vec3 = [number, number, number];
 
+/** A voxel axis: x → patient left, y → posterior, z → superior. */
+export type Axis = 'x' | 'y' | 'z';
+
 export type SlicePlane = 'coronal' | 'sagittal' | 'axial';
 export type MobileTab = '3d' | 'coronal' | 'sagittal' | 'axial' | 'controls';
 

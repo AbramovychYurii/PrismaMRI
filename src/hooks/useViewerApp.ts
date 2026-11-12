@@ -1,7 +1,7 @@
 import { isAbort, useVolumeLoader } from '@/hooks/useVolumeLoader';
 import { type DirPickerWindow, IMPORT_ACCEPT, pickFiles } from '@/lib/file-pickers';
 import { fromDirectoryHandle, fromFileList } from '@/lib/import/scan-folder';
-import { useVolumeStore } from '@/store';
+import { useViewerStore } from '@/viewer';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 /**
@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
  * Store-driven effects live in `useViewerStoreEffects` instead.
  */
 export function useViewerApp() {
-  const setError = useVolumeStore((s) => s.setError);
+  const setError = useViewerStore((s) => s.setError);
   const {
     loadFromSource,
     loadFromUrl,

@@ -1,4 +1,4 @@
-import { useVolumeStore } from '@/store';
+import { useViewerStore } from '@/viewer';
 import { ChevronLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
@@ -40,7 +40,7 @@ const DisclaimerBold = styled.b`
 
 export function SessionCell() {
   const navigate = useNavigate();
-  const volume = useVolumeStore((s) => s.volume);
+  const volume = useViewerStore((s) => s.volume);
 
   return (
     <>

@@ -1,4 +1,3 @@
-import { MAX_3D_TEXTURE_EDGE } from '@/constants';
 import type { LoadedVolume, PreparedVolumeFor3D, Vec3 } from '@/types';
 import {
   type ScalarHistogram,
@@ -24,6 +23,9 @@ import {
  * volumes now reach it. `MAX_3D_TEXTURE_EDGE` is the knob if that ever needs
  * trading back.
  */
+/** Longest edge, in voxels, of the 3-D texture along any one axis. */
+export const MAX_3D_TEXTURE_EDGE = 512;
+
 function targetDims([sx, sy, sz]: Vec3): Vec3 {
   return [
     Math.min(sx, MAX_3D_TEXTURE_EDGE),

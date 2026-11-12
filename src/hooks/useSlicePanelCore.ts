@@ -17,8 +17,8 @@ import {
   sliceNumber,
   voxelToFrac,
 } from '@/lib/volume/plane';
-import { useVolumeStore } from '@/store';
 import type { SlicePlane, Vec3, VolumeCursor } from '@/types';
+import { useViewerStore, useViewerSurfaces } from '@/viewer';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 export const axisColor = (axis: Axis) => ACCENT_VAR[AXIS_ACCENT[axis]];
@@ -48,16 +48,16 @@ export function useSlicePanelCore(plane: SlicePlane, halfSlabs = 0) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const canvasSize = useCanvasSize(canvasRef);
 
-  const activePlane = useVolumeStore((s) => s.activePlane);
-  const setActivePlane = useVolumeStore((s) => s.setActivePlane);
-  const setCursor = useVolumeStore((s) => s.setCursor);
-  const requestSnapToView = useVolumeStore((s) => s.requestSnapToView);
-  const dims = useVolumeStore((s) => s.volume?.meta.dims);
-  const spacing = useVolumeStore((s) => s.volume?.meta.spacing);
-  const cursor = useVolumeStore((s) => s.cursor);
-  const scrubVisible = useVolumeStore((s) => s.scrubVisible[plane]);
-  const setScrubVisible = useVolumeStore((s) => s.setScrubVisible);
-  const setCanvasRef = useVolumeStore((s) => s.setCanvasRef);
+  const activePlane = useViewerStore((s) => s.activePlane);
+  const setActivePlane = useViewerStore((s) => s.setActivePlane);
+  const setCursor = useViewerStore((s) => s.setCursor);
+  const requestSnapToView = useViewerStore((s) => s.requestSnapToView);
+  const dims = useViewerStore((s) => s.volume?.meta.dims);
+  const spacing = useViewerStore((s) => s.volume?.meta.spacing);
+  const cursor = useViewerStore((s) => s.cursor);
+  const scrubVisible = useViewerStore((s) => s.scrubVisible[plane]);
+  const setScrubVisible = useViewerStore((s) => s.setScrubVisible);
+  const surfaces = useViewerSurfaces();
 
   const drawFracs = useMemo<LetterboxRect | null>(
     () =>
@@ -78,9 +78,9 @@ export function useSlicePanelCore(plane: SlicePlane, halfSlabs = 0) {
   // exists per plane — so an agent capture always gets the canvas the user is
   // actually looking at, rail or fullscreen.
   useEffect(() => {
-    setCanvasRef(plane, canvasRef.current);
-    return () => setCanvasRef(plane, null);
-  }, [plane, setCanvasRef]);
+    surfaces.setCanvas(plane, canvasRef.current);
+    return () => surfaces.setCanvas(plane, null);
+  }, [plane, surfaces]);
 
   const cross = useMemo(() => {
     if (!dims || !cursor) return null;

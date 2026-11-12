@@ -1,7 +1,7 @@
 import { AuroraSparkles } from '@/components/ui/AuroraSparkles';
 import { useViewerActions } from '@/hooks/ViewerActionsContext';
 import { useHover } from '@/hooks/useHover';
-import { useVolumeStore } from '@/store';
+import { useViewerStore } from '@/viewer';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
@@ -423,7 +423,7 @@ function ExampleCard({
 
 export function ExamplesSection() {
   const { loadFromUrl } = useViewerActions();
-  const examplesDisabled = useVolumeStore((s) => s.loading.active);
+  const examplesDisabled = useViewerStore((s) => s.loading.active);
 
   const trackRef = useRef<HTMLUListElement>(null);
   const [canPrev, setCanPrev] = useState(false);

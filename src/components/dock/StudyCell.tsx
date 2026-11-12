@@ -1,5 +1,5 @@
 import { intensityUnit } from '@/lib/volume/units';
-import { useVolumeStore } from '@/store';
+import { useViewerStore } from '@/viewer';
 import styled from 'styled-components';
 
 const StudyGrid = styled.div`
@@ -54,7 +54,7 @@ function Row({ k, v, dim }: { k: string; v: string; dim?: string }) {
 }
 
 export function StudyCell() {
-  const volume = useVolumeStore((s) => s.volume);
+  const volume = useViewerStore((s) => s.volume);
   const unit = intensityUnit(volume?.meta.modality);
   const meta = volume?.meta;
 

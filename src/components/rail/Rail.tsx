@@ -1,6 +1,6 @@
 import { SlicePanel } from '@/components/rail/SlicePanel';
-import { useVolumeStore } from '@/store';
 import type { SlicePlane } from '@/types';
+import { useViewerStore } from '@/viewer';
 import styled from 'styled-components';
 
 const RailAside = styled.aside`
@@ -15,7 +15,7 @@ const RailAside = styled.aside`
 const PLANES: SlicePlane[] = ['coronal', 'sagittal', 'axial'];
 
 export function Rail() {
-  const railOpen = useVolumeStore((s) => s.toolbar.rail);
+  const railOpen = useViewerStore((s) => s.toolbar.rail);
   if (!railOpen) return null;
   return (
     <RailAside>

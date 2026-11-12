@@ -3,7 +3,8 @@ import { ACTION_LABELS, LAST_LOCAL_PORT_KEY, SESSION_IDLE_MS } from '@/lib/mcp/c
 import { MCP_HANDLERS } from '@/lib/mcp/handlers';
 import { findLocalServer } from '@/lib/mcp/local-server';
 import type { IncomingMessage, OutgoingResult } from '@/lib/mcp/protocol';
-import { useVolumeStore } from '@/store/volumeStore';
+import { useAgentStore } from '@/store';
+import { useViewer } from '@/viewer';
 import { useCallback, useEffect, useRef } from 'react';
 
 /**
@@ -31,7 +32,8 @@ export function useMcpBridge() {
   const pingWatchdog = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Guards against a second connect() while the async port scan is in flight. */
   const connecting = useRef(false);
-  const store = useVolumeStore;
+  const store = useAgentStore;
+  const viewer = useViewer();
 
   const isLeader = useBridgeLeadership();
 
@@ -91,12 +93,12 @@ export function useMcpBridge() {
         return;
       }
       try {
-        await handler({ msg, ok, fail });
+        await handler({ msg, ok, fail, viewer });
       } catch (err) {
         fail((err as Error).message ?? 'Internal error');
       }
     },
-    [send, store, clearSessionIdle, scheduleSessionIdle],
+    [send, store, viewer, clearSessionIdle, scheduleSessionIdle],
   );
 
   // Held in a ref so connect() keeps a stable identity and never tears down the

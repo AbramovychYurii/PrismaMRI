@@ -1,3 +1,4 @@
+import { usePortalContainer } from '@/viewer';
 import { memo, useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
@@ -65,6 +66,7 @@ export function useTooltip(label: string, above = false) {
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const hide = useCallback(() => setPos(null), []);
   useDismissOnEscape(pos !== null, hide);
+  const portalContainer = usePortalContainer();
 
   const onMouseEnter = (e: React.MouseEvent<HTMLElement>) =>
     setPos(anchorOf(e.currentTarget, above));
@@ -79,7 +81,7 @@ export function useTooltip(label: string, above = false) {
         <TipBox role="tooltip" $x={pos.x} $y={pos.y} $above={above}>
           {label}
         </TipBox>,
-        document.body,
+        portalContainer,
       )
     : null;
 
@@ -102,6 +104,7 @@ export const Tooltip = memo(function Tooltip({ label, above = false, children }:
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const hide = useCallback(() => setPos(null), []);
   useDismissOnEscape(pos !== null, hide);
+  const portalContainer = usePortalContainer();
 
   return (
     <span
@@ -123,7 +126,7 @@ export const Tooltip = memo(function Tooltip({ label, above = false, children }:
           <TipBox role="tooltip" $x={pos.x} $y={pos.y} $above={above}>
             {label}
           </TipBox>,
-          document.body,
+          portalContainer,
         )}
     </span>
   );

@@ -1,6 +1,6 @@
 import { PLANE_LABEL } from '@/constants';
-import { useVolumeStore } from '@/store';
 import type { MobileTab } from '@/types';
+import { useViewerStore } from '@/viewer';
 import { Box, Settings } from 'lucide-react';
 import { useRef } from 'react';
 import styled from 'styled-components';
@@ -123,8 +123,8 @@ function nextTab(current: MobileTab, key: string): MobileTab | null {
 }
 
 export function MobileTabBar() {
-  const mobileTab = useVolumeStore((s) => s.mobileTab);
-  const setMobileTab = useVolumeStore((s) => s.setMobileTab);
+  const mobileTab = useViewerStore((s) => s.mobileTab);
+  const setMobileTab = useViewerStore((s) => s.setMobileTab);
   const barRef = useRef<HTMLDivElement>(null);
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {

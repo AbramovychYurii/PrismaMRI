@@ -5,7 +5,7 @@ import { SessionCell } from '@/components/dock/SessionCell';
 import { StudyCell } from '@/components/dock/StudyCell';
 import { useTooltip } from '@/components/ui/Tooltip';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
-import { useVolumeStore } from '@/store';
+import { useViewerStore } from '@/viewer';
 import { ChevronDown } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import styled from 'styled-components';
@@ -163,9 +163,9 @@ function PanelsToggle({
 }
 
 export function Dock() {
-  const dockOpen = useVolumeStore((s) => s.toolbar.dock);
-  const toggleToolbar = useVolumeStore((s) => s.toggleToolbar);
-  const volumeLoaded = useVolumeStore((s) => s.volume !== null);
+  const dockOpen = useViewerStore((s) => s.toolbar.dock);
+  const toggleToolbar = useViewerStore((s) => s.toggleToolbar);
+  const volumeLoaded = useViewerStore((s) => s.volume !== null);
   const reduced = usePrefersReducedMotion();
 
   const handleToggle = () => toggleToolbar('dock');

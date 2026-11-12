@@ -6,7 +6,7 @@
  * clickable because its z-index sits above this overlay.
  */
 
-import { useVolumeStore } from '@/store/volumeStore';
+import { useAgentStore } from '@/store';
 import { Bot } from 'lucide-react';
 import styled, { keyframes } from 'styled-components';
 
@@ -79,8 +79,8 @@ const ActionText = styled.span`
 `;
 
 export function AgentLockOverlay() {
-  const sessionActive = useVolumeStore((s) => s.agentSessionActive);
-  const action = useVolumeStore((s) => s.agentActivity.action);
+  const sessionActive = useAgentStore((s) => s.agentSessionActive);
+  const action = useAgentStore((s) => s.agentActivity.action);
 
   if (!sessionActive) return null;
 

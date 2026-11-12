@@ -17,8 +17,8 @@ import { waitForPaint } from '@/lib/mcp/canvas-utils';
 import { type Capture, annotateCanvas, captureRaw } from '@/lib/report/capture';
 import { sliceNumber } from '@/lib/volume/plane';
 import { intensityUnit } from '@/lib/volume/units';
-import { useVolumeStore } from '@/store/volumeStore';
 import type { AiAnnotation, SlicePlane } from '@/types';
+import { useViewerStore, useViewerSurfaces } from '@/viewer';
 import { Download, FileText, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -99,10 +99,10 @@ export function ReportModal({ finding, findingIndex, allFindings, onClose }: Pro
   const [downloading, setDownloading] = useState(false);
   const [previewThumbs, setPreviewThumbs] = useState<Map<string, Capture>>(() => new Map());
 
-  const volume = useVolumeStore((s) => s.volume);
-  const canvasRefs = useVolumeStore((s) => s.canvasRefs);
-  const setCursor = useVolumeStore((s) => s.setCursor);
-  const cursor = useVolumeStore((s) => s.cursor);
+  const volume = useViewerStore((s) => s.volume);
+  const surfaces = useViewerSurfaces();
+  const setCursor = useViewerStore((s) => s.setCursor);
+  const cursor = useViewerStore((s) => s.cursor);
 
   const today = new Date().toISOString().slice(0, 10);
   // The report says what the volume says: no modality, no invented CT or HU.
@@ -126,7 +126,7 @@ export function ReportModal({ finding, findingIndex, allFindings, onClose }: Pro
 
   // Captures whatever slice each plane canvas currently shows.
   // This prevents any background viewer repaint when options/scope change.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: canvasRefs does not change identity; scope/showImages/showMarkers are the real triggers
+  // biome-ignore lint/correctness/useExhaustiveDependencies: surfaces does not change identity; scope/showImages/showMarkers are the real triggers
   useEffect(() => {
     if (!showImages) {
       setPreviewThumbs(new Map());
@@ -134,7 +134,7 @@ export function ReportModal({ finding, findingIndex, allFindings, onClose }: Pro
     }
     const thumbs = new Map<string, Capture>();
     for (const f of scopeFindings) {
-      const canvas = canvasRefs[f.plane as keyof typeof canvasRefs];
+      const canvas = surfaces.canvas(f.plane);
       if (canvas) {
         thumbs.set(
           f.id,
@@ -158,7 +158,7 @@ export function ReportModal({ finding, findingIndex, allFindings, onClose }: Pro
         for (const f of scopeFindings) {
           setCursor(f.voxel);
           await waitForPaint();
-          const canvas = canvasRefs[f.plane as keyof typeof canvasRefs];
+          const canvas = surfaces.canvas(f.plane);
           if (canvas) {
             thumbnails.set(
               f.id,

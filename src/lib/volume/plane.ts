@@ -1,6 +1,5 @@
-import type { Axis } from '@/constants';
 import { clamp } from '@/lib/volume/math';
-import type { SlicePlane, VolumeCursor } from '@/types';
+import type { Axis, SlicePlane, VolumeCursor } from '@/types';
 
 /** Any per-axis triple — voxel dimensions or millimetre spacing. */
 type AxisTriple = readonly [number, number, number];

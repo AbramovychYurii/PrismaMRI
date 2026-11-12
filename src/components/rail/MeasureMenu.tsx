@@ -1,5 +1,6 @@
 import { accentRgba } from '@/constants';
 import { useMenuKeyboard } from '@/hooks/useMenuKeyboard';
+import { usePortalContainer } from '@/viewer';
 import { Eye, MapPin, Ruler, Trash2 } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -77,6 +78,7 @@ export function MeasureMenu({
   onClear,
   onClose,
 }: Props) {
+  const portalContainer = usePortalContainer();
   const ref = useRef<HTMLDivElement>(null);
 
   // Clamp to viewport so menu never overflows edge — items: measure-from (+
@@ -136,6 +138,6 @@ export function MeasureMenu({
         </>
       )}
     </Menu>,
-    document.body,
+    portalContainer,
   );
 }

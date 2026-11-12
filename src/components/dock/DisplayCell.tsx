@@ -1,6 +1,6 @@
 import { HistogramBar } from '@/components/dock/HistogramBar';
 import { intensityUnit } from '@/lib/volume/units';
-import { useVolumeStore } from '@/store';
+import { useViewerStore } from '@/viewer';
 import styled from 'styled-components';
 
 const DisplayCellWrap = styled.div`
@@ -108,10 +108,10 @@ function SliderRow({ name, value, unit, min, max, accent, hint, onChange }: Slid
 }
 
 export function DisplayCell() {
-  const wlDraft = useVolumeStore((s) => s.wlDraft);
-  const setWLDraft = useVolumeStore((s) => s.setWLDraft);
-  const volume = useVolumeStore((s) => s.volume);
-  const histogram = useVolumeStore((s) => s.histogram);
+  const wlDraft = useViewerStore((s) => s.wlDraft);
+  const setWLDraft = useViewerStore((s) => s.setWLDraft);
+  const volume = useViewerStore((s) => s.volume);
+  const histogram = useViewerStore((s) => s.histogram);
 
   const scalarMin = volume ? Math.floor(volume.scalarMin) : -1000;
   const scalarMax = volume ? Math.ceil(volume.scalarMax) : 3000;

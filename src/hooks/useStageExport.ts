@@ -1,6 +1,6 @@
 import { downloadBlob } from '@/lib/download';
 import type { ThreePreview } from '@/lib/volume/three-preview';
-import { useVolumeStore } from '@/store/volumeStore';
+import { useViewerStore } from '@/viewer';
 import { useCallback, useState } from 'react';
 
 /** Hand the file to the user: save it, or offer it to the OS share sheet. */
@@ -39,7 +39,7 @@ function deliver(blob: Blob, filename: string, title: string, how: Delivery): Pr
  */
 export function useStageExport(previewRef: React.MutableRefObject<ThreePreview | null>) {
   const [recordPct, setRecordPct] = useState<number | null>(null);
-  const setError = useVolumeStore((s) => s.setError);
+  const setError = useViewerStore((s) => s.setError);
 
   // Shown by StageAlert; the console alone left a failed export looking like
   // a click that did nothing. Engine text stays in the console — the user gets

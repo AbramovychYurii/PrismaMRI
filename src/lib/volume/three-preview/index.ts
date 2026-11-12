@@ -16,6 +16,7 @@ import {
 import type {
   ActiveMeasurement,
   AiAnnotation,
+  AnnotationSeverity,
   PlanesMode,
   PreparedVolumeFor3D,
   SlicePlane,
@@ -42,6 +43,11 @@ function pickVideoMime(): string | null {
   return candidates.find((c) => MediaRecorder.isTypeSupported(c)) ?? null;
 }
 
+export interface ThreePreviewOptions {
+  /** Finding marker colour per severity, as 0xRRGGBB. */
+  severityColors: Readonly<Record<AnnotationSeverity, number>>;
+}
+
 export class ThreePreview {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
@@ -49,7 +55,7 @@ export class ThreePreview {
   private controls: TrackballControls | null = null;
   private volume: VolumeObject | null = null;
   private readonly measurementLine = new MeasurementLine();
-  private readonly annotationMarkers = new AnnotationMarkers();
+  private readonly annotationMarkers: AnnotationMarkers;
   /** Voxel spacing of the loaded volume — for marker world placement. */
   private _spacing: readonly [number, number, number] = [1, 1, 1];
   /** Texture dims, and the full-resolution dims the cursor is expressed in.
@@ -107,7 +113,11 @@ export class ThreePreview {
   private readonly _snapDirA = new THREE.Vector3();
   private readonly _snapDirB = new THREE.Vector3();
 
-  constructor(private readonly canvas: HTMLCanvasElement) {
+  constructor(
+    private readonly canvas: HTMLCanvasElement,
+    options: ThreePreviewOptions,
+  ) {
+    this.annotationMarkers = new AnnotationMarkers(options.severityColors);
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: true,

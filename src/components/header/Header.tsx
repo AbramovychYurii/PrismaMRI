@@ -4,7 +4,7 @@ import { Tooltip } from '@/components/ui/Tooltip';
 import { accentRgba } from '@/constants';
 import { useViewerActions } from '@/hooks/ViewerActionsContext';
 import { usePwaInstall } from '@/hooks/usePwaInstall';
-import { useVolumeStore } from '@/store';
+import { useViewerStore } from '@/viewer';
 import { MonitorDown } from 'lucide-react';
 import styled from 'styled-components';
 
@@ -95,7 +95,7 @@ const LoadingBar = styled.div<{ $width: number }>`
 
 export function Header() {
   // Only the bar width — progress messages also change current/total/message.
-  const loadingPercent = useVolumeStore((s) => (s.loading.active ? s.loading.percent : null));
+  const loadingPercent = useViewerStore((s) => (s.loading.active ? s.loading.percent : null));
   const { setShowShortcuts } = useViewerActions();
   const { canInstall, install } = usePwaInstall();
 
