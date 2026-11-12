@@ -1,4 +1,4 @@
-import { ACCENT_VAR, AXIS_ACCENT, type Axis, accentRgba } from '@/constants';
+import { ACCENT_VAR, AXIS_ACCENT, type Axis } from '@/constants';
 import { useMeasurementInteraction } from '@/hooks/useMeasurementInteraction';
 import { useCanvasPainter, useCanvasSize } from '@/hooks/useSliceCanvas';
 import { useSliceImage } from '@/hooks/useSliceImage';
@@ -18,11 +18,11 @@ import {
   voxelToFrac,
 } from '@/lib/volume/plane';
 import type { SlicePlane, Vec3, VolumeCursor } from '@/types';
-import { useViewerStore, useViewerSurfaces } from '@/viewer';
+import { accentAlpha, useViewerStore, useViewerSurfaces, useViewerTheme } from '@/viewer';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 export const axisColor = (axis: Axis) => ACCENT_VAR[AXIS_ACCENT[axis]];
-export const axisGlow = (axis: Axis) => accentRgba(AXIS_ACCENT[axis], 0.45);
+export const axisGlow = (axis: Axis) => accentAlpha(AXIS_ACCENT[axis], 0.45);
 
 /** Where a click lands in voxel space, keeping the plane's own slice index. */
 export function cursorFromClick(
@@ -58,6 +58,7 @@ export function useSlicePanelCore(plane: SlicePlane, halfSlabs = 0) {
   const scrubVisible = useViewerStore((s) => s.scrubVisible[plane]);
   const setScrubVisible = useViewerStore((s) => s.setScrubVisible);
   const surfaces = useViewerSurfaces();
+  const theme = useViewerTheme();
 
   const drawFracs = useMemo<LetterboxRect | null>(
     () =>
@@ -71,7 +72,7 @@ export function useSlicePanelCore(plane: SlicePlane, halfSlabs = 0) {
   const image = useSliceImage(plane, halfSlabs);
   const onWheel = useSliceScroll(plane);
 
-  useCanvasPainter(canvasRef, image, drawFracs, canvasSize);
+  useCanvasPainter(canvasRef, image, drawFracs, canvasSize, theme.canvasBackground);
 
   // Published so useMcpBridge can capture this plane. It lives here rather
   // than in the panel because the core owns the canvas, and exactly one core
@@ -130,6 +131,7 @@ export function useSlicePanelCore(plane: SlicePlane, halfSlabs = 0) {
     slice: { idx, total, scrubVisible, setScrubVisible, onScrub: handleScrub, onWheel },
     /** Measurement state, its context menu and the shift-drag handlers. */
     measure: {
+      enabled: measureInteraction.enabled,
       measurement: measureInteraction.measurement,
       dots: adjustedDots,
       menu: measureInteraction.menu,

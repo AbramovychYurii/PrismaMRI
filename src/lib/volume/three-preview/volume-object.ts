@@ -6,8 +6,23 @@ import {
   buildTransferFunction,
   isLowPower,
 } from '@/lib/volume/three-preview/volume-shader';
-import type { PreparedVolumeFor3D } from '@/types';
+import type { PreparedVolumeFor3D, SlicePlane } from '@/types';
 import * as THREE from 'three';
+
+/** Colour of each cursor plane in the 3-D view, as 0xRRGGBB. */
+export type PlaneColors = Readonly<Record<SlicePlane, number>>;
+
+/** 0xRRGGBB → the 0..1 channels the shader mixes with, as the hex reads. */
+function planeColorUniform(hex: number): THREE.Vector3 {
+  return new THREE.Vector3(((hex >> 16) & 255) / 255, ((hex >> 8) & 255) / 255, (hex & 255) / 255);
+}
+
+/** Re-colours the cursor planes of an existing material. */
+export function setPlaneColors(material: THREE.ShaderMaterial, planeColors: PlaneColors): void {
+  material.uniforms.u_planeCor.value = planeColorUniform(planeColors.coronal);
+  material.uniforms.u_planeSag.value = planeColorUniform(planeColors.sagittal);
+  material.uniforms.u_planeAxi.value = planeColorUniform(planeColors.axial);
+}
 
 /** Data3DTexture: single-channel Uint8, linear filtering, tight packing. */
 export function buildTexture(prepared: PreparedVolumeFor3D): THREE.Data3DTexture {
@@ -28,7 +43,8 @@ export function buildMaterial(
   colormapPre: THREE.DataTexture,
   occupancy: THREE.Data3DTexture,
   prepared: PreparedVolumeFor3D,
-  preset: RenderPreset = 'mip',
+  preset: RenderPreset,
+  planeColors: PlaneColors,
 ): THREE.ShaderMaterial {
   const [w, h, d] = prepared.dims;
 
@@ -53,6 +69,9 @@ export function buildMaterial(
     u_activePlane: { value: 0 },
     /** Cursor position in voxel / texture space. */
     u_planePos: { value: new THREE.Vector3() },
+    u_planeCor: { value: planeColorUniform(planeColors.coronal) },
+    u_planeSag: { value: planeColorUniform(planeColors.sagittal) },
+    u_planeAxi: { value: planeColorUniform(planeColors.axial) },
     /** 0 = no shading, 1 = Phong — on by default for DVR depth cues. */
     u_shading: { value: 1 },
     /** 0 = AO disabled, 1 = enabled.  Starts OFF on low-power devices
@@ -93,7 +112,8 @@ export interface VolumeObject {
 
 export function buildVolumeMesh(
   prepared: PreparedVolumeFor3D,
-  preset: RenderPreset = 'mip',
+  preset: RenderPreset,
+  planeColors: PlaneColors,
 ): VolumeObject {
   const [w, h, d] = prepared.dims;
   const [sx, sy, sz] = prepared.spacing;
@@ -101,7 +121,15 @@ export function buildVolumeMesh(
   const colormap = buildTransferFunction(preset);
   const colormapPre = buildPreIntegratedTF(preset);
   const occupancy = buildOccupancyGrid(prepared);
-  const material = buildMaterial(texture, colormap, colormapPre, occupancy, prepared, preset);
+  const material = buildMaterial(
+    texture,
+    colormap,
+    colormapPre,
+    occupancy,
+    prepared,
+    preset,
+    planeColors,
+  );
 
   // The render box is 10 % larger than the voxel dims (5 % padding each side)
   // so cursor planes extend visibly past the volume boundary.  The centre

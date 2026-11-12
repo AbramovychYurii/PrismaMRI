@@ -1,13 +1,44 @@
-import { SEVERITY_HEX_NUM } from '@/constants';
-import { ThreePreview } from '@/lib/volume/three-preview';
-import type { SlicePlane } from '@/types';
-import { useViewerStore, useViewerStoreApi, useViewerSurfaces } from '@/viewer';
-import { useEffect, useRef, useState } from 'react';
+import { ThreePreview, type ThreePreviewOptions } from '@/lib/volume/three-preview';
+import type { Annotation, SlicePlane } from '@/types';
+import {
+  type ViewerTheme,
+  useViewerFeatures,
+  useViewerStore,
+  useViewerStoreApi,
+  useViewerSurfaces,
+  useViewerTheme,
+} from '@/viewer';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import * as THREE from 'three';
 
 /** Fallback plane when no panel has been clicked yet. */
 const DEFAULT_PLANE: SlicePlane = 'coronal';
 
 type PreviewRef = React.MutableRefObject<ThreePreview | null>;
+
+const NO_ANNOTATIONS: Annotation[] = [];
+
+/** Any CSS colour the theme holds → 0xRRGGBB for Three.js. */
+const hex = (color: string) => new THREE.Color(color).getHex();
+
+/** The 3-D view's colours from the theme: planes follow the panels' accents. */
+function previewColors(theme: ViewerTheme): ThreePreviewOptions {
+  const { colors, severity } = theme;
+  return {
+    planeColors: {
+      coronal: hex(colors.amber),
+      sagittal: hex(colors.violet),
+      axial: hex(colors.azure),
+    },
+    measureColor: hex(colors.measure),
+    severityColors: {
+      critical: hex(severity.critical),
+      serious: hex(severity.serious),
+      moderate: hex(severity.moderate),
+      comment: hex(severity.comment),
+    },
+  };
+}
 
 /**
  * What the stage can show: the 3-D view, nothing because this browser has no
@@ -36,13 +67,19 @@ function usePreviewInstance(canvasRef: React.RefObject<HTMLCanvasElement | null>
   const previewRef = useRef<ThreePreview | null>(null);
   const surfaces = useViewerSurfaces();
   const [status, setStatus] = useState<PreviewStatus>('ready');
+  const theme = useViewerTheme();
+  const colors = useMemo(() => previewColors(theme), [theme]);
+  // Read at construction without rebuilding the renderer on a theme change —
+  // that would drop the loaded volume; the effect below re-colours instead.
+  const colorsRef = useRef(colors);
+  colorsRef.current = colors;
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     let preview: ThreePreview;
     try {
-      preview = new ThreePreview(canvas, { severityColors: SEVERITY_HEX_NUM });
+      preview = new ThreePreview(canvas, colorsRef.current);
     } catch (err) {
       console.warn('[3d] WebGL 2 is unavailable:', err);
       setStatus('unavailable');
@@ -64,6 +101,10 @@ function usePreviewInstance(canvasRef: React.RefObject<HTMLCanvasElement | null>
       surfaces.setPreview(null);
     };
   }, [canvasRef, surfaces]);
+
+  useEffect(() => {
+    previewRef.current?.setColors(colors);
+  }, [colors]);
 
   return { previewRef, status };
 }
@@ -127,7 +168,9 @@ function useSceneSync(previewRef: PreviewRef): void {
 
 /** Severity-coded finding markers and which one is emphasised. */
 function useAnnotationSync(previewRef: PreviewRef): void {
-  const annotations = useViewerStore((s) => s.annotations);
+  const stored = useViewerStore((s) => s.annotations);
+  const { annotations: enabled } = useViewerFeatures();
+  const annotations = enabled ? stored : NO_ANNOTATIONS;
   const activeAnnotationId = useViewerStore((s) => s.activeAnnotationId);
   const prepared3D = useViewerStore((s) => s.prepared3D);
 

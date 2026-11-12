@@ -23,15 +23,11 @@ import {
  * volumes now reach it. `MAX_3D_TEXTURE_EDGE` is the knob if that ever needs
  * trading back.
  */
-/** Longest edge, in voxels, of the 3-D texture along any one axis. */
+/** Default longest edge, in voxels, of the 3-D texture along any one axis. */
 export const MAX_3D_TEXTURE_EDGE = 512;
 
-function targetDims([sx, sy, sz]: Vec3): Vec3 {
-  return [
-    Math.min(sx, MAX_3D_TEXTURE_EDGE),
-    Math.min(sy, MAX_3D_TEXTURE_EDGE),
-    Math.min(sz, MAX_3D_TEXTURE_EDGE),
-  ];
+function targetDims([sx, sy, sz]: Vec3, maxEdge: number): Vec3 {
+  return [Math.min(sx, maxEdge), Math.min(sy, maxEdge), Math.min(sz, maxEdge)];
 }
 
 /**
@@ -69,9 +65,11 @@ export function prepareVolumeFor3D(
   volume: LoadedVolume,
   prebuiltHist?: ScalarHistogram,
   onProgress?: SubProgressFn,
+  /** Cap per axis; lower it for weak GPUs, raise it for detail. */
+  maxEdge: number = MAX_3D_TEXTURE_EDGE,
 ): PreparedVolumeFor3D {
   const [sx, sy, sz] = volume.meta.dims;
-  const [dx, dy, dz] = targetDims(volume.meta.dims);
+  const [dx, dy, dz] = targetDims(volume.meta.dims, maxEdge);
 
   const hist = prebuiltHist ?? buildScalarHistogram(volume.voxels, 1024);
   const [lo, hi] = resolveScalarRange(hist);

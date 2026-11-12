@@ -31,7 +31,12 @@ export class AnnotationMarkers {
   private markers = new Map<string, Marker>();
 
   /** @param colors marker colour per severity, as 0xRRGGBB. */
-  constructor(private readonly colors: Readonly<Record<AnnotationSeverity, number>>) {}
+  constructor(private colors: Readonly<Record<AnnotationSeverity, number>>) {}
+
+  /** New colours apply from the next `setAnnotations`. */
+  setColors(colors: Readonly<Record<AnnotationSeverity, number>>): void {
+    this.colors = colors;
+  }
 
   setAnnotations(
     list: Annotation[],

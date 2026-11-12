@@ -1,7 +1,5 @@
 import * as THREE from 'three';
 
-const DOT_COLOR = new THREE.Color(0xff4500);
-
 // All sizes are relative to sceneSize (max physical extent of the volume, mm).
 
 /** Sphere radius = sceneSize × this */
@@ -42,10 +40,10 @@ function disposeObject(obj: THREE.Object3D): void {
   (mesh.material as THREE.Material)?.dispose();
 }
 
-function buildMainLine(from: THREE.Vector3, to: THREE.Vector3): THREE.Line {
+function buildMainLine(from: THREE.Vector3, to: THREE.Vector3, color: THREE.Color): THREE.Line {
   const geo = new THREE.BufferGeometry().setFromPoints([from, to]);
   const mat = new THREE.LineDashedMaterial({
-    color: DOT_COLOR,
+    color,
     depthTest: false,
     depthWrite: false,
     transparent: true,
@@ -57,7 +55,7 @@ function buildMainLine(from: THREE.Vector3, to: THREE.Vector3): THREE.Line {
   return line;
 }
 
-function makeLabel(text: string): THREE.Sprite {
+function makeLabel(text: string, color: THREE.Color): THREE.Sprite {
   const W = 512;
   const H = 80;
   const canvas = document.createElement('canvas');
@@ -77,7 +75,7 @@ function makeLabel(text: string): THREE.Sprite {
   ctx.shadowOffsetX = 1;
   ctx.shadowOffsetY = 1;
 
-  ctx.fillStyle = `#${DOT_COLOR.getHexString()}`;
+  ctx.fillStyle = `#${color.getHexString()}`;
   ctx.fillText(text, W / 2, H / 2);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -89,10 +87,10 @@ function makeLabel(text: string): THREE.Sprite {
   return new THREE.Sprite(mat);
 }
 
-function makePointMarker(radius: number): THREE.Mesh {
+function makePointMarker(radius: number, color: THREE.Color): THREE.Mesh {
   const geo = new THREE.SphereGeometry(radius, 10, 10);
   const mat = new THREE.MeshBasicMaterial({
-    color: DOT_COLOR,
+    color,
     depthTest: false,
     depthWrite: false,
     transparent: true,
@@ -103,12 +101,23 @@ function makePointMarker(radius: number): THREE.Mesh {
 export class MeasurementLine {
   readonly group = new THREE.Group();
   private objects: THREE.Object3D[] = [];
+  private readonly color: THREE.Color;
+
+  /** @param color line, end points and label, as 0xRRGGBB. */
+  constructor(color: number) {
+    this.color = new THREE.Color(color);
+  }
+
+  /** New colour applies from the next `setFrom` / `setBoth`. */
+  setColor(color: number): void {
+    this.color.set(color);
+  }
 
   /** Show single "from" marker while waiting for second point. */
   setFrom(fromWorld: THREE.Vector3, sceneSize: number): void {
     this.clear();
     const radius = sceneSize * POINT_RADIUS_FACTOR;
-    const sphere = makePointMarker(radius);
+    const sphere = makePointMarker(radius, this.color);
     sphere.position.copy(fromWorld);
     this.add(sphere);
   }
@@ -132,15 +141,15 @@ export class MeasurementLine {
     const labelW = Math.max(sceneSize * LABEL_SCENE_FACTOR, distanceMm * LABEL_DIST_FACTOR);
     const perp = stablePerpendicular(dir);
 
-    this.add(buildMainLine(fromWorld, toWorld));
+    this.add(buildMainLine(fromWorld, toWorld, this.color));
 
     for (const pos of [fromWorld, toWorld]) {
-      const marker = makePointMarker(radius);
+      const marker = makePointMarker(radius, this.color);
       marker.position.copy(pos);
       this.add(marker);
     }
 
-    const label = makeLabel(`${distanceMm.toFixed(1)} mm`);
+    const label = makeLabel(`${distanceMm.toFixed(1)} mm`, this.color);
     label.position
       .copy(new THREE.Vector3().lerpVectors(fromWorld, toWorld, 0.5))
       .addScaledVector(perp, tickH * 3);

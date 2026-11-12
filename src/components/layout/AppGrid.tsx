@@ -2,10 +2,9 @@ import { Viewer } from '@/components/Viewer';
 import { BrandBlock } from '@/components/header/BrandBlock';
 import { Header } from '@/components/header/Header';
 import { Tooltip } from '@/components/ui/Tooltip';
-import { accentRgba } from '@/constants';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { usePwaInstall } from '@/hooks/usePwaInstall';
-import { type ViewerSlots, useViewer, useViewerStore } from '@/viewer';
+import { type ViewerSlots, accentAlpha, useViewer, useViewerStore } from '@/viewer';
 import { MonitorDown } from 'lucide-react';
 import styled from 'styled-components';
 
@@ -78,7 +77,7 @@ const MobileInstallBtn = styled.button`
   -webkit-tap-highlight-color: transparent;
 
   &:active {
-    background: ${accentRgba('amber', 0.08)};
+    background: ${accentAlpha('amber', 0.08)};
     border-color: var(--amber-dim);
     color: var(--amber);
   }
@@ -92,7 +91,7 @@ const MobileLoadingBar = styled.div<{ $width: number }>`
   width: ${({ $width }) => $width}%;
   background: var(--amber);
   transition: width 180ms ease-out;
-  box-shadow: 0 0 6px ${accentRgba('amber', 0.6)};
+  box-shadow: 0 0 6px ${accentAlpha('amber', 0.6)};
 `;
 
 function MobileHeader() {

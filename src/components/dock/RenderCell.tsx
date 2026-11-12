@@ -1,7 +1,7 @@
 import { Tooltip } from '@/components/ui/Tooltip';
 import { useHover } from '@/hooks/useHover';
 import type { RenderPreset } from '@/types';
-import { useViewerStore } from '@/viewer';
+import { useViewerFeatures, useViewerStore } from '@/viewer';
 import { Info } from 'lucide-react';
 import styled from 'styled-components';
 
@@ -154,11 +154,14 @@ export function RenderCell() {
   const setRenderPreset = useViewerStore((s) => s.setRenderPreset);
   const slabMm = useViewerStore((s) => s.slabMm);
   const setSlabMm = useViewerStore((s) => s.setSlabMm);
+  const features = useViewerFeatures();
+  // In the host's order, not ours.
+  const offered = features.renderPresets.flatMap((id) => PRESETS.filter((p) => p.id === id));
 
   return (
     <Wrap>
       <PresetGrid>
-        {PRESETS.map(({ id, name, desc }) => (
+        {offered.map(({ id, name, desc }) => (
           <PresetButton
             key={id}
             name={name}
@@ -169,31 +172,33 @@ export function RenderCell() {
         ))}
       </PresetGrid>
 
-      <SlabSection>
-        <SlabHead>
-          <SlabHeadTitle>Slab MIP</SlabHeadTitle>
-          <Tooltip
-            label="Maximum Intensity Projection — composites several adjacent slices into one image. Reveals vessels, fractures and lesions that span multiple slices. 3–5 mm is ideal for most CT studies."
-            above
-          >
-            <Info size={13} style={{ color: 'var(--ink-3)', cursor: 'default', flexShrink: 0 }} />
-          </Tooltip>
-          <SlabHeadLine />
-        </SlabHead>
-        <SlabRow>
-          {SLAB_PRESETS.map(([label, mm]) => (
-            <SlabBtn
-              key={label}
-              type="button"
-              $active={slabMm === mm}
-              onClick={() => setSlabMm(mm)}
-              aria-pressed={slabMm === mm}
+      {features.slab && (
+        <SlabSection>
+          <SlabHead>
+            <SlabHeadTitle>Slab MIP</SlabHeadTitle>
+            <Tooltip
+              label="Maximum Intensity Projection — composites several adjacent slices into one image. Reveals vessels, fractures and lesions that span multiple slices. 3–5 mm is ideal for most CT studies."
+              above
             >
-              {label}
-            </SlabBtn>
-          ))}
-        </SlabRow>
-      </SlabSection>
+              <Info size={13} style={{ color: 'var(--ink-3)', cursor: 'default', flexShrink: 0 }} />
+            </Tooltip>
+            <SlabHeadLine />
+          </SlabHead>
+          <SlabRow>
+            {SLAB_PRESETS.map(([label, mm]) => (
+              <SlabBtn
+                key={label}
+                type="button"
+                $active={slabMm === mm}
+                onClick={() => setSlabMm(mm)}
+                aria-pressed={slabMm === mm}
+              >
+                {label}
+              </SlabBtn>
+            ))}
+          </SlabRow>
+        </SlabSection>
+      )}
     </Wrap>
   );
 }

@@ -12,6 +12,9 @@ export {
   useViewerEnvironment,
   useViewerHost,
   useViewerLayout,
+  useViewerTheme,
+  useViewerFeatures,
+  useViewerLabels,
   useViewerStore,
   useViewerStoreApi,
   useViewerSurfaces,
@@ -33,4 +36,28 @@ export {
   isAbort,
 } from './loader';
 export type { ViewerSurfaces } from './surfaces';
+export {
+  ALL_RENDER_PRESETS,
+  type ViewerFeatures,
+  defaultFeatures,
+  resolveFeatures,
+} from './features';
+export {
+  type PlaneLabel,
+  type ViewerLabels,
+  type ViewerLabelsInput,
+  defaultLabels,
+  resolveLabels,
+} from './labels';
+export {
+  type ViewerColors,
+  type ViewerFonts,
+  type ViewerTheme,
+  type ViewerThemeInput,
+  defaultTheme,
+  resolveTheme,
+  themeCssVars,
+  withAlpha,
+  accentAlpha,
+} from './theme';
 export { MOBILE_MAX_WIDTH, type ViewerLayoutMode, useContainerLayout } from './layout';

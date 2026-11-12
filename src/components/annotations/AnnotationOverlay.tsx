@@ -4,10 +4,9 @@
  * selecting it focuses the finding across the whole app.
  */
 
-import { SEVERITY_HEX } from '@/constants';
 import { sliceIndex } from '@/lib/volume/plane';
 import type { Annotation, SlicePlane } from '@/types';
-import { useViewerStore } from '@/viewer';
+import { useViewerFeatures, useViewerStore, useViewerTheme, withAlpha } from '@/viewer';
 import { memo, useMemo } from 'react';
 import styled from 'styled-components';
 
@@ -31,15 +30,15 @@ const Pin = styled.button<{ $color: string; $active: boolean }>`
   border: ${({ $active }) => ($active ? '1.75px' : '1.25px')} solid ${({ $color }) => $color};
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, 0.55),
-    0 0 ${({ $active }) => ($active ? '12px' : '6px')} ${({ $color }) => $color}aa;
+    0 0 ${({ $active }) => ($active ? '12px' : '6px')} ${({ $color }) => withAlpha($color, 0.667)};
   cursor: pointer;
   pointer-events: auto;
   -webkit-tap-highlight-color: transparent;
   animation: annotation-pulse 2.4s ease-in-out infinite;
 
   @keyframes annotation-pulse {
-    0%, 100% { box-shadow: 0 0 0 1px rgba(0,0,0,0.55), 0 0 6px ${({ $color }) => $color}88; }
-    50%       { box-shadow: 0 0 0 1px rgba(0,0,0,0.55), 0 0 13px ${({ $color }) => $color}dd; }
+    0%, 100% { box-shadow: 0 0 0 1px rgba(0,0,0,0.55), 0 0 6px ${({ $color }) => withAlpha($color, 0.533)}; }
+    50%       { box-shadow: 0 0 0 1px rgba(0,0,0,0.55), 0 0 13px ${({ $color }) => withAlpha($color, 0.867)}; }
   }
 `;
 
@@ -65,7 +64,7 @@ const PinLabel = styled.span<{
   background: rgba(8, 7, 5, 0.72);
   padding: 2px 6px;
   border-radius: 3px;
-  border: 1px solid ${({ $color }) => $color}44;
+  border: 1px solid ${({ $color }) => withAlpha($color, 0.267)};
   pointer-events: none;
 `;
 
@@ -80,7 +79,7 @@ const PinItem = memo(function PinItem({
   opacity: number;
   onSelect: (id: string) => void;
 }) {
-  const color = SEVERITY_HEX[annotation.severity];
+  const color = useViewerTheme().severity[annotation.severity];
   const labelSide = annotation.fx > 0.55 ? 'left' : 'right';
   const labelVSide = annotation.fy < 0.15 ? 'top' : annotation.fy > 0.85 ? 'bottom' : 'center';
   return (
@@ -130,7 +129,8 @@ export function AnnotationOverlay({
       .filter(({ dist }) => dist <= tol);
   }, [annotations, plane, currentSlice, tol, cursor]);
 
-  if (!cursor || visible.length === 0) return null;
+  const { annotations: enabled } = useViewerFeatures();
+  if (!enabled || !cursor || visible.length === 0) return null;
 
   return (
     <Overlay>

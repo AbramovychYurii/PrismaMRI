@@ -1,10 +1,9 @@
 import { BrandBlock } from '@/components/header/BrandBlock';
 import { StatusStrip } from '@/components/status/StatusStrip';
 import { Tooltip } from '@/components/ui/Tooltip';
-import { accentRgba } from '@/constants';
 import { useViewerActions } from '@/hooks/ViewerActionsContext';
 import { usePwaInstall } from '@/hooks/usePwaInstall';
-import { useViewerStore } from '@/viewer';
+import { accentAlpha, useViewerStore } from '@/viewer';
 import { MonitorDown } from 'lucide-react';
 import styled from 'styled-components';
 
@@ -48,7 +47,7 @@ const InstallBtn = styled.button`
   transition: background 80ms, border-color 80ms, color 80ms;
 
   &:hover {
-    background: ${accentRgba('amber', 0.08)};
+    background: ${accentAlpha('amber', 0.08)};
     border-color: var(--amber-dim);
     color: var(--amber);
   }
@@ -90,7 +89,7 @@ const LoadingBar = styled.div<{ $width: number }>`
   width: ${({ $width }) => $width}%;
   background: var(--amber);
   transition: width 180ms ease-out;
-  box-shadow: 0 0 6px ${accentRgba('amber', 0.6)};
+  box-shadow: 0 0 6px ${accentAlpha('amber', 0.6)};
 `;
 
 export function Header() {

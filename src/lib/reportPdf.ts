@@ -3,9 +3,8 @@
  *
  * Pure function: receives all data up-front (including pre-captured
  * thumbnail data URLs) and returns a PDF Blob.  No React hooks inside.
- */
+ */ import { defaultLabels } from '@/viewer';
 
-import { PLANE_LABEL } from '@/constants';
 import { sliceNumber } from '@/lib/volume/plane';
 import { intensityUnit } from '@/lib/volume/units';
 import type { Annotation, AnnotationSeverity, ParsedVolumeMeta, SlicePlane } from '@/types';
@@ -32,7 +31,7 @@ function hexToRgb(hex: string): [number, number, number] {
 }
 void hexToRgb; // used optionally; keep to avoid lint errors
 
-const planeName = (plane: SlicePlane) => PLANE_LABEL[plane].primary;
+const planeName = (plane: SlicePlane) => defaultLabels.planes[plane].name;
 
 const sliceNum = (a: Annotation) => sliceNumber(a.voxel, a.plane);
 

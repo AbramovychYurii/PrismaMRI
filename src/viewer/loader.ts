@@ -14,6 +14,11 @@ export type VolumeLoadedListener = (result: LoadResult) => void;
 export interface ViewerLoaderOptions {
   /** Replaces the volume worker — for tests, or a host that parses elsewhere. */
   runLoad?: VolumeLoadRunner;
+  /**
+   * Per-axis cap, in voxels, on the 3-D texture (default 512). Lower it for
+   * weak GPUs; the slice panels always use the full-resolution volume.
+   */
+  maxTextureEdge?: number;
 }
 
 export interface ViewerLoader {
@@ -49,8 +54,11 @@ export const isAbort = (err: unknown) => err instanceof DOMException && err.name
  */
 export function createViewerLoader(
   store: ViewerStore,
-  { runLoad = loadVolumeInWorker }: ViewerLoaderOptions = {},
+  { runLoad = loadVolumeInWorker, maxTextureEdge }: ViewerLoaderOptions = {},
 ): ViewerLoader {
+  if (maxTextureEdge !== undefined && !(Number.isInteger(maxTextureEdge) && maxTextureEdge > 0)) {
+    throw new Error(`maxTextureEdge must be a positive integer, not ${maxTextureEdge}.`);
+  }
   let abort: AbortController | null = null;
   let resolveChoice: ((key: string | null) => void) | null = null;
   const listeners = new Set<VolumeLoadedListener>();
@@ -112,6 +120,7 @@ export function createViewerLoader(
         },
         controller.signal,
         seriesKey,
+        { maxTextureEdge },
       );
 
       if (out.kind === 'series-choice') {

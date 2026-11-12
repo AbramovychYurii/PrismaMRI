@@ -6,7 +6,7 @@
  */
 
 import type { SeriesChoice } from '@/lib/import/types';
-import { useViewer, useViewerStore } from '@/viewer';
+import { useViewer, useViewerFeatures, useViewerStore } from '@/viewer';
 import { ChevronDown, Layers } from 'lucide-react';
 import styled from 'styled-components';
 
@@ -98,7 +98,8 @@ export function StageSeriesSelect() {
   const loading = useViewerStore((s) => s.loading.active);
   const { switchSeries } = useViewer();
 
-  if (!seriesList || seriesList.length <= 1) return null;
+  const { seriesSelect } = useViewerFeatures();
+  if (!seriesSelect || !seriesList || seriesList.length <= 1) return null;
 
   return (
     <Wrap>

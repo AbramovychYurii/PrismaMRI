@@ -1,10 +1,10 @@
 import { StageMenu } from '@/components/stage/StageMenu';
 import { Tooltip } from '@/components/ui/Tooltip';
-import { accentRgba } from '@/constants';
 import { useHover } from '@/hooks/useHover';
 import type { ThreePreview } from '@/lib/volume/three-preview';
 import type { PlanesMode, ToolbarState } from '@/types';
-import { useViewerLayout, useViewerStore } from '@/viewer';
+import { useViewerFeatures, useViewerLayout, useViewerStore } from '@/viewer';
+import { accentAlpha } from '@/viewer/theme';
 import { Maximize2, PanelRight } from 'lucide-react';
 import styled from 'styled-components';
 
@@ -120,7 +120,7 @@ const PillWrap = styled.div`
 
 const ToolBtn = styled.button<{ $on: boolean; $hover: boolean }>`
   background: ${({ $on, $hover }) =>
-    $on ? accentRgba('amber', 0.08) : $hover ? 'rgba(28,24,18,0.92)' : 'rgba(20,18,14,0.85)'};
+    $on ? accentAlpha('amber', 0.08) : $hover ? 'rgba(28,24,18,0.92)' : 'rgba(20,18,14,0.85)'};
   backdrop-filter: blur(8px);
   border: 1px solid ${({ $on }) => ($on ? 'var(--amber-dim)' : 'var(--rule)')};
   border-radius: 999px;
@@ -238,20 +238,21 @@ interface ToolbarPillProps {
 
 export function ToolbarPill({ previewRef, has3D = true }: ToolbarPillProps) {
   const isMobile = useViewerLayout() === 'mobile';
+  const features = useViewerFeatures();
   const visible = BUTTONS.filter(
-    (b) => !(isMobile && b.mobileHidden) && (has3D || b.id === 'rail'),
+    (b) => !(isMobile && b.mobileHidden) && (has3D || b.id === 'rail') && features[b.id],
   );
   // Rail is always the last button — StageMenu sits just before it.
   const beforeMenu = visible.filter((b) => b.id !== 'rail');
   const afterMenu = visible.filter((b) => b.id === 'rail');
   return (
     <PillWrap>
-      {has3D && <PlanesButton />}
-      {has3D && <ClipButton />}
+      {has3D && features.planes && <PlanesButton />}
+      {has3D && features.clip && <ClipButton />}
       {beforeMenu.map((b) => (
         <ToolButton key={b.id} btn={b} />
       ))}
-      {has3D && <StageMenu previewRef={previewRef} />}
+      {has3D && features.export && <StageMenu previewRef={previewRef} />}
       {afterMenu.map((b) => (
         <ToolButton key={b.id} btn={b} />
       ))}

@@ -12,6 +12,8 @@ export interface WorkerLoadRequest {
   source: ImportSource;
   /** When set, assemble only this series (from a prior series-choice). */
   seriesKey?: string;
+  /** Per-axis cap on the 3-D texture; the default when unset. */
+  maxTextureEdge?: number;
 }
 
 export type WorkerRequest = WorkerLoadRequest;

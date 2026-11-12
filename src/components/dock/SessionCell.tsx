@@ -1,4 +1,4 @@
-import { useViewerHost, useViewerStore } from '@/viewer';
+import { useViewerHost, useViewerLabels, useViewerStore } from '@/viewer';
 import { ChevronLeft } from 'lucide-react';
 import styled from 'styled-components';
 
@@ -46,6 +46,7 @@ const DisclaimerBold = styled.b`
 
 export function SessionCell() {
   const { onExit } = useViewerHost();
+  const { session } = useViewerLabels();
   const volume = useViewerStore((s) => s.volume);
 
   return (
@@ -53,12 +54,11 @@ export function SessionCell() {
       {onExit && (
         <BackButton type="button" onClick={onExit} disabled={!volume}>
           <ChevronLeft size={13} />
-          Back to import
+          {session.exit}
         </BackButton>
       )}
       <Disclaimer>
-        <DisclaimerBold>Reference only.</DisclaimerBold> Not for diagnosis, treatment planning,
-        measurements, or implant workflows.
+        <DisclaimerBold>{session.disclaimerLead}</DisclaimerBold> {session.disclaimer}
       </Disclaimer>
     </>
   );
