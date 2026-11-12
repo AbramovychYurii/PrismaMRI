@@ -40,6 +40,17 @@ describe('texture sizing', () => {
     expect(p.dims).toEqual([cap, 4, cap]);
   });
 
+  it('takes a lower cap from the caller', () => {
+    const p = prepareVolumeFor3D(
+      makeVolume([300, 100, 40], () => 1),
+      undefined,
+      undefined,
+      128,
+    );
+    expect(p.dims).toEqual([128, 100, 40]);
+    expect(p.sourceDims).toEqual([300, 100, 40]);
+  });
+
   it('does not fall off a cliff one voxel over the cap', () => {
     // The old ceil() stride sent an edge of cap+1 all the way down to cap/2.
     const p = prepareVolumeFor3D(makeVolume([MAX_3D_TEXTURE_EDGE + 1, 4, 4], () => 1));

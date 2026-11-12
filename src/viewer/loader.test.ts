@@ -113,6 +113,7 @@ describe('createViewerLoader', () => {
       expect.any(Function),
       expect.any(AbortSignal),
       's2',
+      { maxTextureEdge: undefined },
     );
     expect(store.getState().volume?.meta.dims[2]).toBe(2);
     expect(store.getState().activeSeriesKey).toBe('s2');
@@ -148,6 +149,19 @@ describe('createViewerLoader', () => {
 
     expect(store.getState().error).toBe('Unrecognized format.');
     expect(store.getState().loading).toMatchObject({ active: false, stage: 'error' });
+  });
+
+  it('hands the texture cap to every load, and refuses a nonsense one', async () => {
+    const runLoad = vi.fn<VolumeLoadRunner>(async () => ({ kind: 'volume', result: result(1) }));
+    const loader = createViewerLoader(createViewerStore(), { runLoad, maxTextureEdge: 256 });
+    await loader.load(SOURCE);
+    expect(runLoad.mock.calls[0][4]).toEqual({ maxTextureEdge: 256 });
+
+    for (const bad of [0, -1, 1.5, Number.NaN]) {
+      expect(() => createViewerLoader(createViewerStore(), { maxTextureEdge: bad })).toThrow(
+        'maxTextureEdge must be a positive integer',
+      );
+    }
   });
 
   it('stops calling a listener once it unsubscribes', async () => {

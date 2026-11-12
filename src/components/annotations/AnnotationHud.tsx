@@ -20,10 +20,16 @@
 
 import { AuroraSparkles } from '@/components/ui/AuroraSparkles';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
-import { PLANE_LABEL, SEVERITY_HEX, SEVERITY_LABEL, SEVERITY_RANK } from '@/constants';
+import { SEVERITY_RANK } from '@/constants';
 import { sliceNumber } from '@/lib/volume/plane';
 import type { Annotation, SlicePlane, VolumeCursor } from '@/types';
-import { useViewerHost, useViewerStore } from '@/viewer';
+import {
+  useViewerFeatures,
+  useViewerHost,
+  useViewerLabels,
+  useViewerStore,
+  useViewerTheme,
+} from '@/viewer';
 import { ChevronLeft, ChevronRight, Sparkles, Trash2, X } from 'lucide-react';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -58,8 +64,8 @@ import {
   TopRow,
 } from './AnnotationHud.styles';
 
-function sliceInfo(plane: SlicePlane, v: VolumeCursor): string {
-  return `${PLANE_LABEL[plane].primary} · slice ${sliceNumber(v, plane)}`;
+function sliceInfo(planeName: string, plane: SlicePlane, v: VolumeCursor): string {
+  return `${planeName} · slice ${sliceNumber(v, plane)}`;
 }
 
 function orderAll(list: Annotation[]): Annotation[] {
@@ -115,6 +121,9 @@ export function AnnotationHud() {
   const [open, setOpen] = useState(false);
   const [confirmDismiss, setConfirmDismiss] = useState(false);
   const { slots } = useViewerHost();
+  const theme = useViewerTheme();
+  const labels = useViewerLabels();
+  const { annotations: enabled } = useViewerFeatures();
 
   // The pill plays its full multi-layer entrance only the first time it
   // appears for a given run.  Subsequent re-renders (collapse/expand,
@@ -182,7 +191,7 @@ export function AnnotationHud() {
   // O(n log n) sort. Recompute only when the underlying findings change.
   const ordered = useMemo(() => orderAll(annotations), [annotations]);
 
-  if (annotations.length === 0) return null;
+  if (!enabled || annotations.length === 0) return null;
 
   const active = activeId ? annotations.find((a) => a.id === activeId) : null;
 
@@ -212,7 +221,7 @@ export function AnnotationHud() {
   }
 
   const shown = active ?? ordered[0];
-  const color = SEVERITY_HEX[shown.severity];
+  const color = theme.severity[shown.severity];
   const idx = ordered.findIndex((a) => a.id === shown.id);
 
   const step = (delta: number) => {
@@ -235,9 +244,11 @@ export function AnnotationHud() {
           <TopRow>
             <SeverityChip $color={color}>
               <ChipDot $color={color} />
-              {SEVERITY_LABEL[shown.severity]}
+              {labels.severity[shown.severity]}
             </SeverityChip>
-            <Location>{sliceInfo(shown.plane, shown.voxel)}</Location>
+            <Location>
+              {sliceInfo(labels.planes[shown.plane].name, shown.plane, shown.voxel)}
+            </Location>
             <HeaderBtn
               type="button"
               aria-label="Close"

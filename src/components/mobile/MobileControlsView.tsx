@@ -2,6 +2,7 @@ import { DisplayCell } from '@/components/dock/DisplayCell';
 import { RenderCell } from '@/components/dock/RenderCell';
 import { SessionCell } from '@/components/dock/SessionCell';
 import { StudyCell } from '@/components/dock/StudyCell';
+import { useViewerLabels } from '@/viewer';
 import styled from 'styled-components';
 
 const ScrollWrap = styled.div`
@@ -56,21 +57,22 @@ function CtrlSection({ title, children }: { title: string; children: React.React
 }
 
 export function MobileControlsView() {
+  const { sections } = useViewerLabels();
   return (
     <ScrollWrap>
-      <CtrlSection title="Display">
+      <CtrlSection title={sections.display}>
         <DisplayCell />
       </CtrlSection>
 
-      <CtrlSection title="Render Mode">
+      <CtrlSection title={sections.render}>
         <RenderCell />
       </CtrlSection>
 
-      <CtrlSection title="Study">
+      <CtrlSection title={sections.study}>
         <StudyCell />
       </CtrlSection>
 
-      <CtrlSection title="Session">
+      <CtrlSection title={sections.session}>
         <SessionCell />
       </CtrlSection>
     </ScrollWrap>

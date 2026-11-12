@@ -6,7 +6,7 @@
  * CrosshairOverlay, MeasureLine, MeasureDot).
  */
 
-import { accentRgba } from '@/constants';
+import { accentAlpha } from '@/viewer/theme';
 import styled from 'styled-components';
 
 /** Fixed pixel size of measurement dots on 2-D slice panels. */
@@ -163,7 +163,7 @@ export const ActiveBorder = styled.div`
   z-index: var(--z-panel-chrome);
   border: 1.5px solid var(--amber);
   pointer-events: none;
-  box-shadow: inset 0 0 0 1px ${accentRgba('amber', 0.15)};
+  box-shadow: inset 0 0 0 1px ${accentAlpha('amber', 0.15)};
 `;
 
 export const MeasureLine = styled.svg`
@@ -250,7 +250,7 @@ export const TrayBtn = styled.button<{ $active?: boolean; $large?: boolean }>`
   flex-shrink: 0;
   border-radius: ${({ $large }) => ($large ? '6px' : '3px')};
   border: 1px solid ${({ $active }) => ($active ? 'var(--amber-dim)' : 'var(--rule)')};
-  background: ${({ $active }) => ($active ? accentRgba('amber', 0.08) : 'rgba(15,13,10,0.90)')};
+  background: ${({ $active }) => ($active ? accentAlpha('amber', 0.08) : 'rgba(15,13,10,0.90)')};
   color: ${({ $active }) => ($active ? 'var(--amber)' : 'var(--ink-3)')};
   display: flex;
   align-items: center;

@@ -50,14 +50,19 @@ ctx.onmessage = async (e: MessageEvent<WorkerRequest>) => {
       });
     });
     const windowLevel = resolveHistogramWindowLevel(hist);
-    const prepared = prepareVolumeFor3D(volume, hist, (r) => {
-      emit({
-        stage: 'preparing-3d',
-        current: HIST_WEIGHT + Math.round(r * PREP_WEIGHT),
-        total: 100,
-        message: 'Building 3D texture…',
-      });
-    });
+    const prepared = prepareVolumeFor3D(
+      volume,
+      hist,
+      (r) => {
+        emit({
+          stage: 'preparing-3d',
+          current: HIST_WEIGHT + Math.round(r * PREP_WEIGHT),
+          total: 100,
+          message: 'Building 3D texture…',
+        });
+      },
+      req.maxTextureEdge,
+    );
     // Empty-space grid for the ray marcher: a full scan of the texture, so it
     // runs here rather than on the main thread while the viewer mounts.
     const occupancy = computeOccupancy(prepared.data, prepared.dims);

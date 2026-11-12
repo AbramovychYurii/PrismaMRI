@@ -1,7 +1,10 @@
 import type { Annotation } from '@/types';
 import type { Viewer } from '@/viewer/createViewer';
+import { type ViewerFeatures, defaultFeatures } from '@/viewer/features';
+import { type ViewerLabels, defaultLabels } from '@/viewer/labels';
 import type { ViewerStore, ViewerStoreState } from '@/viewer/store';
 import type { ViewerSurfaces } from '@/viewer/surfaces';
+import { type ViewerTheme, defaultTheme } from '@/viewer/theme';
 import { type ReactNode, createContext, useContext, useMemo } from 'react';
 import { useStore } from 'zustand';
 
@@ -25,6 +28,10 @@ export interface ViewerEnvironment {
    * that must not reach another viewer on the page are scoped to it.
    */
   rootElement: HTMLElement | null;
+  /** Resolved theme — for what CSS can't reach: canvas fills, the 3-D view. */
+  theme: ViewerTheme;
+  features: ViewerFeatures;
+  labels: ViewerLabels;
 }
 
 /** The finding a navigator action is rendered for. */
@@ -79,6 +86,9 @@ export function ViewerProvider({
   portalContainer = document.body,
   layout = 'desktop',
   rootElement = null,
+  theme = defaultTheme,
+  features = defaultFeatures,
+  labels = defaultLabels,
   slots = NO_SLOTS,
   onExit,
   children,
@@ -86,8 +96,30 @@ export function ViewerProvider({
   // Every hook below reads this context, so a fresh object per render would
   // re-render every consumer whenever the provider's parent does.
   const value = useMemo(
-    () => ({ viewer, keyboardTarget, portalContainer, layout, rootElement, slots, onExit }),
-    [viewer, keyboardTarget, portalContainer, layout, rootElement, slots, onExit],
+    () => ({
+      viewer,
+      keyboardTarget,
+      portalContainer,
+      layout,
+      rootElement,
+      theme,
+      features,
+      labels,
+      slots,
+      onExit,
+    }),
+    [
+      viewer,
+      keyboardTarget,
+      portalContainer,
+      layout,
+      rootElement,
+      theme,
+      features,
+      labels,
+      slots,
+      onExit,
+    ],
   );
   return <ViewerContext.Provider value={value}>{children}</ViewerContext.Provider>;
 }
@@ -132,8 +164,22 @@ export function useViewerHost(): ViewerHost {
 }
 
 export function useViewerEnvironment(): ViewerEnvironment {
-  const { keyboardTarget, portalContainer, layout, rootElement } = useViewerContext();
-  return { keyboardTarget, portalContainer, layout, rootElement };
+  const { keyboardTarget, portalContainer, layout, rootElement, theme, features, labels } =
+    useViewerContext();
+  return { keyboardTarget, portalContainer, layout, rootElement, theme, features, labels };
+}
+
+/** The viewer's words — defaults, or the host's labels; also outside a viewer. */
+export function useViewerLabels(): ViewerLabels {
+  return useContext(ViewerContext)?.labels ?? defaultLabels;
+}
+
+export function useViewerFeatures(): ViewerFeatures {
+  return useViewerContext().features;
+}
+
+export function useViewerTheme(): ViewerTheme {
+  return useViewerContext().theme;
 }
 
 export function useViewerLayout(): ViewerLayout {

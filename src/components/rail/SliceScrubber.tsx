@@ -1,6 +1,7 @@
-import { PLANE_ACCENT, PLANE_LABEL } from '@/constants';
+import { PLANE_ACCENT } from '@/constants';
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion';
 import type { SlicePlane } from '@/types';
+import { useViewerLabels } from '@/viewer';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import {
   type PointerEvent as RPointerEvent,
@@ -238,6 +239,7 @@ export function SliceScrubber({
   large,
 }: SliceScrubberProps) {
   const accent = PLANE_ACCENT[axis];
+  const planeLabels = useViewerLabels().planes;
   const trackRef = useRef<HTMLDivElement>(null);
   const [trackH, setTrackH] = useState(0);
   const draggingRef = useRef(false);
@@ -353,7 +355,7 @@ export function SliceScrubber({
         ref={trackRef}
         role="slider"
         tabIndex={0}
-        aria-label={`${PLANE_LABEL[axis].primary} slice`}
+        aria-label={`${planeLabels[axis].name} slice`}
         aria-orientation="vertical"
         aria-valuemin={1}
         aria-valuemax={total}

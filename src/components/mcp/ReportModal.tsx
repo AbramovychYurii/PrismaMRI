@@ -10,7 +10,7 @@
  */
 
 import { AuroraSparkles } from '@/components/ui/AuroraSparkles';
-import { PLANE_LABEL, SEVERITY_HEX, SEVERITY_LABEL } from '@/constants';
+import { SEVERITY_HEX } from '@/constants';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { downloadBlob } from '@/lib/download';
 import { waitForPaint } from '@/lib/mcp/canvas-utils';
@@ -18,7 +18,7 @@ import { type Capture, annotateCanvas, captureRaw } from '@/lib/report/capture';
 import { sliceNumber } from '@/lib/volume/plane';
 import { intensityUnit } from '@/lib/volume/units';
 import type { Annotation, SlicePlane } from '@/types';
-import { useViewerStore, useViewerSurfaces } from '@/viewer';
+import { defaultLabels, useViewerStore, useViewerSurfaces } from '@/viewer';
 import { Download, FileText, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -75,7 +75,7 @@ import {
   SpinIcon,
 } from './ReportModal.styles';
 
-const planeName = (plane: SlicePlane) => PLANE_LABEL[plane].primary;
+const planeName = (plane: SlicePlane) => defaultLabels.planes[plane].name;
 
 const sliceNum = (a: Annotation) => sliceNumber(a.voxel, a.plane);
 
@@ -401,7 +401,7 @@ export function ReportModal({ finding, findingIndex, allFindings, onClose }: Pro
                           <FindingIndex>{String(globalIdx + 1).padStart(2, '0')}</FindingIndex>
                           <FindingTitle>{f.label}</FindingTitle>
                           <FindingSeverity $color={color}>
-                            {SEVERITY_LABEL[f.severity]}
+                            {defaultLabels.severity[f.severity]}
                           </FindingSeverity>
                         </FindingRow>
                         <FindingLocation>

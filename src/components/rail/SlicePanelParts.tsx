@@ -1,9 +1,10 @@
 import { MeasureMenu } from '@/components/rail/MeasureMenu';
 import { Tooltip } from '@/components/ui/Tooltip';
-import { PLANE_ACCENT, PLANE_GLYPH, PLANE_LABEL } from '@/constants';
+import { PLANE_ACCENT, PLANE_GLYPH } from '@/constants';
 import type { SlicePanelCore } from '@/hooks/useSlicePanelCore';
 import { downloadBlob } from '@/lib/download';
 import type { SlicePlane } from '@/types';
+import { useViewerLabels } from '@/viewer';
 import { Download } from 'lucide-react';
 import { memo } from 'react';
 import {
@@ -84,16 +85,16 @@ export function ExportSliceButton({
   );
 }
 
-/** Everything here is a lookup on `plane` — no panel state involved. */
+/** Everything here is a lookup on `plane` and the labels — no panel state involved. */
 export function PlaneHeading({ plane }: { plane: SlicePlane }) {
   const accent = PLANE_ACCENT[plane];
-  const label = PLANE_LABEL[plane];
+  const label = useViewerLabels().planes[plane];
   return (
     <PanelHeader>
       <PlaneGlyph $color={accent}>{PLANE_GLYPH[plane]}</PlaneGlyph>
       <PlaneLabel>
-        <PlaneLabelAccent $color={accent}>{label.primary}</PlaneLabelAccent>
-        {` · ${label.secondary}`}
+        <PlaneLabelAccent $color={accent}>{label.name}</PlaneLabelAccent>
+        {` · ${label.detail}`}
       </PlaneLabel>
     </PanelHeader>
   );
@@ -120,6 +121,7 @@ export function MeasureContextMenu({
     <MeasureMenu
       x={measure.menu.screenX}
       y={measure.menu.screenY}
+      canMeasure={measure.enabled}
       hasMeasurementFrom={measure.measurement !== null}
       onMeasureFrom={measure.onMeasureFrom}
       onMeasureTo={measure.onMeasureTo}

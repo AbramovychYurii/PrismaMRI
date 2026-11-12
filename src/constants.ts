@@ -1,36 +1,12 @@
 import type { AnnotationSeverity, Axis, SlicePlane } from '@/types';
+import { defaultTheme } from '@/viewer/theme';
 
 export const APP_NAME = 'PrismaMRI';
 
 export const WL_DEBOUNCE_MS = 96;
 
-/**
- * Canvas 2D context background fill for slice panels.
- * Canvas ctx properties don't support CSS custom properties, so this mirrors
- * `--surface-deep` as a concrete hex value with a slight lift for visual depth.
- */
-export const CANVAS_BG = '#080604';
-
-/**
- * Single source of truth for the accent palette. CSS keeps its own copies in
- * globals.css (for `var(--x)`), this mirrors them for contexts that need a
- * concrete value: Three.js numeric hex and arbitrary-alpha rgba glows.
- */
-export const ACCENT_HEX = {
-  amber: '#ffb547',
-  violet: '#b59dd1',
-  azure: '#82a8d4',
-  teal: '#7fd1c5',
-} as const;
-
-export type Accent = keyof typeof ACCENT_HEX;
-
-export const ACCENT_HEX_NUM: Record<Accent, number> = {
-  amber: 0xffb547,
-  violet: 0xb59dd1,
-  azure: 0x82a8d4,
-  teal: 0x7fd1c5,
-};
+/** The accents CSS reaches as `var(--amber)` etc.; their values live in the theme. */
+export type Accent = 'amber' | 'violet' | 'azure' | 'teal';
 
 export const ACCENT_VAR: Record<Accent, string> = {
   amber: 'var(--amber)',
@@ -38,12 +14,6 @@ export const ACCENT_VAR: Record<Accent, string> = {
   azure: 'var(--azure)',
   teal: 'var(--teal)',
 };
-
-/** rgba() string for an accent at the given alpha (glows, tints). */
-export function accentRgba(accent: Accent, alpha: number): string {
-  const n = Number.parseInt(ACCENT_HEX[accent].slice(1), 16);
-  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
-}
 
 export type { Axis };
 
@@ -93,43 +63,15 @@ export const PLANE_GLYPH: Record<SlicePlane, string> = {
   axial: 'A',
 };
 
-/** Anatomical orientation hint and axis code shown in the slice panel footer. */
-export const PLANE_FOOTER: Record<SlicePlane, { hint: string; code: string }> = {
-  coronal: { hint: 'R ← → L', code: 'XZ' },
-  sagittal: { hint: 'A ← → P', code: 'YZ' },
-  axial: { hint: 'R ← → L', code: 'XY' },
+/** Voxel axes each panel shows, in its footer beside the orientation hint. */
+export const PLANE_AXIS_CODE: Record<SlicePlane, string> = {
+  coronal: 'XZ',
+  sagittal: 'YZ',
+  axial: 'XY',
 };
 
-/** Human-readable plane label split into primary and secondary parts for styled rendering. */
-export const PLANE_LABEL: Record<SlicePlane, { primary: string; secondary: string }> = {
-  coronal: { primary: 'Coronal', secondary: 'frontal' },
-  sagittal: { primary: 'Sagittal', secondary: 'lateral' },
-  axial: { primary: 'Axial', secondary: 'transverse' },
-};
-
-/** Severity → marker colour (hex). Shared by 2-D overlay and 3-D markers. */
-export const SEVERITY_HEX: Record<AnnotationSeverity, string> = {
-  critical: '#ff3b30', // red    — critical
-  serious: '#ff9500', //  orange — serious but not critical
-  moderate: '#ffd60a', // yellow — moderate
-  comment: '#34c759', //  green  — informational note
-};
-
-/** Severity → numeric hex for Three.js. */
-export const SEVERITY_HEX_NUM: Record<AnnotationSeverity, number> = {
-  critical: 0xff3b30,
-  serious: 0xff9500,
-  moderate: 0xffd60a,
-  comment: 0x34c759,
-};
-
-/** Severity → short human label. */
-export const SEVERITY_LABEL: Record<AnnotationSeverity, string> = {
-  critical: 'Critical',
-  serious: 'Serious',
-  moderate: 'Moderate',
-  comment: 'Note',
-};
+/** The default severity colours — for the app's PDF report; the viewer reads its theme. */
+export const SEVERITY_HEX: Record<AnnotationSeverity, string> = defaultTheme.severity;
 
 /** Most-severe-first ordering used when sorting findings in the navigator. */
 export const SEVERITY_RANK: Record<AnnotationSeverity, number> = {

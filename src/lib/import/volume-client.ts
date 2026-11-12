@@ -54,11 +54,17 @@ function resultFromDone(msg: WorkerDoneMsg): LoadResult {
  * A multi-series source resolves to `{ kind: 'series-choice' }` instead of a
  * volume; re-call with `seriesKey` set to the chosen series to assemble it.
  */
+export interface LoadOptions {
+  /** Per-axis cap on the 3-D texture, in voxels. */
+  maxTextureEdge?: number;
+}
+
 export function loadVolumeInWorker(
   source: ImportSource,
   onProgress: (p: ImportProgress, percent: number) => void,
   signal?: AbortSignal,
   seriesKey?: string,
+  options: LoadOptions = {},
 ): Promise<LoadWorkerResult> {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) {
@@ -121,6 +127,11 @@ export function loadVolumeInWorker(
       reject(new Error('Could not read the volume worker reply.'));
     };
 
-    worker.postMessage({ type: 'load', source, seriesKey } satisfies WorkerRequest);
+    worker.postMessage({
+      type: 'load',
+      source,
+      seriesKey,
+      maxTextureEdge: options.maxTextureEdge,
+    } satisfies WorkerRequest);
   });
 }

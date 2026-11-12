@@ -3,9 +3,11 @@ import { AnnotationMarkers } from '@/lib/volume/three-preview/annotation-markers
 import { buildCamera, buildControls, frameCamera } from '@/lib/volume/three-preview/camera';
 import { MeasurementLine } from '@/lib/volume/three-preview/measurement-line';
 import {
+  type PlaneColors,
   type VolumeObject,
   buildVolumeMesh,
   disposeVolumeObject,
+  setPlaneColors,
 } from '@/lib/volume/three-preview/volume-object';
 import {
   type RenderPreset,
@@ -46,6 +48,10 @@ function pickVideoMime(): string | null {
 export interface ThreePreviewOptions {
   /** Finding marker colour per severity, as 0xRRGGBB. */
   severityColors: Readonly<Record<AnnotationSeverity, number>>;
+  /** Cursor plane colours, matching the slice panels' accents. */
+  planeColors: PlaneColors;
+  /** Measurement line, end points and distance label, as 0xRRGGBB. */
+  measureColor: number;
 }
 
 export class ThreePreview {
@@ -54,7 +60,13 @@ export class ThreePreview {
   private camera: THREE.OrthographicCamera;
   private controls: TrackballControls | null = null;
   private volume: VolumeObject | null = null;
-  private readonly measurementLine = new MeasurementLine();
+  private readonly measurementLine: MeasurementLine;
+  private planeColors: PlaneColors;
+  /** Last measurement drawn — redrawn when the colours change. */
+  private lastMeasurement: { m: ActiveMeasurement | null; spacing: [number, number, number] } = {
+    m: null,
+    spacing: [1, 1, 1],
+  };
   private readonly annotationMarkers: AnnotationMarkers;
   /** Voxel spacing of the loaded volume — for marker world placement. */
   private _spacing: readonly [number, number, number] = [1, 1, 1];
@@ -118,6 +130,8 @@ export class ThreePreview {
     options: ThreePreviewOptions,
   ) {
     this.annotationMarkers = new AnnotationMarkers(options.severityColors);
+    this.measurementLine = new MeasurementLine(options.measureColor);
+    this.planeColors = options.planeColors;
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: true,
@@ -161,7 +175,7 @@ export class ThreePreview {
       disposeVolumeObject(this.volume);
       this.volume = null;
     }
-    const vol = buildVolumeMesh(prepared, preset);
+    const vol = buildVolumeMesh(prepared, preset, this.planeColors);
     this.volume = vol;
     this.colormapPreset = preset;
     this.scene.add(vol.mesh);
@@ -294,6 +308,7 @@ export class ThreePreview {
   }
 
   setMeasurement(m: ActiveMeasurement | null, spacing: [number, number, number]): void {
+    this.lastMeasurement = { m, spacing };
     if (!m) {
       this.measurementLine.clear();
       this.dirty = true;
@@ -309,6 +324,16 @@ export class ThreePreview {
     const toW = new THREE.Vector3(m.to.x * sx, m.to.y * sy, m.to.z * sz);
     this.measurementLine.setBoth(fromW, toW, m.distanceMm, this.sceneSize);
     this.dirty = true;
+  }
+
+  /** Re-colours the cursor planes, finding markers and measurement — e.g. on a theme change. */
+  setColors(options: ThreePreviewOptions): void {
+    this.planeColors = options.planeColors;
+    if (this.volume) setPlaneColors(this.volume.material, options.planeColors);
+    this.annotationMarkers.setColors(options.severityColors);
+    this.setAnnotations(this._annotations);
+    this.measurementLine.setColor(options.measureColor);
+    this.setMeasurement(this.lastMeasurement.m, this.lastMeasurement.spacing);
   }
 
   setAnnotations(list: Annotation[]): void {

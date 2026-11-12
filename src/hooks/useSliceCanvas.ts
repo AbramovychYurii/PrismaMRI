@@ -1,4 +1,3 @@
-import { CANVAS_BG } from '@/constants';
 import type { LetterboxRect } from '@/lib/volume/letterbox';
 import type { SliceImage } from '@/types';
 import { useEffect, useRef, useState } from 'react';
@@ -31,6 +30,7 @@ export function useCanvasPainter(
   image: SliceImage | null,
   rect: LetterboxRect | null,
   size: { w: number; h: number },
+  background: string,
 ) {
   const offscreen = useRef<HTMLCanvasElement | null>(null);
 
@@ -46,7 +46,7 @@ export function useCanvasPainter(
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    ctx.fillStyle = CANVAS_BG;
+    ctx.fillStyle = background;
     ctx.fillRect(0, 0, width, height);
     if (!image) return;
 
@@ -76,5 +76,5 @@ export function useCanvasPainter(
     } else {
       ctx.drawImage(buffer, 0, 0, width, height);
     }
-  }, [canvasRef, image, rect, size]);
+  }, [canvasRef, image, rect, size, background]);
 }

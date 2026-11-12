@@ -1,7 +1,7 @@
 import { type LetterboxRect, pointerToImageFrac } from '@/lib/volume/letterbox';
 import { fracToVoxel, sliceIndex, voxelToFrac } from '@/lib/volume/plane';
 import type { ActiveMeasurement, MeasurementPoint, SlicePlane, VolumeCursor } from '@/types';
-import { useViewerStore } from '@/viewer';
+import { useViewerFeatures, useViewerStore } from '@/viewer';
 import { useCallback, useMemo, useState } from 'react';
 
 type PointerLike = { clientX: number; clientY: number };
@@ -46,6 +46,7 @@ export function useMeasurementInteraction(
   const setMeasurementFrom = useViewerStore((s) => s.setMeasurementFrom);
   const setMeasurementTo = useViewerStore((s) => s.setMeasurementTo);
   const clearMeasurement = useViewerStore((s) => s.clearMeasurement);
+  const { measure: enabled } = useViewerFeatures();
 
   const [menu, setMenu] = useState<MenuState | null>(null);
 
@@ -95,21 +96,23 @@ export function useMeasurementInteraction(
    */
   const beginDrag = useCallback(
     (event: PointerLike, canvas: HTMLCanvasElement, rect?: LetterboxRect | null) => {
-      const voxel = voxelAtPointer(event, canvas, rect);
+      const voxel = enabled ? voxelAtPointer(event, canvas, rect) : null;
       if (voxel) setMeasurementFrom(voxel);
     },
-    [voxelAtPointer, setMeasurementFrom],
+    [enabled, voxelAtPointer, setMeasurementFrom],
   );
 
   const updateDrag = useCallback(
     (event: PointerLike, canvas: HTMLCanvasElement, rect?: LetterboxRect | null) => {
-      const voxel = voxelAtPointer(event, canvas, rect);
+      const voxel = enabled ? voxelAtPointer(event, canvas, rect) : null;
       if (voxel) setMeasurementTo(voxel);
     },
-    [voxelAtPointer, setMeasurementTo],
+    [enabled, voxelAtPointer, setMeasurementTo],
   );
 
   return {
+    /** False when the host turned measuring off: the menu keeps only "View from this side". */
+    enabled,
     measurement,
     measureDots,
     menu,

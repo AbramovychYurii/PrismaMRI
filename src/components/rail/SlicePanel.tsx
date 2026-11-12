@@ -8,7 +8,7 @@ import {
   TrayButton,
 } from '@/components/rail/SlicePanelParts';
 import { SliceScrubber } from '@/components/rail/SliceScrubber';
-import { PLANE_FOOTER } from '@/constants';
+import { PLANE_AXIS_CODE } from '@/constants';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
 import { useHalfSlabs } from '@/hooks/useHalfSlabs';
 import { useSlicePanelCore } from '@/hooks/useSlicePanelCore';
@@ -19,7 +19,7 @@ import {
 } from '@/hooks/useSlicePanelGestures';
 import { useSlicePanelKeys } from '@/hooks/useSlicePanelKeys';
 import type { SlicePlane } from '@/types';
-import { useViewerEnvironment, useViewerLayout, useViewerStore } from '@/viewer';
+import { useViewerEnvironment, useViewerLabels, useViewerLayout, useViewerStore } from '@/viewer';
 import { ChevronsUpDown, Maximize2, Minimize2 } from 'lucide-react';
 import { useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -49,7 +49,7 @@ function ExpandedSlicePanel({ plane }: { plane: SlicePlane }) {
   const moveCrosshair = useCrosshairClick(core, plane);
   const dragHandlers = useShiftDragMeasurement(core, plane);
   const panelKeys = useSlicePanelKeys(core, plane);
-  const footer = PLANE_FOOTER[plane];
+  const hint = useViewerLabels().planes[plane].hint;
 
   const onClose = useCallback(() => setExpandedPlane(null), [setExpandedPlane]);
 
@@ -130,7 +130,8 @@ function ExpandedSlicePanel({ plane }: { plane: SlicePlane }) {
 
       <PanelFooter $scrubVisible={scrubVisible}>
         <span>
-          {footer.hint} · {footer.code} · SHIFT+DRAG · MEASURE
+          {hint} · {PLANE_AXIS_CODE[plane]}
+          {measure.enabled && ' · SHIFT+DRAG · MEASURE'}
         </span>
         {total > 0 && <SliceCount idx={idx} total={total} />}
       </PanelFooter>
@@ -144,6 +145,7 @@ function ExpandedSlicePanel({ plane }: { plane: SlicePlane }) {
 }
 
 function RailSlicePanel({ plane }: { plane: SlicePlane }) {
+  const labels = useViewerLabels();
   const isMobile = useViewerLayout() === 'mobile';
   const slabMm = useViewerStore((s) => s.slabMm);
   const halfSlabs = useHalfSlabs(plane, slabMm);
@@ -233,7 +235,7 @@ function RailSlicePanel({ plane }: { plane: SlicePlane }) {
 
       <PanelFooter $scrubVisible={scrubberVisible}>
         <span>
-          {PLANE_FOOTER[plane].hint} · {PLANE_FOOTER[plane].code}
+          {labels.planes[plane].hint} · {PLANE_AXIS_CODE[plane]}
         </span>
         {!isMobile && total > 0 && <SliceCount idx={idx} total={total} />}
       </PanelFooter>

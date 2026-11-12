@@ -1,7 +1,7 @@
-import { PLANE_LABEL } from '@/constants';
 import type { SlicePanelCore } from '@/hooks/useSlicePanelCore';
 import { type ScreenDirection, stepInPlane } from '@/lib/volume/plane';
 import type { SlicePlane } from '@/types';
+import { useViewerLabels } from '@/viewer';
 import { useCallback, useRef } from 'react';
 
 const ARROWS: Record<string, ScreenDirection> = {
@@ -38,6 +38,7 @@ export function useSlicePanelKeys(core: SlicePanelCore, plane: SlicePlane) {
   const { dims, cursor } = core.frame;
   const { openMenuAtCursor, onContextMenu: openMenuAtPointer } = core.measure;
   const openedByKeyAt = useRef(Number.NEGATIVE_INFINITY);
+  const planeName = useViewerLabels().planes[plane].name;
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLElement>) => {
@@ -87,7 +88,7 @@ export function useSlicePanelKeys(core: SlicePanelCore, plane: SlicePlane) {
   return {
     tabIndex: 0,
     role: 'group',
-    'aria-label': `${PLANE_LABEL[plane].primary} slice — up and down arrows step through slices, Shift and arrow keys move the crosshair, Shift+F10 opens the measure menu`,
+    'aria-label': `${planeName} slice — up and down arrows step through slices, Shift and arrow keys move the crosshair, Shift+F10 opens the measure menu`,
     'aria-keyshortcuts': SHORTCUTS,
     onKeyDown,
     onFocus,

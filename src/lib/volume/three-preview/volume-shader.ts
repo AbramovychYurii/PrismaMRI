@@ -567,6 +567,10 @@ export const VolumeShader = {
     u_activePlane: { value: 0 },
     /** Cursor position in voxel / texture space (same coords as u_size). */
     u_planePos: { value: new THREE.Vector3() },
+    /** Plane colours (linear 0..1 RGB), matching the slice-panel accents. */
+    u_planeCor: { value: new THREE.Vector3(1.0, 0.71, 0.278) },
+    u_planeSag: { value: new THREE.Vector3(0.71, 0.616, 0.82) },
+    u_planeAxi: { value: new THREE.Vector3(0.51, 0.659, 0.831) },
   },
 
   // ── Vertex ────────────────────────────────────────────────────────────────
@@ -602,6 +606,9 @@ export const VolumeShader = {
     uniform int       u_planeMode;
     uniform int       u_activePlane;
     uniform vec3      u_planePos;
+    uniform vec3      u_planeCor;
+    uniform vec3      u_planeSag;
+    uniform vec3      u_planeAxi;
     /** 0 = off, 1 = clip active plane (hide the camera-side half). */
     uniform int       u_clipMode;
     /** +1 = clip positive-axis side, -1 = clip negative-axis side.
@@ -643,10 +650,10 @@ export const VolumeShader = {
       vec3 V = -rayDir;
 
       // ── Plane intersection setup (shared by MIP and DVR) ─────────────────
-      // Colours match slice-panel accents (amber / violet / azure)
-      const vec3 P_COR = vec3(1.000, 0.710, 0.278);
-      const vec3 P_SAG = vec3(0.710, 0.616, 0.820);
-      const vec3 P_AXI = vec3(0.510, 0.659, 0.831);
+      // Colours match the slice-panel accents, set from the viewer's theme.
+      vec3 P_COR = u_planeCor;
+      vec3 P_SAG = u_planeSag;
+      vec3 P_AXI = u_planeAxi;
 
       bool showCor = u_planeMode == 2 || (u_planeMode == 1 && u_activePlane == 0);
       bool showSag = u_planeMode == 2 || (u_planeMode == 1 && u_activePlane == 1);

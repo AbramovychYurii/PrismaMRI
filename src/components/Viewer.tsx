@@ -1,6 +1,6 @@
 import { Dock } from '@/components/dock/Dock';
 import { MobileControlsView } from '@/components/mobile/MobileControlsView';
-import { MobileTabBar } from '@/components/mobile/MobileTabBar';
+import { MobileTabBar, isTabOffered } from '@/components/mobile/MobileTabBar';
 import { Rail } from '@/components/rail/Rail';
 import { SlicePanel } from '@/components/rail/SlicePanel';
 import { Stage } from '@/components/stage/Stage';
@@ -11,10 +11,14 @@ import {
   type ViewerLayout,
   ViewerProvider,
   type ViewerSlots,
+  useViewerFeatures,
   useViewerStore,
 } from '@/viewer';
+import { type ViewerFeatures, resolveFeatures } from '@/viewer/features';
+import { type ViewerLabelsInput, resolveLabels } from '@/viewer/labels';
 import { type ViewerLayoutMode, useContainerLayout } from '@/viewer/layout';
-import { type CSSProperties, useState } from 'react';
+import { type ViewerThemeInput, resolveTheme, themeCssVars } from '@/viewer/theme';
+import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import styled from 'styled-components';
 
 export interface ViewerProps {
@@ -27,8 +31,17 @@ export interface ViewerProps {
    * `null` turns them off.
    */
   keyboardTarget?: EventTarget | null;
-  /** Where menus and tooltips are portalled. Defaults to the page body. */
+  /**
+   * Where menus and tooltips are portalled. Defaults to the page body. They
+   * render inside a wrapper there that carries the viewer's theme and layout.
+   */
   portalContainer?: Element;
+  /** Any part of the theme; the rest stays default. Keep the object stable. */
+  theme?: ViewerThemeInput;
+  /** Turn parts of the viewer off; everything is on by default. Keep the object stable. */
+  features?: Partial<ViewerFeatures>;
+  /** Any of the viewer's words, to translate or rename. Keep the object stable. */
+  labels?: ViewerLabelsInput;
   /** Keep the object stable (module-level or memoised). */
   slots?: ViewerSlots;
   /** Offered as "Back" in the session panel. */
@@ -102,18 +115,21 @@ const MobileControlsWrap = styled.div`
 `;
 
 function DesktopViewer() {
-  const railOpen = useViewerStore((s) => s.toolbar.rail);
+  const features = useViewerFeatures();
+  const railOpen = useViewerStore((s) => s.toolbar.rail) && features.rail;
   return (
     <DesktopGrid $railOpen={railOpen}>
       <Stage />
-      <Rail />
-      <Dock />
+      {features.rail && <Rail />}
+      {features.dock && <Dock />}
     </DesktopGrid>
   );
 }
 
 function MobileViewer() {
-  const mobileTab = useViewerStore((s) => s.mobileTab);
+  const features = useViewerFeatures();
+  const storedTab = useViewerStore((s) => s.mobileTab);
+  const mobileTab = isTabOffered(storedTab, features) ? storedTab : '3d';
   const volumeLoaded = useViewerStore((s) => s.volume !== null);
   return (
     <MobileColumn>
@@ -144,9 +160,55 @@ function MobileViewer() {
   );
 }
 
-/** The debounced W/L commit and the plane keys — one set per viewer. */
+/**
+ * A wrapper for this viewer's menus and tooltips inside `host`: portalled
+ * content sits outside the viewer's root, so it gets the theme variables and
+ * the layout attribute from here instead.
+ */
+function usePortalRoot(
+  host: Element | undefined,
+  vars: Record<string, string>,
+  layout: ViewerLayout | null,
+): HTMLDivElement | null {
+  const [portalRoot, setPortalRoot] = useState<HTMLDivElement | null>(null);
+
+  useLayoutEffect(() => {
+    const el = document.createElement('div');
+    el.className = 'pmri-portal';
+    (host ?? document.body).appendChild(el);
+    setPortalRoot(el);
+    return () => {
+      el.remove();
+      setPortalRoot(null);
+    };
+  }, [host]);
+
+  useLayoutEffect(() => {
+    if (!portalRoot) return;
+    for (const [name, value] of Object.entries(vars)) portalRoot.style.setProperty(name, value);
+    if (layout) portalRoot.dataset.layout = layout;
+  }, [portalRoot, vars, layout]);
+
+  return portalRoot;
+}
+
+/**
+ * Keeps the render preset among those offered — a fresh load starts on MIP,
+ * which a host may have left out.
+ */
+function useOfferedPreset(): void {
+  const { renderPresets } = useViewerFeatures();
+  const preset = useViewerStore((s) => s.renderPreset);
+  const setRenderPreset = useViewerStore((s) => s.setRenderPreset);
+  useEffect(() => {
+    if (!renderPresets.includes(preset)) setRenderPreset(renderPresets[0]);
+  }, [renderPresets, preset, setRenderPreset]);
+}
+
+/** The debounced W/L commit, the plane keys and the preset rule — one set per viewer. */
 function ViewerEffects() {
   useViewerStoreEffects();
+  useOfferedPreset();
   return null;
 }
 
@@ -159,6 +221,9 @@ export function Viewer({
   layout: layoutMode = 'auto',
   keyboardTarget,
   portalContainer,
+  theme: themeInput,
+  features: featuresInput,
+  labels: labelsInput,
   slots,
   onExit,
   className,
@@ -166,6 +231,12 @@ export function Viewer({
 }: ViewerProps) {
   const [root, setRoot] = useState<HTMLDivElement | null>(null);
   const layout: ViewerLayout | null = useContainerLayout(root, layoutMode);
+  const theme = useMemo(() => resolveTheme(themeInput), [themeInput]);
+  const vars = useMemo(() => themeCssVars(theme), [theme]);
+  const features = useMemo(() => resolveFeatures(featuresInput), [featuresInput]);
+  const labels = useMemo(() => resolveLabels(labelsInput), [labelsInput]);
+  const rootStyle = useMemo(() => ({ ...vars, ...style }) as CSSProperties, [vars, style]);
+  const portalRoot = usePortalRoot(portalContainer, vars, layout);
 
   return (
     <ViewerRoot
@@ -173,15 +244,18 @@ export function Viewer({
       tabIndex={-1}
       data-layout={layout ?? undefined}
       className={className}
-      style={style}
+      style={rootStyle}
     >
-      {root && layout && (
+      {root && layout && portalRoot && (
         <ViewerProvider
           viewer={viewer}
           keyboardTarget={keyboardTarget === undefined ? root : keyboardTarget}
-          portalContainer={portalContainer}
+          portalContainer={portalRoot}
           layout={layout}
           rootElement={root}
+          theme={theme}
+          features={features}
+          labels={labels}
           slots={slots}
           onExit={onExit}
         >

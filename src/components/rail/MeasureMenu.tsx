@@ -1,6 +1,6 @@
-import { accentRgba } from '@/constants';
 import { useMenuKeyboard } from '@/hooks/useMenuKeyboard';
 import { usePortalContainer } from '@/viewer';
+import { accentAlpha } from '@/viewer/theme';
 import { Eye, MapPin, Ruler, Trash2 } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
@@ -46,7 +46,7 @@ const DangerItem = styled(Item)`
   color: var(--ink-3);
 
   &:hover {
-    background: ${accentRgba('amber', 0.08)};
+    background: ${accentAlpha('amber', 0.08)};
     color: var(--amber);
   }
 `;
@@ -60,6 +60,8 @@ const Divider = styled.div`
 interface Props {
   x: number;
   y: number;
+  /** False when measuring is turned off: only "View from this side" remains. */
+  canMeasure: boolean;
   hasMeasurementFrom: boolean;
   onMeasureFrom: () => void;
   onMeasureTo: () => void;
@@ -71,7 +73,8 @@ interface Props {
 export function MeasureMenu({
   x,
   y,
-  hasMeasurementFrom,
+  canMeasure,
+  hasMeasurementFrom: hasFrom,
   onMeasureFrom,
   onMeasureTo,
   onSnapToView,
@@ -84,7 +87,8 @@ export function MeasureMenu({
   // Clamp to viewport so menu never overflows edge — items: measure-from (+
   // optional measure-to) → divider → view-from-here → optional clear group.
   const menuW = 200;
-  const baseH = 44 + 8 + 36; // measure-from + divider + view-from-here
+  const hasMeasurementFrom = canMeasure && hasFrom;
+  const baseH = canMeasure ? 44 + 8 + 36 : 44; // measure-from + divider + view-from-here
   const menuH = hasMeasurementFrom ? baseH + 36 + 8 + 36 : baseH;
   const safeX = Math.min(x, window.innerWidth - menuW - 8);
   const safeY = Math.min(y, window.innerHeight - menuH - 8);
@@ -113,17 +117,21 @@ export function MeasureMenu({
       style={{ left: safeX, top: safeY }}
       onClick={(e) => e.stopPropagation()}
     >
-      <Item type="button" role="menuitem" tabIndex={-1} onClick={wrap(onMeasureFrom)}>
-        <MapPin size={12} />
-        Measure from here
-      </Item>
-      {hasMeasurementFrom && (
-        <Item type="button" role="menuitem" tabIndex={-1} onClick={wrap(onMeasureTo)}>
-          <Ruler size={12} />
-          Measure to here
-        </Item>
+      {canMeasure && (
+        <>
+          <Item type="button" role="menuitem" tabIndex={-1} onClick={wrap(onMeasureFrom)}>
+            <MapPin size={12} />
+            Measure from here
+          </Item>
+          {hasMeasurementFrom && (
+            <Item type="button" role="menuitem" tabIndex={-1} onClick={wrap(onMeasureTo)}>
+              <Ruler size={12} />
+              Measure to here
+            </Item>
+          )}
+          <Divider aria-hidden />
+        </>
       )}
-      <Divider aria-hidden />
       <Item type="button" role="menuitem" tabIndex={-1} onClick={wrap(onSnapToView)}>
         <Eye size={12} />
         View from this side

@@ -3,7 +3,7 @@ import { StageAlert } from '@/components/stage/StageAlert';
 import { StageSeriesSelect } from '@/components/stage/StageSeriesSelect';
 import { ToolbarPill } from '@/components/stage/ToolbarPill';
 import { useThreePreview } from '@/hooks/useThreePreview';
-import { useViewerHost, useViewerStore } from '@/viewer';
+import { useViewerHost, useViewerLabels, useViewerStore } from '@/viewer';
 import { useEffect, useRef } from 'react';
 import styled, { css } from 'styled-components';
 
@@ -103,6 +103,7 @@ export function Stage() {
   const focus = useViewerStore((s) => s.toolbar.focus);
   const hasVolume = useViewerStore((s) => s.prepared3D !== null);
   const { slots } = useViewerHost();
+  const labels = useViewerLabels();
 
   // Focus mode is left by its own button, which is not shown without a 3-D
   // view — and the mode is kept across reloads — so leave it here instead of
@@ -115,15 +116,12 @@ export function Stage() {
     <StageSection $focus={focus} data-testid="stage-section">
       <StageCanvas ref={canvasRef} data-testid="stage-canvas" />
       {status === 'ready' && !hasVolume && (
-        <NoVolumePlaceholder>No volume loaded</NoVolumePlaceholder>
+        <NoVolumePlaceholder>{labels.stage.noVolume}</NoVolumePlaceholder>
       )}
       {status === 'unavailable' && (
         <StageMessage>
-          <StageMessageTitle>3D view unavailable</StageMessageTitle>
-          <StageMessageHint>
-            This browser or device can't run WebGL 2, which the 3D view needs. The slice panels
-            still work.
-          </StageMessageHint>
+          <StageMessageTitle>{labels.stage.unavailableTitle}</StageMessageTitle>
+          <StageMessageHint>{labels.stage.unavailableHint}</StageMessageHint>
         </StageMessage>
       )}
       {/* Always mounted, empty while the view is fine: a live region added
@@ -131,10 +129,8 @@ export function Stage() {
       <StageMessage as="output">
         {status === 'context-lost' && (
           <>
-            <StageMessageTitle>3D view interrupted</StageMessageTitle>
-            <StageMessageHint>
-              The graphics driver was reset. The view comes back by itself once it recovers.
-            </StageMessageHint>
+            <StageMessageTitle>{labels.stage.contextLostTitle}</StageMessageTitle>
+            <StageMessageHint>{labels.stage.contextLostHint}</StageMessageHint>
           </>
         )}
       </StageMessage>

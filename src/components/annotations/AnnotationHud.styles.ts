@@ -6,6 +6,7 @@
  *   • Expanded card (Card, AccentBar, Body, TopRow, …, Footer)
  */
 
+import { withAlpha } from '@/viewer/theme';
 import styled, { css, keyframes } from 'styled-components';
 
 export const SIDE_OFFSET = 30;
@@ -141,8 +142,8 @@ export const SeverityChip = styled.span<{ $color: string }>`
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: ${({ $color }) => $color};
-  border: 1px solid ${({ $color }) => `${$color}66`};
-  background: ${({ $color }) => `${$color}14`};
+  border: 1px solid ${({ $color }) => withAlpha($color, 0.4)};
+  background: ${({ $color }) => withAlpha($color, 0.078)};
   padding: 3px 8px;
   border-radius: 999px;
   flex-shrink: 0;
