@@ -33,7 +33,7 @@ const Wrap = styled.div`
     color: var(--ink);
   }
 
-  @media (max-width: 767px) {
+  [data-layout='mobile'] & {
     top: 12px;
     left: 12px;
     height: 40px;

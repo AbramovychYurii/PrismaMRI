@@ -3,6 +3,7 @@ export {
   type AnnotationActionContext,
   type ViewerEnvironment,
   type ViewerHost,
+  type ViewerLayout,
   type ViewerSlots,
   ViewerProvider,
   type ViewerProviderProps,
@@ -10,6 +11,7 @@ export {
   useViewer,
   useViewerEnvironment,
   useViewerHost,
+  useViewerLayout,
   useViewerStore,
   useViewerStoreApi,
   useViewerSurfaces,
@@ -31,3 +33,4 @@ export {
   isAbort,
 } from './loader';
 export type { ViewerSurfaces } from './surfaces';
+export { MOBILE_MAX_WIDTH, type ViewerLayoutMode, useContainerLayout } from './layout';

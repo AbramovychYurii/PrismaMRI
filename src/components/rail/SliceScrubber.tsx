@@ -39,7 +39,7 @@ const ChevronBtn = styled.button<{
   transform: ${({ $pressed }) => ($pressed ? 'scale(0.94)' : 'none')};
   transition: ${({ $reduced }) => ($reduced ? 'none' : 'transform 80ms ease')};
 
-  @media (max-width: 767px) {
+  [data-layout='mobile'] & {
     width: 36px;
     height: 36px;
     border-radius: 6px;

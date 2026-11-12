@@ -69,7 +69,12 @@ function RunCell({
   );
 }
 
-export function RunStrip() {
+/**
+ * One line of what is open: scanner, volume size, spacing, modality and the
+ * current measurement. Part of the viewer, placed by the host — PrismaMRI puts
+ * it in its header.
+ */
+export function StatusStrip() {
   const volume = useViewerStore((s) => s.volume);
   const measurement = useViewerStore((s) => s.measurement);
   const meta = volume?.meta;

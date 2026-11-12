@@ -5,6 +5,9 @@ import type { ViewerSurfaces } from '@/viewer/surfaces';
 import { type ReactNode, createContext, useContext, useMemo } from 'react';
 import { useStore } from 'zustand';
 
+/** Which arrangement the viewer is drawn in: rail beside the stage, or tabs. */
+export type ViewerLayout = 'desktop' | 'mobile';
+
 export interface ViewerEnvironment {
   /**
    * Where the viewer listens for its keyboard shortcuts (↑/↓ step, 1/2/3
@@ -13,8 +16,15 @@ export interface ViewerEnvironment {
    * shortcuts off.
    */
   keyboardTarget: EventTarget | null;
-  /** Where menus, tooltips and the fullscreen panel are portalled. */
+  /** Where menus and tooltips are portalled. */
   portalContainer: Element;
+  layout: ViewerLayout;
+  /**
+   * The element the viewer is drawn in, once mounted. Overlays that must stay
+   * inside the viewer (the fullscreen slice panel) render here, and lookups
+   * that must not reach another viewer on the page are scoped to it.
+   */
+  rootElement: HTMLElement | null;
 }
 
 /** The finding a navigator action is rendered for. */
@@ -67,6 +77,8 @@ export function ViewerProvider({
   viewer,
   keyboardTarget = typeof window === 'undefined' ? null : window,
   portalContainer = document.body,
+  layout = 'desktop',
+  rootElement = null,
   slots = NO_SLOTS,
   onExit,
   children,
@@ -74,8 +86,8 @@ export function ViewerProvider({
   // Every hook below reads this context, so a fresh object per render would
   // re-render every consumer whenever the provider's parent does.
   const value = useMemo(
-    () => ({ viewer, keyboardTarget, portalContainer, slots, onExit }),
-    [viewer, keyboardTarget, portalContainer, slots, onExit],
+    () => ({ viewer, keyboardTarget, portalContainer, layout, rootElement, slots, onExit }),
+    [viewer, keyboardTarget, portalContainer, layout, rootElement, slots, onExit],
   );
   return <ViewerContext.Provider value={value}>{children}</ViewerContext.Provider>;
 }
@@ -120,6 +132,10 @@ export function useViewerHost(): ViewerHost {
 }
 
 export function useViewerEnvironment(): ViewerEnvironment {
-  const { keyboardTarget, portalContainer } = useViewerContext();
-  return { keyboardTarget, portalContainer };
+  const { keyboardTarget, portalContainer, layout, rootElement } = useViewerContext();
+  return { keyboardTarget, portalContainer, layout, rootElement };
+}
+
+export function useViewerLayout(): ViewerLayout {
+  return useViewerContext().layout;
 }

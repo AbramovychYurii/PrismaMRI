@@ -45,7 +45,7 @@ const ToggleButton = styled.button<{
   $hover: boolean;
   $reduced: boolean;
 }>`
-  position: fixed;
+  position: absolute;
   bottom: ${({ $open }) => ($open ? DOCK_H + 10 : 10)}px;
   left: 50%;
   transform: translateX(-50%);
@@ -76,7 +76,7 @@ const ChevronWrap = styled.span<{ $open: boolean; $reduced: boolean }>`
 `;
 
 const DockPanel = styled.div<{ $open: boolean; $reduced: boolean }>`
-  position: fixed;
+  position: absolute;
   bottom: 0;
   left: 0;
   right: 0;

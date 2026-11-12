@@ -25,7 +25,7 @@ const TriggerBtn = styled.button<{ $on: boolean; $hover: boolean }>`
   transition: 120ms;
   -webkit-tap-highlight-color: transparent;
 
-  @media (max-width: 767px) {
+  [data-layout='mobile'] & {
     padding: 14px 14px;
     min-width: 44px;
     min-height: 44px;
