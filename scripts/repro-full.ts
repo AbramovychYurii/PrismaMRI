@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { unzipSync } from 'fflate';
-import { dicomAdapter } from '@/lib/import/adapters/dicom/adapter';
-import type { ImportSource } from '@/lib/import/types';
-import { prepareVolumeFor3D } from '@/lib/volume/preview-3d';
-import { buildScalarHistogram, resolveHistogramWindowLevel } from '@/workers/volume/scalars';
+import { dicomAdapter } from '@/viewer-core/import/adapters/dicom/adapter';
+import type { ImportSource } from '@/viewer-core/import/types';
+import { prepareVolumeFor3D } from '@/viewer-core/volume/preview-3d';
+import { buildScalarHistogram, resolveHistogramWindowLevel } from '@/viewer-core/worker/volume/scalars';
 
 const ZIP = '/Users/yurii/Desktop/Yurii_Abramovych_Head_Neck_DICOM.zip';
 

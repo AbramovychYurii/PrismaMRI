@@ -1,9 +1,7 @@
 import { BrandBlock } from '@/components/header/BrandBlock';
-import { StatusStrip } from '@/components/status/StatusStrip';
-import { Tooltip } from '@/components/ui/Tooltip';
 import { useViewerActions } from '@/hooks/ViewerActionsContext';
 import { usePwaInstall } from '@/hooks/usePwaInstall';
-import { accentAlpha, useViewerStore } from '@/viewer';
+import { StatusStrip, Tooltip, accentAlpha, useViewerStore } from '@prisma-mri/viewer-react';
 import { MonitorDown } from 'lucide-react';
 import styled from 'styled-components';
 

@@ -1,7 +1,7 @@
 import { type DirPickerWindow, IMPORT_ACCEPT, pickFiles } from '@/lib/file-pickers';
-import { fromDirectoryHandle, fromFileList } from '@/lib/import/scan-folder';
 import * as volumeDb from '@/lib/volumeDb';
-import { isAbort, useViewer, useViewerStore } from '@/viewer';
+import { fromDirectoryHandle, fromFileList } from '@prisma-mri/viewer-core';
+import { isAbort, useViewer, useViewerStore } from '@prisma-mri/viewer-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 

@@ -17,7 +17,11 @@
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
-    "paths": { "@/*": ["src/*"] },
+    "paths": {
+      "@prisma-mri/viewer-core": ["src/viewer-core/index.ts"],
+      "@prisma-mri/viewer-react": ["src/viewer-react/index.ts"],
+      "@/*": ["src/*"]
+    },
     "types": ["vite/client"],
     "noEmit": true
   },

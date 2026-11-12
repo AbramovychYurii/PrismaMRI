@@ -1,0 +1,146 @@
+import { type SlicePlane, clamp, sliceAxis, sliceCount } from '@prisma-mri/viewer-core';
+import { useCallback, useEffect, useRef } from 'react';
+import {
+  type ViewerStore,
+  useViewerEnvironment,
+  useViewerStore,
+  useViewerStoreApi,
+} from '../viewer';
+
+/** Moves the cursor `steps` slices along `plane`. Returns false when no volume is open. */
+function stepSlice(store: ViewerStore, plane: SlicePlane, steps: number): boolean {
+  const { volume, cursor, setCursor } = store.getState();
+  if (!volume || !cursor) return false;
+  const axis = sliceAxis(plane);
+  const next = clamp(cursor[axis] + steps, 0, sliceCount(volume.meta.dims, plane) - 1);
+  if (next === cursor[axis]) return true;
+  setCursor({ ...cursor, [axis]: next });
+  return true;
+}
+
+/** Pixels of wheel delta per slice — roughly one mouse-wheel notch. */
+const WHEEL_PX_PER_STEP = 28;
+
+const DELTA_MODE_SCALE = [1, 16, 100];
+
+/**
+ * Whole slice steps contained in `delta`, plus the sub-step remainder to carry
+ * into the next frame.
+ *
+ * Deliberately uncapped. Moving three slices and moving thirty cost exactly the
+ * same — one cursor update, one extraction, one repaint — because the slices in
+ * between are never drawn. Capping bought no time; it only made a deep study
+ * crawl (a 996-slice scan took ~5 s of solid scrolling to cross) and left the
+ * unspent remainder creeping onward after the wheel had stopped.
+ */
+export function stepsFromWheelDelta(
+  delta: number,
+  pxPerStep: number = WHEEL_PX_PER_STEP,
+): { steps: number; remainder: number } {
+  const steps = Math.trunc(delta / pxPerStep);
+  return { steps, remainder: delta - steps * pxPerStep };
+}
+
+/**
+ * Wheel handler for slice navigation. Trackpads emit ~120 events/s, far more
+ * than three canvases can repaint, so deltas accumulate and flush at most once
+ * per frame. The remainder is carried over, letting slow scrolls cross the
+ * threshold exactly once instead of ping-ponging.
+ */
+export function useSliceScroll(plane: SlicePlane) {
+  const store = useViewerStoreApi();
+  const accumulated = useRef(0);
+  const rafId = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (rafId.current !== null) cancelAnimationFrame(rafId.current);
+      rafId.current = null;
+      accumulated.current = 0;
+    };
+  }, []);
+
+  return useCallback(
+    (e: React.WheelEvent) => {
+      accumulated.current += e.deltaY * (DELTA_MODE_SCALE[e.deltaMode] ?? 1);
+      if (rafId.current !== null) return;
+
+      rafId.current = requestAnimationFrame(() => {
+        rafId.current = null;
+        const { steps, remainder } = stepsFromWheelDelta(accumulated.current);
+        if (steps === 0) return;
+
+        // Keep only the sub-step remainder, so movement ends when the wheel does.
+        accumulated.current = remainder;
+        if (!stepSlice(store, plane, steps)) accumulated.current = 0;
+      });
+    },
+    [store, plane],
+  );
+}
+
+/** Adds a keydown listener to `target`; returns the matching cleanup. */
+function listenForKeys(target: EventTarget, onKey: (e: KeyboardEvent) => void): () => void {
+  const listener = (e: Event) => onKey(e as KeyboardEvent);
+  target.addEventListener('keydown', listener);
+  return () => target.removeEventListener('keydown', listener);
+}
+
+const PLANE_FOCUS_KEYS: Record<string, SlicePlane> = {
+  '1': 'coronal',
+  '2': 'sagittal',
+  '3': 'axial',
+};
+
+/**
+ * 1 / 2 / 3 focus the coronal / sagittal / axial plane — the same focus that
+ * arrow stepping and the crosshair act on. Modifier combos and text fields are
+ * left alone.
+ */
+export function usePlaneFocusKeys(): void {
+  const store = useViewerStoreApi();
+  const { keyboardTarget } = useViewerEnvironment();
+
+  useEffect(() => {
+    if (!keyboardTarget) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      const plane = PLANE_FOCUS_KEYS[e.key];
+      if (!plane) return;
+      const { volume, setActivePlane } = store.getState();
+      if (!volume) return;
+      e.preventDefault();
+      setActivePlane(plane);
+    };
+    return listenForKeys(keyboardTarget, onKey);
+  }, [store, keyboardTarget]);
+}
+
+const CONTROLS_WITH_ARROWS =
+  'input, textarea, select, [role="slider"], [role="menu"], [role="tablist"], [role="listbox"]';
+
+/** ↑/↓ stepping of the active plane by ±1 slice, wherever the viewer listens for keys. */
+export function useActivePlaneKeys(): void {
+  const store = useViewerStoreApi();
+  const { keyboardTarget } = useViewerEnvironment();
+  const activePlane = useViewerStore((s) => s.activePlane);
+
+  useEffect(() => {
+    if (!activePlane || !keyboardTarget) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      // Modified arrows belong to others (Shift moves the crosshair in a
+      // focused slice panel), and so do arrows a control already handles or
+      // that have a meaning of their own there — a range input, a menu, tabs.
+      if (e.shiftKey || e.altKey || e.metaKey || e.ctrlKey || e.defaultPrevented) return;
+      if (e.target instanceof Element && e.target.closest(CONTROLS_WITH_ARROWS)) return;
+      const { volume, cursor } = store.getState();
+      if (!volume || !cursor) return;
+      e.preventDefault();
+      stepSlice(store, activePlane, e.key === 'ArrowUp' ? 1 : -1);
+    };
+    return listenForKeys(keyboardTarget, onKey);
+  }, [store, keyboardTarget, activePlane]);
+}

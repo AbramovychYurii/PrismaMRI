@@ -8,7 +8,7 @@
  * body sections (How it works, Capabilities, Prompt, Copy).
  */
 
-import { DOCK_H } from '@/components/dock/Dock';
+import { DOCK_H } from '@prisma-mri/viewer-react';
 import styled, { keyframes } from 'styled-components';
 
 export type BtnState = 'idle' | 'ok' | 'err';

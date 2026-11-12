@@ -6,8 +6,8 @@
  * Renders into document.body via a portal. Esc and backdrop-click cancel.
  */
 
-import { useFocusTrap } from '@/hooks/useFocusTrap';
-import type { SeriesChoice } from '@/lib/import/types';
+import type { SeriesChoice } from '@prisma-mri/viewer-core';
+import { useFocusTrap } from '@prisma-mri/viewer-react';
 import { Layers, X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';

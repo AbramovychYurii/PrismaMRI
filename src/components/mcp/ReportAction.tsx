@@ -1,6 +1,5 @@
-import { AnnotationActionButton } from '@/components/annotations/AnnotationHud';
 import { ReportModal } from '@/components/mcp/ReportModal';
-import type { AnnotationActionContext } from '@/viewer';
+import { AnnotationActionButton, type AnnotationActionContext } from '@prisma-mri/viewer-react';
 import { FileText } from 'lucide-react';
 import { useState } from 'react';
 

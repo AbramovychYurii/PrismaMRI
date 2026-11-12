@@ -1,4 +1,9 @@
-import type { LoadedVolume, PreparedVolumeFor3D, Vec3, VolumeHistogram } from '@/types';
+import type {
+  LoadedVolume,
+  PreparedVolumeFor3D,
+  Vec3,
+  VolumeHistogram,
+} from '@prisma-mri/viewer-core';
 
 const DB_NAME = 'prisma-mri';
 const DB_VERSION = 1;

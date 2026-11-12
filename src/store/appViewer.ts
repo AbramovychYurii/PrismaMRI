@@ -1,6 +1,6 @@
 import * as annotationsStorage from '@/lib/annotationsStorage';
 import { createThrottledStorage } from '@/lib/throttledStorage';
-import { createViewer } from '@/viewer';
+import { createViewer } from '@prisma-mri/viewer-react';
 
 /**
  * The PrismaMRI app's one viewer. UI state goes to sessionStorage — per tab,

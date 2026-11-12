@@ -15,7 +15,7 @@
  *  3. Add a new entry below with the recorded annotations array.
  */
 
-import type { Annotation } from '@/types';
+import type { Annotation } from '@prisma-mri/viewer-core';
 
 /** Annotations recorded for a specific demo volume. */
 export interface SampleReport {

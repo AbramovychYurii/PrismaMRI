@@ -1,5 +1,5 @@
 import { QUOTA_SHARE, fitsInQuota, recordBuffer, recordBytes } from '@/lib/volumeDb';
-import type { LoadedVolume, PreparedVolumeFor3D, VolumeHistogram } from '@/types';
+import type { LoadedVolume, PreparedVolumeFor3D, VolumeHistogram } from '@prisma-mri/viewer-core';
 import { describe, expect, it } from 'vitest';
 
 const MB = 1e6;

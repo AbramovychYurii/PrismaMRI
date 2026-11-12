@@ -6,7 +6,7 @@
  * here is just data + protocol tuning knobs.
  */
 
-import type { AnnotationSeverity } from '@/types';
+import type { AnnotationSeverity } from '@prisma-mri/viewer-core';
 
 /** Ports the MCP server tries in order. Must match mcp-server/src/index.ts. */
 export const LOCAL_PORTS = [7389, 7390, 7391, 7392, 7393] as const;

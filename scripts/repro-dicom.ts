@@ -3,7 +3,7 @@ import { unzipSync } from 'fflate';
 import {
   parseImplicitLittleEndianDicom,
   sortDicomSlices,
-} from '../src/lib/import/adapters/dicom/reader';
+} from '../src/viewer-core/import/adapters/dicom/reader';
 
 const ZIP = '/Users/yurii/Desktop/Yurii_Abramovych_Head_Neck_DICOM.zip';
 

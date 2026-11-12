@@ -1,6 +1,12 @@
-import { clamp } from '@/lib/volume/math';
 import {
+  type Annotation,
+  type LoadedVolume,
+  type MeasurementPoint,
+  type SlicePlane,
+  type VolumeCursor,
+  clamp,
   clampToDims,
+  extractSliceGrayImage,
   fracToVoxel,
   slabHalfSlices,
   sliceAxis,
@@ -8,11 +14,8 @@ import {
   sliceIndex,
   sliceNumber,
   volumeCenter,
-} from '@/lib/volume/plane';
-import { extractSliceGrayImage } from '@/lib/volume/slices';
-import type { Annotation, LoadedVolume, MeasurementPoint, SlicePlane, VolumeCursor } from '@/types';
-import type { Viewer } from '@/viewer';
-import type { ViewerStoreState } from '@/viewer/store';
+} from '@prisma-mri/viewer-core';
+import type { ViewerInstance, ViewerStoreState } from '@prisma-mri/viewer-react';
 
 import { captureCanvas, renderSliceForMcp, waitForPaint } from './canvas-utils';
 import { MCP_JPEG_QUALITY, MCP_MAX_EDGE, WL_PRESETS } from './constants';
@@ -36,7 +39,7 @@ export interface HandlerContext {
   ok: (data?: unknown) => void;
   fail: (error: string) => void;
   /** The viewer the command acts on. */
-  viewer: Viewer;
+  viewer: ViewerInstance;
 }
 
 export type Handler = (ctx: HandlerContext) => void | Promise<void>;
@@ -47,7 +50,7 @@ type LoadedState = ViewerStoreState & { volume: LoadedVolume; cursor: VolumeCurs
  * Reports "No volume loaded" and returns null unless a volume is open. The
  * store only ever sets a cursor alongside a volume, so both are narrowed here.
  */
-function requireLoaded(viewer: Viewer, fail: (error: string) => void): LoadedState | null {
+function requireLoaded(viewer: ViewerInstance, fail: (error: string) => void): LoadedState | null {
   const state = viewer.store.getState();
   if (!state.volume || !state.cursor) {
     fail('No volume loaded');

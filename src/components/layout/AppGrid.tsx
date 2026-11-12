@@ -1,10 +1,15 @@
-import { Viewer } from '@/components/Viewer';
 import { BrandBlock } from '@/components/header/BrandBlock';
 import { Header } from '@/components/header/Header';
-import { Tooltip } from '@/components/ui/Tooltip';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { usePwaInstall } from '@/hooks/usePwaInstall';
-import { type ViewerSlots, accentAlpha, useViewer, useViewerStore } from '@/viewer';
+import {
+  Tooltip,
+  Viewer,
+  type ViewerSlots,
+  accentAlpha,
+  useViewer,
+  useViewerStore,
+} from '@prisma-mri/viewer-react';
 import { MonitorDown } from 'lucide-react';
 import styled from 'styled-components';
 

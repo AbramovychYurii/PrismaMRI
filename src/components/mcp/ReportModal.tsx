@@ -9,16 +9,23 @@
  * glue and the preview JSX.
  */
 
-import { AuroraSparkles } from '@/components/ui/AuroraSparkles';
-import { SEVERITY_HEX } from '@/constants';
-import { useFocusTrap } from '@/hooks/useFocusTrap';
-import { downloadBlob } from '@/lib/download';
 import { waitForPaint } from '@/lib/mcp/canvas-utils';
 import { type Capture, annotateCanvas, captureRaw } from '@/lib/report/capture';
-import { sliceNumber } from '@/lib/volume/plane';
-import { intensityUnit } from '@/lib/volume/units';
-import type { Annotation, SlicePlane } from '@/types';
-import { defaultLabels, useViewerStore, useViewerSurfaces } from '@/viewer';
+import {
+  type Annotation,
+  type SlicePlane,
+  intensityUnit,
+  sliceNumber,
+} from '@prisma-mri/viewer-core';
+import {
+  AuroraSparkles,
+  SEVERITY_HEX,
+  defaultLabels,
+  downloadBlob,
+  useFocusTrap,
+  useViewerStore,
+  useViewerSurfaces,
+} from '@prisma-mri/viewer-react';
 import { Download, FileText, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';

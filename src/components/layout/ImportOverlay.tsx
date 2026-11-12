@@ -7,13 +7,13 @@
  * All visual styling lives in `ImportOverlay.styles.ts`.
  */
 
+import { APP_NAME } from '@/brand';
 import { SeriesPickerModal } from '@/components/import/SeriesPickerModal';
 import { ExamplesSection } from '@/components/layout/ExamplesSection';
-import { APP_NAME } from '@/constants';
 import { useViewerActions } from '@/hooks/ViewerActionsContext';
-import { type FsEntry, collectFilesFromEntry } from '@/lib/import/scan-folder';
 import { loadViewerPage } from '@/pages/loadViewerPage';
-import { useViewer, useViewerStore } from '@/viewer';
+import { type FsEntry, collectFilesFromEntry } from '@prisma-mri/viewer-core';
+import { useViewer, useViewerStore } from '@prisma-mri/viewer-react';
 import { FolderOpen, Github } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {

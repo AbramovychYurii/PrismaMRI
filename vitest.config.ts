@@ -18,7 +18,11 @@ const root = path.dirname(fileURLToPath(import.meta.url));
  */
 export default defineConfig({
   resolve: {
-    alias: { '@': path.resolve(root, 'src') },
+    alias: {
+      '@prisma-mri/viewer-core': path.resolve(root, 'src/viewer-core/index.ts'),
+      '@prisma-mri/viewer-react': path.resolve(root, 'src/viewer-react/index.ts'),
+      '@': path.resolve(root, 'src'),
+    },
   },
   test: {
     environment: 'node',

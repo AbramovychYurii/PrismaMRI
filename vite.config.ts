@@ -120,11 +120,26 @@ export default defineConfig({
     }),
   ],
   resolve: {
+    // The viewer packages resolve to their sources until they move into
+    // their own workspaces (stage 3).
     alias: {
+      "@prisma-mri/viewer-core": path.resolve(root, "src/viewer-core/index.ts"),
+      "@prisma-mri/viewer-react": path.resolve(root, "src/viewer-react/index.ts"),
       "@": path.resolve(root, "src"),
     },
   },
   worker: { format: "es" },
+  build: {
+    rollupOptions: {
+      // What `"sideEffects": ["**/*.css"]` in the packages' package.json will
+      // say once they are packages: their JS modules have no side effects, so
+      // a re-export the import screen does not use (the 3-D view, three.js)
+      // stays in the lazily loaded viewer chunk instead of the entry.
+      treeshake: {
+        moduleSideEffects: (id) => !/\/src\/viewer-(core|react)\/.*\.tsx?$/.test(id),
+      },
+    },
+  },
   server: {
     host: true,
     port: Number.isFinite(port) && port > 0 ? port : 5173,
