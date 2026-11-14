@@ -57,6 +57,21 @@ export interface ThreePreviewOptions {
 export class ThreePreview {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
+  /**
+   * Turns the volume, its markers and the measurement line about the volume
+   * centre (view controls rotate the model, not the camera). The volume's own
+   * origin is its first voxel, so `volumeOffset` moves the centre onto the pivot.
+   */
+  private readonly volumePivot = new THREE.Group();
+  private readonly volumeOffset = new THREE.Group();
+  /** CSS pixels at the bottom of the canvas covered by an overlay (the phone sheet). */
+  private framingInsetBottom = 0;
+  /** A pointer drag of the trackball is in progress. */
+  private interacting = false;
+  /** Low-resolution rendering while a view control is held down. */
+  private heldLowRes = false;
+  private heldRenderAt = 0;
+  private heldRestoreTimer: ReturnType<typeof setTimeout> | null = null;
   private camera: THREE.OrthographicCamera;
   private controls: TrackballControls | null = null;
   private volume: VolumeObject | null = null;
@@ -124,6 +139,8 @@ export class ThreePreview {
   // Dedicated scratch objects for the snap animation (not reused elsewhere).
   private readonly _snapDirA = new THREE.Vector3();
   private readonly _snapDirB = new THREE.Vector3();
+  private readonly _snapFromModel = new THREE.Quaternion();
+  private readonly _identity = new THREE.Quaternion();
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -144,8 +161,10 @@ export class ThreePreview {
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.sortObjects = false;
-    this.scene.add(this.measurementLine.group);
-    this.scene.add(this.annotationMarkers.group);
+    this.volumePivot.add(this.volumeOffset);
+    this.scene.add(this.volumePivot);
+    this.volumeOffset.add(this.measurementLine.group);
+    this.volumeOffset.add(this.annotationMarkers.group);
     this.camera = buildCamera(1, 256);
     // three registered its own handlers first: it prevents the default on
     // loss (so the browser may restore) and re-initialises on restore.
@@ -171,14 +190,14 @@ export class ThreePreview {
    */
   setVolume(prepared: PreparedVolumeFor3D, preset: RenderPreset = 'mip'): void {
     if (this.volume) {
-      this.scene.remove(this.volume.mesh);
+      this.volumeOffset.remove(this.volume.mesh);
       disposeVolumeObject(this.volume);
       this.volume = null;
     }
     const vol = buildVolumeMesh(prepared, preset, this.planeColors);
     this.volume = vol;
     this.colormapPreset = preset;
-    this.scene.add(vol.mesh);
+    this.volumeOffset.add(vol.mesh);
 
     const dims = prepared.dims;
     const [sx, sy, sz] = prepared.spacing;
@@ -191,6 +210,10 @@ export class ThreePreview {
       (dims[2] / 2 - 0.5) * sz,
     );
     this._volumeCenter.copy(center);
+    // A new volume starts unrotated, pivoting at its centre.
+    this.volumePivot.position.copy(center);
+    this.volumePivot.quaternion.identity();
+    this.volumeOffset.position.copy(center).negate();
     const maxEdge = Math.max(dims[0] * sx, dims[1] * sy, dims[2] * sz);
     this.sceneSize = maxEdge;
     this._spacing = prepared.spacing;
@@ -213,9 +236,13 @@ export class ThreePreview {
 
     this.controls.addEventListener('start', () => {
       didMove = false;
+      this.interacting = true;
     });
     this.controls.addEventListener('change', () => {
-      if (!didMove) {
+      // 'change' also fires when something else moved the camera (a snap, the
+      // view controls) — only a drag between start and end lowers the DPR,
+      // or nothing would ever restore it.
+      if (this.interacting && !didMove) {
         // First real camera movement: drop to half DPR for responsiveness.
         // We intentionally do NOT toggle AO here — toggling AO between orbit
         // and rest causes a visible brightness flash on release (AO crushes
@@ -229,6 +256,7 @@ export class ThreePreview {
       this.dirty = true;
     });
     this.controls.addEventListener('end', () => {
+      this.interacting = false;
       if (didMove) {
         // Restore full resolution only when we actually dragged.
         this.renderer.setPixelRatio(this.nativeDpr);
@@ -398,11 +426,13 @@ export class ThreePreview {
     const center = this.controls.target;
     const radius = this.camera.position.distanceTo(center);
 
-    // Target camera direction (unit vector FROM center TO camera) and up vector.
+    // Target camera direction (unit vector FROM center TO camera) and up vector,
+    // the same views as the view controls' Align C / S / A (LPS_PLANES): axial
+    // looks from the feet, so it reads R ← → L like the axial slice panel.
     const dirMap: Record<SlicePlane, [THREE.Vector3, THREE.Vector3]> = {
       coronal: [new THREE.Vector3(0, -1, 0), new THREE.Vector3(0, 0, 1)],
       sagittal: [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 1)],
-      axial: [new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, -1, 0)],
+      axial: [new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, -1, 0)],
     };
     const [dir, up] = dirMap[plane];
 
@@ -412,6 +442,8 @@ export class ThreePreview {
     this._snapToUp.copy(up);
     this._snapCenter.copy(center);
     this._snapRadius = radius;
+    // The planes are fixed to the volume: a rotated volume turns back too.
+    this._snapFromModel.copy(this.volumePivot.quaternion);
     this._snapStartTs = 0; // will be set on first animation frame
     this._snapActive = true;
 
@@ -425,6 +457,54 @@ export class ThreePreview {
     return t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
   }
 
+  /**
+   * What view controls drive: the camera, the trackball and the volume's
+   * pivot. Null until a volume is loaded; all three are rebuilt by setVolume,
+   * so a caller holding them must take them again after each load.
+   */
+  viewHandles(): {
+    camera: THREE.OrthographicCamera;
+    controls: TrackballControls;
+    model: THREE.Object3D;
+  } | null {
+    if (!this.volume || !this.controls) return null;
+    return { camera: this.camera, controls: this.controls, model: this.volumePivot };
+  }
+
+  /**
+   * Repaint after something outside moved the view. Requests arriving back to
+   * back (a held view control repeats every frame) render at half resolution
+   * like a drag does, and full resolution returns once they stop.
+   */
+  requestRender(): void {
+    this.dirty = true;
+    const now = performance.now();
+    const continuous = now - this.heldRenderAt < 120;
+    this.heldRenderAt = now;
+    if (!continuous || this.interacting) return;
+    if (!this.heldLowRes) {
+      this.heldLowRes = true;
+      this.renderer.setPixelRatio(Math.max(0.75, this.nativeDpr * 0.5));
+      this.resize();
+    }
+    if (this.heldRestoreTimer) clearTimeout(this.heldRestoreTimer);
+    this.heldRestoreTimer = setTimeout(() => {
+      this.heldRestoreTimer = null;
+      this.heldLowRes = false;
+      if (this.disposed) return;
+      this.renderer.setPixelRatio(this.nativeDpr);
+      this.resize();
+    }, 180);
+  }
+
+  /** Keep the model centred above an overlay covering `bottom` CSS pixels of the canvas. */
+  setFramingInset(inset: { bottom: number }): void {
+    const bottom = Math.max(0, Math.round(inset.bottom));
+    if (bottom === this.framingInsetBottom) return;
+    this.framingInsetBottom = bottom;
+    this.resize();
+  }
+
   resize(): void {
     const rect = this.canvas.getBoundingClientRect();
     const w = Math.max(1, Math.floor(rect.width));
@@ -434,6 +514,11 @@ export class ThreePreview {
     const top = this.camera.top;
     this.camera.left = -top * aspect;
     this.camera.right = top * aspect;
+    // Shift the picture up by half the covered strip, so the model stays
+    // centred in what is left visible above it.
+    const inset = Math.min(this.framingInsetBottom, h - 1);
+    if (inset > 0) this.camera.setViewOffset(w, h, 0, inset / 2, w, h);
+    else this.camera.clearViewOffset();
     this.camera.updateProjectionMatrix();
     this.controls?.handleResize();
     this.dirty = true;
@@ -445,9 +530,10 @@ export class ThreePreview {
     if (!vol) return;
 
     // matrixWorld is only computed by three.js during renderer.render(). Force
-    // an update here so the very first frame uses the correct scale matrix
-    // instead of the default identity — otherwise the first render is wrong.
-    vol.mesh.updateMatrixWorld(true);
+    // an update here so the very first frame uses the correct matrix instead
+    // of the default identity — otherwise the first render is wrong. From the
+    // pivot down: the mesh's world matrix includes the view controls' rotation.
+    this.volumePivot.updateMatrixWorld(true);
 
     // Reuse pre-allocated scratch objects — no per-frame allocation / GC.
     this._invModel.copy(vol.mesh.matrixWorld).invert();
@@ -459,7 +545,8 @@ export class ThreePreview {
     // Camera forward direction in voxel space (direction transform — no translation).
     // THREE.js camera looks down -Z in camera space; transform that to world then to voxel.
     this._fwdWorld.set(0, 0, -1).applyQuaternion(this.camera.quaternion).normalize();
-    // For a pure-scale model matrix (no rotation), transformDirection = element-wise /scale.
+    // The inverse model matrix is (rotation · scale)⁻¹ plus a translation that
+    // transformDirection ignores; normalising afterwards gives the voxel-space ray.
     this._fwdVoxel.copy(this._fwdWorld).transformDirection(this._invModel).normalize();
     vol.material.uniforms.u_rayDirVox.value.copy(this._fwdVoxel);
   }
@@ -492,6 +579,7 @@ export class ThreePreview {
       // Lerp up vector and re-aim.
       this.camera.up.lerpVectors(this._snapFromUp, this._snapToUp, e).normalize();
       this.camera.lookAt(this._snapCenter);
+      this.volumePivot.quaternion.slerpQuaternions(this._snapFromModel, this._identity, e);
 
       if (raw >= 1) {
         this._snapActive = false;
@@ -774,6 +862,7 @@ export class ThreePreview {
     this.canvas.removeEventListener('webglcontextlost', this.handleContextLost);
     this.canvas.removeEventListener('webglcontextrestored', this.handleContextRestored);
     cancelAnimationFrame(this.raf);
+    if (this.heldRestoreTimer) clearTimeout(this.heldRestoreTimer);
     this.controls?.dispose();
     if (this.volume) disposeVolumeObject(this.volume);
     this.measurementLine.dispose();

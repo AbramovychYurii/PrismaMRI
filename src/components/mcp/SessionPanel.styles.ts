@@ -352,7 +352,8 @@ export const MinimisedPill = styled.button<{
   }
 
   @media (max-width: 767px) {
-    bottom: 12px;
+    /* Above the viewer's view-controls sheet while it is open. */
+    bottom: calc(12px + var(--pmri-stage-inset-bottom, 0px));
     right: 12px;
   }
 `;

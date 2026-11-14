@@ -1,6 +1,13 @@
-import type { Annotation } from '@prisma-mri/viewer-core';
+import type {
+  ActionId,
+  ActionSource,
+  Annotation,
+  ConfigStorage,
+  ViewControlsConfig,
+} from '@prisma-mri/viewer-core';
 import { type ReactNode, createContext, useContext, useMemo } from 'react';
 import { useStore } from 'zustand';
+import type { DeepPartial, ViewControlsMessages } from '../view-controls/messages';
 import type { ViewerInstance } from './createViewer';
 import { type ViewerFeatures, defaultFeatures } from './features';
 import { type ViewerLabels, defaultLabels } from './labels';
@@ -60,11 +67,29 @@ export interface ViewerSlots {
   annotationHint?: ReactNode;
 }
 
+/**
+ * The 3-D view controls (rotate / align / zoom keys and the on-screen panel).
+ * Everything inside can also be switched off by the user in their settings.
+ */
+export interface ViewerViewControls {
+  /** Controlled config — memoise it. Omitted: what `storage` holds, else defaults. */
+  config?: unknown;
+  /** Where the user's config is kept. Default: localStorage `prismamri.viewControls`; null: nowhere. */
+  storage?: ConfigStorage | null;
+  onConfigChange?: (config: ViewControlsConfig) => void;
+  /** Every dispatched action, e.g. for analytics. */
+  onAction?: (id: ActionId, source: ActionSource) => void;
+  /** Any of the panel's words. */
+  messages?: DeepPartial<ViewControlsMessages>;
+}
+
 /** What the host plugs into the viewer: its slots and its way out. */
 export interface ViewerHost {
   slots: ViewerSlots;
   /** Offered as "Back" in the session panel. Without it, the button is not shown. */
   onExit?: () => void;
+  /** Options for the 3-D view controls. Keep the object stable. */
+  viewControls?: ViewerViewControls;
 }
 
 interface ViewerContextValue extends ViewerEnvironment, ViewerHost {
@@ -80,6 +105,8 @@ export interface ViewerProviderProps extends Partial<ViewerEnvironment> {
   /** Keep the object stable (module-level or memoised): it is part of the context value. */
   slots?: ViewerSlots;
   onExit?: () => void;
+  /** Keep the object stable (module-level or memoised): it is part of the context value. */
+  viewControls?: ViewerViewControls;
   children: ReactNode;
 }
 
@@ -94,6 +121,7 @@ export function ViewerProvider({
   labels = defaultLabels,
   slots = NO_SLOTS,
   onExit,
+  viewControls,
   children,
 }: ViewerProviderProps) {
   // Every hook below reads this context, so a fresh object per render would
@@ -110,6 +138,7 @@ export function ViewerProvider({
       labels,
       slots,
       onExit,
+      viewControls,
     }),
     [
       viewer,
@@ -122,6 +151,7 @@ export function ViewerProvider({
       labels,
       slots,
       onExit,
+      viewControls,
     ],
   );
   return <ViewerContext.Provider value={value}>{children}</ViewerContext.Provider>;
@@ -162,8 +192,8 @@ export function usePortalContainer(): Element {
 
 /** The host's slots and exit, as given to the provider. */
 export function useViewerHost(): ViewerHost {
-  const { slots, onExit } = useViewerContext();
-  return { slots, onExit };
+  const { slots, onExit, viewControls } = useViewerContext();
+  return { slots, onExit, viewControls };
 }
 
 export function useViewerEnvironment(): ViewerEnvironment {

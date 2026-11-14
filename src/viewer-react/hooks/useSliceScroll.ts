@@ -1,11 +1,13 @@
 import { type SlicePlane, clamp, sliceAxis, sliceCount } from '@prisma-mri/viewer-core';
 import { useCallback, useEffect, useRef } from 'react';
+import { useOptionalViewControls } from '../view-controls/context';
 import {
   type ViewerStore,
   useViewerEnvironment,
   useViewerStore,
   useViewerStoreApi,
 } from '../viewer';
+import { arrowsGoToStage } from './useKeyZone';
 
 /** Moves the cursor `steps` slices along `plane`. Returns false when no volume is open. */
 function stepSlice(store: ViewerStore, plane: SlicePlane, steps: number): boolean {
@@ -124,13 +126,21 @@ const CONTROLS_WITH_ARROWS =
 /** ↑/↓ stepping of the active plane by ±1 slice, wherever the viewer listens for keys. */
 export function useActivePlaneKeys(): void {
   const store = useViewerStoreApi();
-  const { keyboardTarget } = useViewerEnvironment();
+  const { keyboardTarget, rootElement, layout, features } = useViewerEnvironment();
   const activePlane = useViewerStore((s) => s.activePlane);
+  const viewControls = useOptionalViewControls();
 
   useEffect(() => {
     if (!activePlane || !keyboardTarget) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      // In the 3-D stage the arrows pitch the volume, when a view control takes them.
+      if (
+        viewControls?.actionForKey(e) &&
+        arrowsGoToStage(rootElement, layout, store.getState(), features)
+      ) {
+        return;
+      }
       // Modified arrows belong to others (Shift moves the crosshair in a
       // focused slice panel), and so do arrows a control already handles or
       // that have a meaning of their own there — a range input, a menu, tabs.
@@ -142,5 +152,5 @@ export function useActivePlaneKeys(): void {
       stepSlice(store, activePlane, e.key === 'ArrowUp' ? 1 : -1);
     };
     return listenForKeys(keyboardTarget, onKey);
-  }, [store, keyboardTarget, activePlane]);
+  }, [store, keyboardTarget, activePlane, viewControls, rootElement, layout, features]);
 }

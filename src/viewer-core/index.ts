@@ -38,3 +38,4 @@ export { extractSliceGrayImage } from './volume/slices';
 export { ThreePreview, type ThreePreviewOptions } from './volume/three-preview';
 export { intensityUnit } from './volume/units';
 export { deriveVolumeId } from './volume/volumeId';
+export * from './view-controls';

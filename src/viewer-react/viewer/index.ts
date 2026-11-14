@@ -5,6 +5,7 @@ export {
   type ViewerHost,
   type ViewerLayout,
   type ViewerSlots,
+  type ViewerViewControls,
   ViewerProvider,
   type ViewerProviderProps,
   usePortalContainer,

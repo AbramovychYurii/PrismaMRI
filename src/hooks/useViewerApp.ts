@@ -77,14 +77,14 @@ export function useViewerApp() {
   const [showShortcuts, setShowShortcuts] = useState(false);
 
   // Esc only closes the shortcuts modal — never navigates back to import, so a
-  // stray press can't dump the user out of a long-loaded volume.
+  // stray press can't dump the user out of a long-loaded volume. `?` belongs to
+  // the viewer's view controls (their shortcut settings); this reference sheet
+  // opens from the header button.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-      if (e.key === '?') {
-        setShowShortcuts((v) => !v);
-      } else if (e.key === 'Escape') {
+      if (e.key === 'Escape') {
         setShowShortcuts((v) => (v ? false : v));
       } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'o') {
         e.preventDefault();

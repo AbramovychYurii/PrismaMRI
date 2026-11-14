@@ -211,7 +211,8 @@ export function ToolbarPill({ previewRef, has3D = true }: ToolbarPillProps) {
       {beforeMenu.map((b) => (
         <ToolButton key={b.id} btn={b} />
       ))}
-      {has3D && features.export && <StageMenu previewRef={previewRef} />}
+      {/* Export items, and the entry to the view-control settings (no ? key on a tablet). */}
+      {has3D && <StageMenu previewRef={previewRef} />}
       {afterMenu.map((b) => (
         <ToolButton key={b.id} btn={b} />
       ))}

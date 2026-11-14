@@ -20,7 +20,7 @@ const SECTIONS: Array<{ label: string; rows: ShortcutRow[] }> = [
     label: 'Slices',
     rows: [
       { keys: ['Scroll'], action: 'Navigate slices' },
-      { keys: ['↑ / ↓'], action: 'Step slice (active plane)' },
+      { keys: ['↑ / ↓'], action: 'Step slice (pointer over the slice panels)' },
       { keys: ['PgUp / PgDn'], action: '±10 slices (scrubber focused)' },
       { keys: ['Home / End'], action: 'First / last slice' },
     ],
@@ -42,6 +42,15 @@ const SECTIONS: Array<{ label: string; rows: ShortcutRow[] }> = [
     rows: [
       { keys: ['Drag'], action: 'Orbit' },
       { keys: ['Scroll'], action: 'Zoom' },
+      { keys: ['↑ / ↓'], action: 'Pitch (pointer over the 3D view)' },
+      { keys: ['← / →'], action: 'Yaw' },
+      { keys: ['Q / E'], action: 'Roll' },
+      { keys: ['Shift'], action: 'Rotate or zoom 3× further' },
+      { keys: ['C / S / A'], action: 'Align to coronal / sagittal / axial' },
+      { keys: ['− / 0 / +'], action: 'Zoom out / fit / zoom in' },
+      { keys: ['R'], action: 'Reset view' },
+      { keys: ['K'], action: 'Show / hide view controls' },
+      { keys: ['?'], action: 'Customize view controls' },
     ],
   },
 ];

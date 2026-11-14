@@ -6,6 +6,7 @@ import {
   type ViewerLayout,
   ViewerProvider,
   type ViewerSlots,
+  type ViewerViewControls,
   useViewerFeatures,
   useViewerStore,
 } from '../viewer';
@@ -13,6 +14,7 @@ import { type ViewerFeatures, resolveFeatures } from '../viewer/features';
 import { type ViewerLabelsInput, resolveLabels } from '../viewer/labels';
 import { type ViewerLayoutMode, useContainerLayout } from '../viewer/layout';
 import { type ViewerThemeInput, resolveTheme, themeCssVars } from '../viewer/theme';
+import { ViewControlsHost } from './ViewControlsHost';
 import styles from './Viewer.module.css';
 import { Dock } from './dock/Dock';
 import { MobileControlsView } from './mobile/MobileControlsView';
@@ -46,6 +48,11 @@ export interface ViewerProps {
   slots?: ViewerSlots;
   /** Offered as "Back" in the session panel. */
   onExit?: () => void;
+  /**
+   * The 3-D view controls: their config (controlled, or kept in `storage`),
+   * change and action callbacks, words. Keep the object stable.
+   */
+  viewControls?: ViewerViewControls;
   className?: string;
   style?: CSSProperties;
 }
@@ -162,6 +169,7 @@ export function Viewer({
   labels: labelsInput,
   slots,
   onExit,
+  viewControls,
   className,
   style,
 }: ViewerProps) {
@@ -196,9 +204,12 @@ export function Viewer({
           labels={labels}
           slots={slots}
           onExit={onExit}
+          viewControls={viewControls}
         >
-          <ViewerEffects />
-          {layout === 'mobile' ? <MobileViewer /> : <DesktopViewer />}
+          <ViewControlsHost>
+            <ViewerEffects />
+            {layout === 'mobile' ? <MobileViewer /> : <DesktopViewer />}
+          </ViewControlsHost>
         </ViewerProvider>
       )}
     </div>

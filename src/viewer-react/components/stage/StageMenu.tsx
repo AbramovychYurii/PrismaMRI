@@ -1,9 +1,11 @@
 import { ThreePreview } from '@prisma-mri/viewer-core';
-import { Loader, Share2 } from 'lucide-react';
+import { Loader, Share2, SlidersHorizontal } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { useHover } from '../../hooks/useHover';
 import { useMenuKeyboard } from '../../hooks/useMenuKeyboard';
 import { useStageExport } from '../../hooks/useStageExport';
+import { useOptionalViewControls } from '../../view-controls/context';
+import { useViewerFeatures } from '../../viewer';
 import styles from './StageMenu.module.css';
 
 function IconMoreHorizontal() {
@@ -151,6 +153,13 @@ export function StageMenu({ previewRef }: Props) {
   }
 
   const recording = recordPct !== null;
+  const { export: canExport } = useViewerFeatures();
+  const viewControls = useOptionalViewControls();
+
+  function handleViewControls() {
+    setOpen(false);
+    viewControls?.setShortcutsOpen(true);
+  }
 
   return (
     <div className={styles.wrap} ref={wrapRef}>
@@ -174,19 +183,21 @@ export function StageMenu({ previewRef }: Props) {
 
       {open && (
         <div className={styles.dropdown} ref={menuRef} role="menu" aria-label="Stage options">
-          <MenuItem
-            icon={<IconDownload />}
-            label="Export 3D view (.png)"
-            onClick={handleExport3D}
-          />
-          {CAN_RECORD_VIDEO && (
+          {canExport && (
+            <MenuItem
+              icon={<IconDownload />}
+              label="Export 3D view (.png)"
+              onClick={handleExport3D}
+            />
+          )}
+          {canExport && CAN_RECORD_VIDEO && (
             <MenuItem
               icon={<IconVideo />}
               label={`Export 3D spin (.${VIDEO_EXT})`}
               onClick={handleExportVideo}
             />
           )}
-          {CAN_SHARE_FILES && (
+          {canExport && CAN_SHARE_FILES && (
             <>
               <div className={styles.divider} aria-hidden />
               <MenuItem
@@ -201,6 +212,16 @@ export function StageMenu({ previewRef }: Props) {
                   onClick={handleShareVideo}
                 />
               )}
+            </>
+          )}
+          {viewControls && (
+            <>
+              {canExport && <div className={styles.divider} aria-hidden />}
+              <MenuItem
+                icon={<SlidersHorizontal size={14} />}
+                label="View controls…"
+                onClick={handleViewControls}
+              />
             </>
           )}
         </div>

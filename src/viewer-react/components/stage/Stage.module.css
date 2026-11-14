@@ -1,6 +1,14 @@
 .stage {
   grid-area: stage;
   position: relative;
+  /* The view controls (view-controls/styles.css) in the viewer's type and
+     slice colours; the rest of their palette is the design's own. */
+  --pmv-vc-font: var(--pmri-sans);
+  --pmv-vc-mono: var(--pmri-mono);
+  --pmv-vc-serif: var(--pmri-serif);
+  --pmv-vc-plane-c: var(--pmri-amber);
+  --pmv-vc-plane-s: var(--pmri-violet);
+  --pmv-vc-plane-a: var(--pmri-azure);
   background: radial-gradient(ellipse at 50% 55%, rgba(28, 26, 20, 0.7) 0%, rgba(8, 7, 5, 0.97) 80%);
   overflow: hidden;
   border-right: 1px solid var(--pmri-rule);

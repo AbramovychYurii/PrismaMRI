@@ -11,3 +11,4 @@ export { useHover } from './hooks/useHover';
 export { downloadBlob } from './util/download';
 export * from './viewer';
 export type { MobileTab, ToolbarState } from './types';
+export * from './view-controls';

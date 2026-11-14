@@ -70,6 +70,7 @@ function ExpandedSlicePanel({ plane }: { plane: SlicePlane }) {
   return createPortal(
     <div
       className={styles.fullscreenOverlay}
+      data-key-zone="slices"
       ref={overlayRef}
       data-active={isActive || undefined}
       onClick={(e) => {
@@ -165,6 +166,7 @@ function RailSlicePanel({ plane }: { plane: SlicePlane }) {
   return (
     <div
       className={styles.panelWrap}
+      data-key-zone="slices"
       data-testid={`slice-panel-${plane}`}
       data-slice-panel={plane}
       onClick={moveCrosshair}

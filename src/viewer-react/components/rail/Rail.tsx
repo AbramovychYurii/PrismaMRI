@@ -9,7 +9,7 @@ export function Rail() {
   const railOpen = useViewerStore((s) => s.toolbar.rail);
   if (!railOpen) return null;
   return (
-    <aside className={styles.railAside}>
+    <aside className={styles.railAside} data-key-zone="slices">
       {PLANES.map((p) => (
         <SlicePanel key={p} plane={p} />
       ))}
