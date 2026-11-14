@@ -154,7 +154,7 @@ test.describe('Dock panel', () => {
 
   test('"Back to import" button returns to import screen', async ({ page }) => {
     // The button is rendered inside SessionCell in the dock (see
-    // src/components/dock/SessionCell.tsx).  The dock is open by default in
+    // src/viewer-react/components/dock/SessionCell.tsx).  The dock is open by default in
     // the test fixture, so the button is reachable.
     await page.getByRole('button', { name: /back to import/i }).click();
 

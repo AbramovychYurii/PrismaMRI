@@ -4,7 +4,7 @@ import { MCP_HANDLERS } from '@/lib/mcp/handlers';
 import { findLocalServer } from '@/lib/mcp/local-server';
 import type { IncomingMessage, OutgoingResult } from '@/lib/mcp/protocol';
 import { useAgentStore } from '@/store';
-import { useViewer } from '@/viewer';
+import { useViewer } from '@prisma-mri/viewer-react';
 import { useCallback, useEffect, useRef } from 'react';
 
 /**

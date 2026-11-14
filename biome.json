@@ -19,19 +19,7 @@
   },
   "overrides": [
     {
-      "include": [
-        "src/viewer/**",
-        "src/components/Viewer.tsx",
-        "src/components/stage/**",
-        "src/components/rail/**",
-        "src/components/dock/**",
-        "src/components/mobile/**",
-        "src/components/annotations/**",
-        "src/components/status/**",
-        "src/components/ui/Tooltip.tsx",
-        "src/components/ui/ConfirmModal.tsx",
-        "src/components/ui/AuroraSparkles.tsx"
-      ],
+      "include": ["src/viewer-core/**", "src/viewer-react/**"],
       "linter": {
         "rules": {
           "nursery": {

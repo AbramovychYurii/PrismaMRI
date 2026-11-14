@@ -1,5 +1,10 @@
-import { PLANE_GEOMETRY, volumeCenter } from '@/lib/volume/plane';
-import type { LoadedVolume, SlicePlane, VolumeCursor } from '@/types';
+import {
+  type LoadedVolume,
+  PLANE_GEOMETRY,
+  type SlicePlane,
+  type VolumeCursor,
+  volumeCenter,
+} from '@prisma-mri/viewer-core';
 
 /** Scalar value at a voxel (post slope/intercept), or −Infinity when out of bounds. */
 export function getVoxelScalar(

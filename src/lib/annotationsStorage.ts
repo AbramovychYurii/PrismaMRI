@@ -13,7 +13,7 @@
  *    Zustand store is the source of truth at runtime.
  */
 
-import type { Annotation } from '@/types';
+import type { Annotation } from '@prisma-mri/viewer-core';
 
 const STORAGE_KEY = 'prismamri.annotations.v2';
 const SCHEMA_VERSION = 2 as const;

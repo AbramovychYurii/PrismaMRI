@@ -1,5 +1,5 @@
-import { isSlicePlane } from '@/constants';
-import type { AnnotationSeverity, SlicePlane } from '@/types';
+import type { AnnotationSeverity, SlicePlane } from '@prisma-mri/viewer-core';
+import { isSlicePlane } from '@prisma-mri/viewer-react';
 import { SEVERITIES } from './constants';
 
 /**

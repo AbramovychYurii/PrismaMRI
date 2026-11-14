@@ -1,0 +1,41 @@
+import { useViewerLabels } from '../../viewer';
+import { DisplayCell } from '../dock/DisplayCell';
+import { RenderCell } from '../dock/RenderCell';
+import { SessionCell } from '../dock/SessionCell';
+import { StudyCell } from '../dock/StudyCell';
+import styles from './MobileControlsView.module.css';
+
+function CtrlSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className={styles.section}>
+      <div className={styles.sectionHead}>
+        <h2 className={styles.sectionTitle}>{title}</h2>
+        <span className={styles.sectionRule} />
+      </div>
+      {children}
+    </section>
+  );
+}
+
+export function MobileControlsView() {
+  const { sections } = useViewerLabels();
+  return (
+    <div className={styles.scrollWrap}>
+      <CtrlSection title={sections.display}>
+        <DisplayCell />
+      </CtrlSection>
+
+      <CtrlSection title={sections.render}>
+        <RenderCell />
+      </CtrlSection>
+
+      <CtrlSection title={sections.study}>
+        <StudyCell />
+      </CtrlSection>
+
+      <CtrlSection title={sections.session}>
+        <SessionCell />
+      </CtrlSection>
+    </div>
+  );
+}

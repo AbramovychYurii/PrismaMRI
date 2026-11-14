@@ -3,11 +3,17 @@
  *
  * Pure function: receives all data up-front (including pre-captured
  * thumbnail data URLs) and returns a PDF Blob.  No React hooks inside.
- */ import { defaultLabels } from '@/viewer';
+ */
+import { defaultLabels } from '@prisma-mri/viewer-react';
 
-import { sliceNumber } from '@/lib/volume/plane';
-import { intensityUnit } from '@/lib/volume/units';
-import type { Annotation, AnnotationSeverity, ParsedVolumeMeta, SlicePlane } from '@/types';
+import {
+  type Annotation,
+  type AnnotationSeverity,
+  type ParsedVolumeMeta,
+  type SlicePlane,
+  intensityUnit,
+  sliceNumber,
+} from '@prisma-mri/viewer-core';
 import jsPDF from 'jspdf';
 
 const PDF_LABEL: Record<AnnotationSeverity, string> = {

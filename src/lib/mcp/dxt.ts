@@ -1,4 +1,4 @@
-import { downloadBlob } from '@/lib/download';
+import { downloadBlob } from '@prisma-mri/viewer-react';
 import { type Zippable, strToU8, zipSync } from 'fflate';
 
 /** The MCP server bundle and its `ws` dependency, emitted by `npm run build:dxt`. */

@@ -7,7 +7,7 @@ import { KeyboardShortcutsModal } from '@/components/ui/KeyboardShortcutsModal';
 import { useViewerActions } from '@/hooks/ViewerActionsContext';
 import * as volumeDb from '@/lib/volumeDb';
 import { useAgentStore } from '@/store';
-import { type ViewerSlots, useViewerStore } from '@/viewer';
+import { type ViewerSlots, useViewerStore } from '@prisma-mri/viewer-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';

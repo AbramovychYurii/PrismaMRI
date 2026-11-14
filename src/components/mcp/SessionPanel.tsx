@@ -19,7 +19,7 @@ import { LOCAL_PORTS } from '@/lib/mcp/constants';
 import { EXAMPLE_PROMPT } from '@/lib/mcp/example-prompt';
 import { getSampleReport } from '@/lib/sampleReports';
 import { useAgentStore } from '@/store';
-import { useViewerStore } from '@/viewer';
+import { useViewerStore } from '@prisma-mri/viewer-react';
 import {
   Bot,
   Check,

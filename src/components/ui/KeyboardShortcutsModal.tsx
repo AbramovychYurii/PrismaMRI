@@ -1,4 +1,4 @@
-import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { useFocusTrap } from '@prisma-mri/viewer-react';
 import { X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';

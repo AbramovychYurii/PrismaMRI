@@ -1,0 +1,68 @@
+import type { ImportSource, SeriesChoice } from '../../import/types';
+import type {
+  ImportProgress,
+  LoadedVolume,
+  ParsedVolumeMeta,
+  PreparedVolumeFor3D,
+  SliceWindowLevel,
+} from '../../types';
+
+export interface WorkerLoadRequest {
+  type: 'load';
+  source: ImportSource;
+  /** When set, assemble only this series (from a prior series-choice). */
+  seriesKey?: string;
+  /** Per-axis cap on the 3-D texture; the default when unset. */
+  maxTextureEdge?: number;
+}
+
+export type WorkerRequest = WorkerLoadRequest;
+
+export interface WorkerProgressMsg {
+  type: 'progress';
+  progress: ImportProgress;
+  percent: number;
+}
+
+/** Volume payload with the heavy buffers detached for Transferable posting. */
+export interface WorkerDoneMsg {
+  type: 'done';
+  voxels: ArrayBuffer;
+  voxelKind: 'f32' | 'i16';
+  meta: ParsedVolumeMeta;
+  scalarMin: number;
+  scalarMax: number;
+  windowLevel: SliceWindowLevel;
+  formatId: LoadedVolume['formatId'];
+  prepared: {
+    data: ArrayBuffer;
+    dims: PreparedVolumeFor3D['dims'];
+    spacing: PreparedVolumeFor3D['spacing'];
+    clim: PreparedVolumeFor3D['clim'];
+    threshold: number;
+    sourceRange: PreparedVolumeFor3D['sourceRange'];
+    sourceDims: PreparedVolumeFor3D['sourceDims'];
+    occupancy: ArrayBuffer;
+  };
+  histogram: {
+    bins: ArrayBuffer;
+    min: number;
+    max: number;
+    count: number;
+  };
+}
+
+export interface WorkerErrorMsg {
+  type: 'error';
+  message: string;
+}
+
+/** Source holds multiple series; the UI must pick one and re-issue `load`. */
+export interface WorkerSeriesMsg {
+  type: 'series';
+  series: SeriesChoice[];
+  /** The source with archives expanded — File handles, so posting it copies nothing. */
+  source: ImportSource;
+}
+
+export type WorkerResponse = WorkerProgressMsg | WorkerDoneMsg | WorkerErrorMsg | WorkerSeriesMsg;
