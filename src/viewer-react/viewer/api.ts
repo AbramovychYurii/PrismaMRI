@@ -141,7 +141,11 @@ function snapshotOf(state: ViewerStoreState, previous: ViewerSnapshot | null): V
 }
 
 /** The facade over one viewer's store. */
-export function createViewerApi(store: ViewerStore): ViewerApi {
+export function createViewerApi(
+  store: ViewerStore,
+  /** Collects every live subscription, so the owner can drop them all at once. */
+  owned: Set<() => void> = new Set(),
+): ViewerApi {
   let last: ViewerSnapshot | null = null;
   const read = (): ViewerSnapshot => {
     last = snapshotOf(store.getState(), last);
@@ -154,13 +158,19 @@ export function createViewerApi(store: ViewerStore): ViewerApi {
 
     subscribe(listener) {
       let seen = read();
-      return store.subscribe(() => {
+      const stop = store.subscribe(() => {
         const next = read();
         if (next === seen) return;
         const previous = seen;
         seen = next;
         listener(next, previous);
       });
+      const off = () => {
+        owned.delete(off);
+        stop();
+      };
+      owned.add(off);
+      return off;
     },
 
     setCursor: (cursor) => act().setCursor(cursor),

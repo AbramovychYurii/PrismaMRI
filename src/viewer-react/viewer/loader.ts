@@ -46,6 +46,11 @@ export interface ViewerLoader {
    * Returns the unsubscribe function.
    */
   onVolumeLoaded: (listener: VolumeLoadedListener) => () => void;
+  /**
+   * Aborts the load in flight, dismisses an open series choice and drops every
+   * `onVolumeLoaded` listener. Safe to call twice; the loader stays usable.
+   */
+  dispose: () => void;
 }
 
 const IDLE_LOADING = { active: false, percent: 0, stage: 'idle' as const, message: '' };
@@ -137,6 +142,13 @@ export function createViewerLoader(
         return;
       }
 
+      // A runner that ignores the abort signal must not land its volume after
+      // the load was cancelled or the viewer disposed.
+      if (controller.signal.aborted) {
+        setLoading(IDLE_LOADING);
+        return;
+      }
+
       const { result } = out;
       const { volume, prepared3D, histogram } = result;
       // Synchronous, listeners included, so a host that swaps screens on load
@@ -158,6 +170,15 @@ export function createViewerLoader(
     } finally {
       if (abort === controller) abort = null;
     }
+  }
+
+  function cancel(): void {
+    if (resolveChoice) {
+      resolveChoice(null);
+      return;
+    }
+    abort?.abort();
+    abort = null;
   }
 
   return {
@@ -182,14 +203,7 @@ export function createViewerLoader(
       }
     },
 
-    cancel() {
-      if (resolveChoice) {
-        resolveChoice(null);
-        return;
-      }
-      abort?.abort();
-      abort = null;
-    },
+    cancel,
 
     switchSeries(key) {
       const { seriesSource, seriesList, activeSeriesKey } = store.getState();
@@ -199,6 +213,11 @@ export function createViewerLoader(
 
     resolveSeries(key) {
       resolveChoice?.(key);
+    },
+
+    dispose() {
+      cancel();
+      listeners.clear();
     },
 
     onVolumeLoaded(listener) {
