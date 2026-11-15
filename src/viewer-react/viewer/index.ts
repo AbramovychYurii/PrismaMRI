@@ -26,6 +26,7 @@ export {
   useViewerEnvironment,
   useViewerHost,
   useViewerLayout,
+  useViewerRootElement,
   useViewerTheme,
   useViewerFeatures,
   useViewerLabels,

@@ -29,12 +29,15 @@ import {
   type ButtonHTMLAttributes,
   type CSSProperties,
   memo,
+  useCallback,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
 } from 'react';
 import { SEVERITY_RANK } from '../../constants';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 import {
   useViewerFeatures,
   useViewerHost,
@@ -64,11 +67,13 @@ const SPARKLE_ICON_STYLE: React.CSSProperties = {
 const SPARKLE_GRADIENT_DEFS_STYLE: React.CSSProperties = { position: 'absolute' };
 
 const SparkleIcon = memo(function SparkleIcon() {
+  // One gradient per icon: a fixed id would be shared by every viewer on the page.
+  const gradientId = `hud-sparkle-${useId().replace(/:/g, '')}`;
   return (
     <>
       <svg width="0" height="0" style={SPARKLE_GRADIENT_DEFS_STYLE} aria-hidden="true">
         <defs>
-          <linearGradient id="hud-sparkle-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="#ff8a3c" />
             <stop offset="25%" stopColor="#ffd24a" />
             <stop offset="50%" stopColor="#7ee0c0" />
@@ -79,7 +84,7 @@ const SparkleIcon = memo(function SparkleIcon() {
       </svg>
       <Sparkles
         size={22}
-        stroke="url(#hud-sparkle-grad)"
+        stroke={`url(#${gradientId})`}
         strokeWidth={1.75}
         style={SPARKLE_ICON_STYLE}
         aria-hidden="true"
@@ -177,14 +182,8 @@ export function AnnotationHud() {
     prevActiveId.current = activeId;
   }, [activeId]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [open]);
+  const closeCard = useCallback(() => setOpen(false), []);
+  useEscapeKey(closeCard, open);
 
   // Memoise the severity-sorted list — orderAll allocates an array and runs an
   // O(n log n) sort. Recompute only when the underlying findings change.

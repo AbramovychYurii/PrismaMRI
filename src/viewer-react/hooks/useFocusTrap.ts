@@ -15,6 +15,7 @@
  */
 
 import { type RefObject, useEffect } from 'react';
+import { isTopLayer, pushLayer, removeLayer } from './layers';
 
 /**
  * Selector for elements that are reachable via Tab in standard browsers.
@@ -64,7 +65,7 @@ export function useFocusTrap(containerRef: RefObject<HTMLElement | null>, active
 
     function onKeyDown(e: KeyboardEvent) {
       if (e.key !== 'Tab') return;
-      if (!container) return;
+      if (!container || !isTopLayer(container)) return;
 
       const focusable = getFocusable(container);
       if (focusable.length === 0) {
@@ -96,7 +97,7 @@ export function useFocusTrap(containerRef: RefObject<HTMLElement | null>, active
     // Defensive: if focus ever escapes (programmatic .focus() outside the
     // container, browser quirk), pull it back to the first focusable element.
     function onFocusIn(e: FocusEvent) {
-      if (!container) return;
+      if (!container || !isTopLayer(container)) return;
       const target = e.target as HTMLElement | null;
       if (target && !container.contains(target)) {
         const focusable = getFocusable(container);
@@ -104,12 +105,14 @@ export function useFocusTrap(containerRef: RefObject<HTMLElement | null>, active
       }
     }
 
+    pushLayer(container);
     document.addEventListener('keydown', onKeyDown);
     document.addEventListener('focusin', onFocusIn);
 
     return () => {
       document.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('focusin', onFocusIn);
+      removeLayer(container);
       // Restore focus to the element that owned it before the trap engaged
       // — but only if it's still in the document.
       if (previouslyFocused && document.body.contains(previouslyFocused)) {
