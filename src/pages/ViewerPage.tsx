@@ -7,7 +7,7 @@ import { KeyboardShortcutsModal } from '@/components/ui/KeyboardShortcutsModal';
 import { useViewerActions } from '@/hooks/ViewerActionsContext';
 import * as volumeDb from '@/lib/volumeDb';
 import { useAgentStore } from '@/store';
-import { type ViewerSlots, useViewerStore } from '@prisma-mri/viewer-react';
+import { type ViewerSlots, useViewer, useViewerSnapshot } from '@prisma-mri/viewer-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
@@ -41,11 +41,10 @@ const APP_SLOTS: ViewerSlots = {
 };
 
 export function ViewerPage() {
-  const volumeLoaded = useViewerStore((s) => s.volume !== null);
+  const volumeLoaded = useViewerSnapshot((s) => s.status === 'ready');
   const mcpConnected = useAgentStore((s) => s.mcpConnected);
-  const restoreVolume = useViewerStore((s) => s.restoreVolume);
-  const loadingActive = useViewerStore((s) => s.loading.active);
-  const setLoading = useViewerStore((s) => s.setLoading);
+  const viewer = useViewer();
+  const loadingActive = useViewerSnapshot((s) => s.loading.active);
   const { showShortcuts, setShowShortcuts } = useViewerActions();
   const navigate = useNavigate();
   const exitToImport = useCallback(() => navigate('/'), [navigate]);
@@ -57,9 +56,9 @@ export function ViewerPage() {
   // frame on screen.
   useEffect(() => {
     if (volumeLoaded && loadingActive) {
-      setLoading({ active: false, percent: 100, stage: 'done', message: 'Ready' });
+      viewer.finishLoading();
     }
-  }, [volumeLoaded, loadingActive, setLoading]);
+  }, [volumeLoaded, loadingActive, viewer]);
 
   const confirmedOnce = useRef(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -90,7 +89,7 @@ export function ViewerPage() {
       .then((result) => {
         if (!alive) return;
         if (result) {
-          restoreVolume(result.volume, result.prepared3D, result.histogram);
+          viewer.restoreVolume(result);
           setRestoring(false);
         } else {
           navigate('/', { replace: true });
@@ -103,7 +102,7 @@ export function ViewerPage() {
     return () => {
       alive = false;
     };
-  }, [volumeLoaded, restoreVolume, navigate]);
+  }, [volumeLoaded, viewer, navigate]);
 
   if (restoring) return <RestoreScreen>Restoring volume…</RestoreScreen>;
 

@@ -7,7 +7,7 @@ export {
   fromFileList,
   type FsEntry,
 } from './import/scan-folder';
-export type { ImportSource, SeriesChoice } from './import/types';
+export type { ImportHints, ImportSource, SeriesChoice } from './import/types';
 export { type LoadResult, loadVolumeInWorker, type LoadWorkerResult } from './import/volume-client';
 export type * from './types';
 export { fetchBlobWithProgress } from './util/fetch-with-progress';

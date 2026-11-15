@@ -38,7 +38,7 @@ async function expandZips(source: ImportSource, onProgress: ProgressFn): Promise
       expanded.push({ path, name, file });
     }
   }
-  return { rootName: source.rootName, files: expanded };
+  return { rootName: source.rootName, files: expanded, hints: source.hints };
 }
 
 export async function loadVolumeFromSource(

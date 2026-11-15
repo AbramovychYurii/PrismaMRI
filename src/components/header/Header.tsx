@@ -1,7 +1,7 @@
 import { BrandBlock } from '@/components/header/BrandBlock';
 import { useViewerActions } from '@/hooks/ViewerActionsContext';
 import { usePwaInstall } from '@/hooks/usePwaInstall';
-import { StatusStrip, Tooltip, accentAlpha, useViewerStore } from '@prisma-mri/viewer-react';
+import { StatusStrip, Tooltip, accentAlpha, useViewerSnapshot } from '@prisma-mri/viewer-react';
 import { MonitorDown } from 'lucide-react';
 import styled from 'styled-components';
 
@@ -92,7 +92,7 @@ const LoadingBar = styled.div<{ $width: number }>`
 
 export function Header() {
   // Only the bar width — progress messages also change current/total/message.
-  const loadingPercent = useViewerStore((s) => (s.loading.active ? s.loading.percent : null));
+  const loadingPercent = useViewerSnapshot((s) => (s.loading.active ? s.loading.percent : null));
   const { setShowShortcuts } = useViewerActions();
   const { canInstall, install } = usePwaInstall();
 

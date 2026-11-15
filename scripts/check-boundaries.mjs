@@ -81,8 +81,15 @@ for (const abs of walk(SRC)) {
   for (const spec of specs) {
     const to = target(spec, file);
     if (home === 'app') {
+      if (/^@prisma-mri\/viewer-[a-z]+\/unstable\b/.test(spec)) {
+        problems.push(
+          `${file}: "${spec}" — the app goes through the viewer's methods and useViewerSnapshot, not its store`,
+        );
+      }
       if (to && packageOf(to) !== 'app') {
-        problems.push(`${file}: "${spec}" reaches into ${PACKAGES[packageOf(to)].dir} — import from @prisma-mri/viewer-${packageOf(to)} instead`);
+        problems.push(
+          `${file}: "${spec}" reaches into ${PACKAGES[packageOf(to)].dir} — import from @prisma-mri/viewer-${packageOf(to)} instead`,
+        );
       }
       continue;
     }

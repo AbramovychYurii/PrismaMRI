@@ -8,7 +8,7 @@ import {
   type ViewerSlots,
   accentAlpha,
   useViewer,
-  useViewerStore,
+  useViewerSnapshot,
 } from '@prisma-mri/viewer-react';
 import { MonitorDown } from 'lucide-react';
 import styled from 'styled-components';
@@ -100,7 +100,7 @@ const MobileLoadingBar = styled.div<{ $width: number }>`
 `;
 
 function MobileHeader() {
-  const loadingPercent = useViewerStore((s) => (s.loading.active ? s.loading.percent : null));
+  const loadingPercent = useViewerSnapshot((s) => (s.loading.active ? s.loading.percent : null));
   const { canInstall, install } = usePwaInstall();
   return (
     <MobileHeaderBar>
@@ -131,7 +131,7 @@ interface AppGridProps {
 export function AppGrid({ slots, onExit }: AppGridProps) {
   const viewer = useViewer();
   const isMobile = useIsMobile();
-  const focus = useViewerStore((s) => s.toolbar.focus);
+  const focus = useViewerSnapshot((s) => s.focusMode);
 
   const content = (
     <Viewer

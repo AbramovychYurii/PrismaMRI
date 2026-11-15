@@ -13,7 +13,7 @@ import { ExamplesSection } from '@/components/layout/ExamplesSection';
 import { useViewerActions } from '@/hooks/ViewerActionsContext';
 import { loadViewerPage } from '@/pages/loadViewerPage';
 import { type FsEntry, collectFilesFromEntry } from '@prisma-mri/viewer-core';
-import { useViewer, useViewerStore } from '@prisma-mri/viewer-react';
+import { useViewer, useViewerSnapshot } from '@prisma-mri/viewer-react';
 import { FolderOpen, Github } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import {
@@ -91,11 +91,11 @@ const FOLDER_OPEN_ICON_STYLE: React.CSSProperties = {
 
 export function ImportOverlay() {
   const [hover, setHover] = useState(false);
-  const error = useViewerStore((s) => s.error);
-  const loading = useViewerStore((s) => s.loading);
+  const error = useViewerSnapshot((s) => s.error);
+  const loading = useViewerSnapshot((s) => s.loading);
   const { openFiles, openFolder, openFile } = useViewerActions();
   const viewer = useViewer();
-  const pendingSeries = useViewerStore((s) => s.pendingSeries);
+  const pendingSeries = useViewerSnapshot((s) => s.pendingSeries);
 
   // Fetch the viewer chunk while the user picks a file, so the route swap
   // after a load never waits on the network.

@@ -19,7 +19,7 @@ import { LOCAL_PORTS } from '@/lib/mcp/constants';
 import { EXAMPLE_PROMPT } from '@/lib/mcp/example-prompt';
 import { getSampleReport } from '@/lib/sampleReports';
 import { useAgentStore } from '@/store';
-import { useViewerStore } from '@prisma-mri/viewer-react';
+import { useViewer, useViewerSnapshot } from '@prisma-mri/viewer-react';
 import {
   Bot,
   Check,
@@ -182,9 +182,9 @@ export function SessionPanel() {
   const mcpConnected = useAgentStore((s) => s.mcpConnected);
   const agentWorking = useAgentStore((s) => s.agentSessionActive);
   const localPort = useAgentStore((s) => s.localPort);
-  const dockOpen = useViewerStore((s) => s.toolbar.dock);
-  const activeVolumeId = useViewerStore((s) => s.activeVolumeId);
-  const setAnnotations = useViewerStore((s) => s.setAnnotations);
+  const dockOpen = useViewerSnapshot((s) => s.dockOpen);
+  const activeVolumeId = useViewerSnapshot((s) => s.activeVolumeId);
+  const { replaceAnnotations } = useViewer();
   // Prefer the store's localPort over isLocalMode() — localPort is set only when
   // the bridge actually connected directly to 127.0.0.1 (covers both PWA standalone
   // and localhost dev-server cases that isLocalMode() would miss).
@@ -203,7 +203,7 @@ export function SessionPanel() {
     if (!sampleReport) return;
     setSampleState('idle');
     try {
-      setAnnotations(sampleReport.annotations);
+      replaceAnnotations(sampleReport.annotations);
       setSampleState('ok');
       // Collapse the panel so the user immediately sees the AnnotationHud
       // entrance animation and the annotated findings on the volume.
@@ -213,7 +213,7 @@ export function SessionPanel() {
       setSampleState('err');
       setTimeout(() => setSampleState('idle'), 3000);
     }
-  }, [sampleReport, setAnnotations]);
+  }, [sampleReport, replaceAnnotations]);
 
   const handleDownloadDxt = useCallback(async () => {
     setDxtState('idle');

@@ -1,7 +1,7 @@
 import { type DirPickerWindow, IMPORT_ACCEPT, pickFiles } from '@/lib/file-pickers';
 import * as volumeDb from '@/lib/volumeDb';
 import { fromDirectoryHandle, fromFileList } from '@prisma-mri/viewer-core';
-import { isAbort, useViewer, useViewerStore } from '@prisma-mri/viewer-react';
+import { isAbort, useViewer } from '@prisma-mri/viewer-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -17,7 +17,6 @@ import { useNavigate } from 'react-router-dom';
  */
 export function useViewerApp() {
   const viewer = useViewer();
-  const setError = useViewerStore((s) => s.setError);
   const navigate = useNavigate();
 
   // Runs inside the viewer's load commit, so the import screen starts
@@ -65,10 +64,10 @@ export function useViewerApp() {
       await viewer.load(await fromDirectoryHandle(handle));
     } catch (err) {
       if (!isAbort(err)) {
-        setError(err instanceof Error ? err.message : 'Folder pick failed.');
+        viewer.setError(err instanceof Error ? err.message : 'Folder pick failed.');
       }
     }
-  }, [viewer, openFiles, setError]);
+  }, [viewer, openFiles]);
 
   const openFile = useCallback(() => {
     pickFiles({ accept: IMPORT_ACCEPT }, openFiles);

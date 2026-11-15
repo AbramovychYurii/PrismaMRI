@@ -23,7 +23,8 @@ import {
   defaultLabels,
   downloadBlob,
   useFocusTrap,
-  useViewerStore,
+  useViewer,
+  useViewerSnapshot,
   useViewerSurfaces,
 } from '@prisma-mri/viewer-react';
 import { Download, FileText, X } from 'lucide-react';
@@ -106,10 +107,10 @@ export function ReportModal({ finding, findingIndex, allFindings, onClose }: Pro
   const [downloading, setDownloading] = useState(false);
   const [previewThumbs, setPreviewThumbs] = useState<Map<string, Capture>>(() => new Map());
 
-  const volume = useViewerStore((s) => s.volume);
+  const volume = useViewerSnapshot((s) => s.volume);
   const surfaces = useViewerSurfaces();
-  const setCursor = useViewerStore((s) => s.setCursor);
-  const cursor = useViewerStore((s) => s.cursor);
+  const { setCursor } = useViewer();
+  const cursor = useViewerSnapshot((s) => s.cursor);
 
   const today = new Date().toISOString().slice(0, 10);
   // The report says what the volume says: no modality, no invented CT or HU.

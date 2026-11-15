@@ -69,13 +69,46 @@
   -webkit-font-smoothing: antialiased;
 }
 
+/*
+ * Reset, scoped to the viewer: the viewer does not assume the host page has one
+ * (Tailwind's preflight, a normalize.css, …), and does not impose one on it.
+ */
 :where(.pmri-root, .pmri-portal) :where(*, *::before, *::after) {
   box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: 0 solid;
 }
 
-:where(.pmri-root, .pmri-portal) :where(button) {
+:where(.pmri-root, .pmri-portal) {
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+}
+
+:where(.pmri-root, .pmri-portal) :where(h1, h2, h3, h4, h5, h6) {
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+:where(.pmri-root, .pmri-portal) :where(b, strong) {
+  font-weight: bolder;
+}
+
+:where(.pmri-root, .pmri-portal) :where(ol, ul, menu) {
+  list-style: none;
+}
+
+:where(.pmri-root, .pmri-portal) :where(img, svg, video, canvas) {
+  display: block;
+  vertical-align: middle;
+}
+
+:where(.pmri-root, .pmri-portal) :where(button, input, select, textarea) {
   font: inherit;
+  letter-spacing: inherit;
   color: inherit;
+  border-radius: 0;
+  background-color: transparent;
 }
 
 :where(.pmri-root, .pmri-portal) :where(input, select, textarea) {
