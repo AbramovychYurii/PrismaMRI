@@ -99,7 +99,7 @@
 
 .card {
   position: absolute;
-  top: 22px;
+  top: calc(22px + var(--below-series, 0px));
   left: 30px;
   z-index: var(--pmri-z-modal);
   width: 360px;
@@ -117,11 +117,11 @@
 }
 [data-layout="mobile"] .card {
   width: calc(100% - 24px);
-  top: 12px;
+  top: calc(12px + var(--below-series, 0px));
   left: 12px;
   /* Constrain to the stage: its height minus the card's top offset and a
      matching bottom gap. */
-  max-height: calc(100% - 12px - 12px);
+  max-height: calc(100% - 12px - var(--below-series, 0px) - 12px);
 }
 
 /* Left vertical accent stripe — full card height, severity-coloured. */
@@ -165,7 +165,7 @@
 
 .hintText {
   position: absolute;
-  top: calc(22px + 100% + 8px);
+  top: calc(22px + var(--below-series, 0px) + 100% + 8px);
   left: 30px;
   margin: 0;
   font-family: var(--pmri-mono);
@@ -187,7 +187,7 @@
 /* The aurora ring around the pill: 0.8px outside the pill's own offsets. */
 .pillWrap {
   position: absolute;
-  top: 21.2px;
+  top: calc(21.2px + var(--below-series, 0px));
   left: 29.2px;
   z-index: var(--pmri-z-modal);
   border-radius: 999px;
@@ -219,7 +219,7 @@
   }
 }
 [data-layout="mobile"] .pillWrap {
-  top: 11.2px;
+  top: calc(11.2px + var(--below-series, 0px));
   left: 11.2px;
 }
 
@@ -507,4 +507,20 @@
   font-size: 13px;
   color: #8e887e;
   letter-spacing: 0.14em;
+}
+
+/*
+ * When the study has several series, the series selector (44 px tall, 40 on
+ * mobile — see StageSeriesSelect.module.css) takes the top-left corner and the
+ * findings sit below it, 8 px apart.
+ */
+.card[data-below-series],
+.pillWrap[data-below-series],
+.hintText[data-below-series] {
+  --below-series: calc(44px + 8px);
+}
+[data-layout="mobile"] .card[data-below-series],
+[data-layout="mobile"] .pillWrap[data-below-series],
+[data-layout="mobile"] .hintText[data-below-series] {
+  --below-series: calc(40px + 8px);
 }

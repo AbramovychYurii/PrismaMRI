@@ -9,7 +9,9 @@ import type {
   SliceWindowLevel,
   VolumeCursor,
 } from '@prisma-mri/viewer-core';
-import type { ViewerState, ViewerStore, ViewerStoreState } from './store';
+import type { ViewerSeriesContext, ViewerState, ViewerStore, ViewerStoreState } from './store';
+
+export type { ViewerSeriesContext };
 
 /**
  * The public face of a viewer: what a host may read and which commands it may
@@ -36,6 +38,7 @@ export interface ViewerSnapshot {
   renderPreset: RenderPreset;
   /** Slab MIP thickness in mm; 0 is a single slice. */
   slabMm: number;
+  /** Findings on the series on screen. */
   annotations: Annotation[];
   activeAnnotationId: string | null;
   measurement: ActiveMeasurement | null;
@@ -43,6 +46,15 @@ export interface ViewerSnapshot {
   loading: ViewerLoadingState;
   /** Series of a source waiting for the user's choice (`resolveSeries`), else null. */
   pendingSeries: SeriesChoice[] | null;
+  /** Every series of the open source, when it has several; else null. */
+  seriesList: SeriesChoice[] | null;
+  /** Key of the series on screen, when `seriesList` is set. */
+  activeSeriesKey: string | null;
+  /**
+   * Findings on the other series of the open source, each with its `seriesKey`.
+   * Only series that have been on screen this session are known.
+   */
+  otherSeriesAnnotations: Annotation[];
   /** Focus mode: the chrome is folded away and the stage fills the viewer. */
   focusMode: boolean;
   /** Whether the control dock is open. */
@@ -77,14 +89,23 @@ export interface ViewerApi {
   clearAnnotations: () => void;
   /** Marks a finding as the active one (card and marker emphasis), or none. */
   setActiveAnnotation: (id: string | null) => void;
-  /** Jumps the crosshair and plane to a finding and makes it active. */
+  /**
+   * Jumps the crosshair and plane to a finding and makes it active. A finding
+   * on another series of the open source is shown by switching to that series
+   * first, so the jump lands once the series has loaded.
+   */
   focusAnnotation: (id: string) => void;
 
   /**
    * Opens a volume the host kept elsewhere (a cache) without resetting the UI
-   * state restored from persistence — cursor, window and level, toolbar.
+   * state restored from persistence — cursor, window and level, toolbar. Pass
+   * the study's `series` (from `onVolumeLoaded`) to bring the series selector
+   * back with it.
    */
-  restoreVolume: (result: Pick<LoadResult, 'volume' | 'prepared3D' | 'histogram'>) => void;
+  restoreVolume: (
+    result: Pick<LoadResult, 'volume' | 'prepared3D' | 'histogram'>,
+    series?: ViewerSeriesContext,
+  ) => void;
   /**
    * Ends the loading state once the host has put the viewer on screen. A load
    * leaves it on through the host's screen swap so nothing flashes back.
@@ -108,6 +129,9 @@ const PICKED = [
   'error',
   'loading',
   'pendingSeries',
+  'seriesList',
+  'activeSeriesKey',
+  'otherSeriesAnnotations',
 ] as const satisfies readonly (keyof ViewerStoreState)[];
 
 function snapshotOf(state: ViewerStoreState, previous: ViewerSnapshot | null): ViewerSnapshot {
@@ -125,6 +149,9 @@ function snapshotOf(state: ViewerStoreState, previous: ViewerSnapshot | null): V
     error: state.error,
     loading: state.loading,
     pendingSeries: state.pendingSeries,
+    seriesList: state.seriesList,
+    activeSeriesKey: state.activeSeriesKey,
+    otherSeriesAnnotations: state.otherSeriesAnnotations,
     focusMode: state.toolbar.focus,
     dockOpen: state.toolbar.dock,
   };
@@ -198,8 +225,10 @@ export function createViewerApi(
     setActiveAnnotation: (id) => act().setActiveAnnotation(id),
     focusAnnotation: (id) => act().focusAnnotation(id),
 
-    restoreVolume: ({ volume, prepared3D, histogram }) =>
-      act().restoreVolume(volume, prepared3D, histogram),
+    restoreVolume: ({ volume, prepared3D, histogram }, series) => {
+      act().restoreVolume(volume, prepared3D, histogram);
+      if (series) act().setSeriesContext(series);
+    },
     finishLoading: () =>
       act().setLoading({ active: false, percent: 100, stage: 'done', message: 'Ready' }),
     setError: (message) => act().setError(message),

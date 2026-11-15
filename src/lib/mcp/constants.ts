@@ -11,17 +11,23 @@ import type { AnnotationSeverity } from '@prisma-mri/viewer-core';
 /** Ports the MCP server tries in order. Must match mcp-server/src/index.ts. */
 export const LOCAL_PORTS = [7389, 7390, 7391, 7392, 7393] as const;
 
-/** localStorage key for caching the most recently used local port. */
-export const LAST_LOCAL_PORT_KEY = 'prismamri-last-local-port';
-
 /** Per-port probe timeout when scanning for a running MCP server. */
 export const LOCAL_PROBE_TIMEOUT_MS = 300;
+
+/** How often, while connected to at least one server, to look for another that started later. */
+export const LOCAL_RESCAN_MS = 15_000;
 
 /** Claude's practical limit for a single image payload sent via MCP. */
 export const MCP_MAX_EDGE = 512;
 
+/** Long-edge cap for the larger images the analysis tools return (the API reads up to ~1568 px). */
+export const MCP_ANALYSIS_MAX_EDGE = 1280;
+
 /** Quality for detailed single-slice captures — high enough to preserve fine anatomy. */
 export const MCP_JPEG_QUALITY = 0.92;
+
+/** Thickest slab MIP a command may ask for, mm. */
+export const MAX_SLAB_MM = 50;
 
 /** Milliseconds of command inactivity before the session banner is hidden. */
 export const SESSION_IDLE_MS = 20_000;
@@ -54,6 +60,20 @@ export const ACTION_LABELS: Record<string, string> = {
   set_measurement: 'Placing measurement',
   get_measurement: 'Reading measurement',
   clear_measurement: 'Clearing measurement',
+  survey_subject: 'Surveying the subject',
+  roi_stats: 'Measuring a region',
+  line_profile: 'Sampling a line',
+  slice_curve: 'Scanning slice by slice',
+  find_objects: 'Finding separate objects',
+  axis_profile: 'Following an object along its axis',
+  check_arrangement: 'Checking how objects are arranged',
+  check_symmetry: 'Comparing the two sides',
+  find_gaps: 'Looking for thin gaps in dense material',
+  navigate_to_voxel: 'Moving to a point',
+  list_series: 'Listing series',
+  switch_series: 'Switching series',
+  capture_region: 'Capturing a close-up',
+  capture_montage: 'Building a contact sheet',
 };
 
 /**

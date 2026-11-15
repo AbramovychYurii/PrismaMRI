@@ -26,6 +26,12 @@ field or a primitive, not a freshly built object.
 `clearAnnotations`, `setActiveAnnotation`, `focusAnnotation`, `load`, `loadUrl`,
 `cancel`, `resolveSeries`, `switchSeries`, `restoreVolume`, `reset`.
 
+A host that caches the open volume for reloads can keep a multi-series study's selector
+too: `onVolumeLoaded` passes the study as a second argument (`ViewerSeriesContext`: the
+files it was opened from, the series, which is open, the volume ID of each series shown),
+and `restoreVolume(result, series)` brings it back. Without it, a restored volume has a
+single series and no selector.
+
 A controlled cursor is `cursorchange` plus `setCursor`:
 
 ```ts

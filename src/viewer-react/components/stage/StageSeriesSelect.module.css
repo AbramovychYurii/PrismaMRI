@@ -63,6 +63,14 @@
 .select:focus-visible {
   color: var(--pmri-ink);
 }
+/* The select itself has no outline (it is part of the pill): the ring goes round
+   the pill, and only for keyboard focus. */
+.wrap:has(.select:focus-visible) {
+  outline: 2px solid var(--pmri-amber);
+  outline-offset: 2px;
+  border-color: var(--pmri-amber-dim);
+  color: var(--pmri-ink);
+}
 
 .chevron {
   position: absolute;

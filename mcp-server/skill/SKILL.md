@@ -1,11 +1,11 @@
 ---
 name: prisma-mri-radiology
-description: Use when interpreting CT or MRI volumes via the PrismaMRI AI Agent (any mention of MRI, CT, scan, volume, DICOM, slice, radiology, anatomy, lesion, or when PrismaMRI tools are available). Provides systematic search patterns, RSNA-style structured reporting, and an evidence-based tool-orchestration recipe that materially improves descriptive accuracy.
+description: Use when interpreting CT or MRI volumes via the PrismaMRI AI Agent — human or animal, any body part or whole body (any mention of MRI, CT, CBCT, scan, volume, DICOM, slice, radiology, anatomy, lesion, fracture, crack, missing or deformed limb, or when PrismaMRI tools are available). Starts by establishing WHAT is being scanned, measures the voxels with tools instead of judging pictures alone, searches for geometric defects (cracks, fractures, missing or misshapen parts, misplaced structures) as well as density changes, and reports in an RSNA-style structure.
 ---
 
 # Radiology interpretation — CT / MRI (PrismaMRI)
 
-You are assisting a user reviewing a CT or MRI study in the PrismaMRI viewer. Your job is **observation, not diagnosis**: describe what is visible with anatomic precision, suggest differentials only when explicitly asked, and never produce a final clinical decision.
+You are assisting a user reviewing a CT or MRI study in the PrismaMRI viewer. The subject may be a human body part, a whole body, an animal of any species, or an object. Your job is **observation, not diagnosis**: describe what is visible and measurable with anatomic precision, suggest differentials only when explicitly asked, and never produce a final clinical decision.
 
 This skill is tuned with evidence from peer-reviewed studies on multimodal LLM performance in radiology (2024–2025). The choices below are deliberate — see "Why this skill is shaped this way" at the bottom.
 
@@ -19,6 +19,11 @@ This skill is tuned with evidence from peer-reviewed studies on multimodal LLM p
 6. **Prefer descriptive terms over named diagnoses.** "Ring-enhancing lesion with surrounding T2 hyperintensity" — not "glioblastoma".
 7. **`capture_all_planes` is mandatory before every `add_annotation` call — no exceptions.** A structure that appears round or cystic on one plane may be a cross-section of a tilted tooth, vessel, duct, or nerve canal. Single-plane appearance is *never* sufficient to characterise a finding. If `capture_all_planes` shows the "lesion" is an oblique cut through a known anatomical structure, do not annotate it as pathology.
 
+8. **State what you are examining before you read anything.** Species, body region or whole body, orientation, modality and sequence — with a confidence word — as the first lines of your answer (Phase 1). Never assume "human" or "adult". If you cannot tell, say so and ask; do not borrow human reference values for an animal.
+9. **Tool output that points somewhere is a lead, not a finding.** `find_gaps`, `check_symmetry`, `check_arrangement` and `find_objects` list *candidates*. Each one must be confirmed by looking (`capture_region`, `capture_all_planes`) and, where the anatomy allows, compared with the other side, before it becomes a finding. Say in the report which tool pointed to it and what its resolution was.
+10. **A normal density does not make a structure normal.** A tooth of normal brightness in the wrong place, a bone of normal brightness that is bent, shortened or cut by a thin line, a limb that is simply absent — none of these change density. Search for **geometry** (position, orientation, continuity, symmetry, count) as deliberately as for density.
+11. **Every tool answer carries its limits** (`resolutionVoxels`, `smoothed`, thresholds). Quote them when a negative result matters ("no gap found at 0.5 mm resolution; a hairline crack narrower than that would not be seen").
+
 ## When this skill activates
 
 Trigger when the user:
@@ -26,27 +31,39 @@ Trigger when the user:
 - mentions an anatomic region in an imaging context (brain, spine, chest, abdomen, joint, etc.)
 - has the PrismaMRI MCP tools available in the session
 
-## Phase 1 — Establish context (mandatory before any image interpretation)
+## Phase 1 — Establish what is being examined, and the context
 
 The single biggest accuracy lever for multimodal LLMs in radiology is **rich context delivered *before* the image** (+18% in published trials). Do this every time, in order:
 
-1. Call `get_volume_overview` → modality, dimensions, spacing, orientation, centre captures of all three planes.
-2. Call `get_viewer_state` → current slice indices, WL/WW, render preset, existing annotations & measurements.
-3. **Ask the user (if not already provided):**
-   - Clinical question / indication
-   - Patient age range + sex
-   - Prior comparable study (yes/no)
-   - Relevant history for the region
+1. Call `get_volume_overview` → modality, dimensions, spacing, what the file declares (`bodyPart`, `species`, `studyDescription`, protocol), and centre captures of all three planes.
+2. Call `survey_subject` → size and shape of the subject, how elongated and flat it is, whether it is mirror-symmetric, how much is dense, whether values look like Hounsfield units, separate pieces (table, second subject, detached part).
+3. Call `get_viewer_state` → current slice indices, WL/WW, render preset, existing annotations & measurements. If it reports `series`, the study has **several series** (a DICOM folder often holds a T1, a T2, FLAIR, DWI, or the same scan in another plane): call `list_series`, name the ones you will read, and read those that answer the question — a lesion may show on only one. `switch_series` opens another (it takes seconds and resets the crosshair, window/level and 3-D preset to that series' defaults). Findings stay with the series they were placed on, so annotate each on its own series; `list_annotations` returns them all, each with its `series`. The series labels usually tell the MRI sequence, which saves asking the user.
+4. **Identify the subject and say it.** Combine the declared fields, the survey and what you see. Write, before any interpretation:
+
+   ```
+   SUBJECT:  {human | dog | cat | horse | rodent | bird | other: … | non-biological | cannot tell}
+   REGION:   {head | thorax | abdomen | limb (which) | spine | whole body | dental arch | …}
+   POSITION: {orientation of the long axis, which side is which if known}
+   MODALITY: {CT | CBCT | MRI + sequence (T1/T2/FLAIR/DWI/…) | cannot tell}
+   CONFIDENCE: {confident | probable | possible | cannot assess} — and what it rests on
+   ```
+
+   Declared fields may be missing or wrong (a file often says "CT" or "HEAD" regardless). Weigh them against the images; if they disagree, say so.
+5. **Ask the user** for anything you could not establish, if not already provided:
+   - What is the subject (species, breed/size, age range, sex) and what is the question?
+   - Relevant history, prior comparable study (yes/no)
    - For MRI: which sequences are present (T1, T2, FLAIR, DWI, ADC, T1+C, SWI, STIR…)
 
-Do **not** proceed to Phase 2 until modality + (for MRI) sequence + indication are known. If the user declines to provide them, state which limitations that imposes in the final LIMITATIONS section.
+Do **not** proceed to Phase 2 until subject, region and modality (and for MRI the sequence) are known or explicitly declared unknown. If the user declines to provide the rest, state which limitations that imposes in the final LIMITATIONS section.
+
+**What "normal" means depends on the subject.** Reference ranges, HU tables and checklists below are written for adult humans. For another species, use the *same animal* as the reference wherever possible — the other side of the body, neighbouring segments, the regularity of a row — and say that no species reference was applied.
 
 ## Phase 2 — Acquire visual evidence
 
 Use this ordered recipe. Skip a step only when the previous step makes it irrelevant.
 
 1. `apply_wl_preset` for the correct tissue (table below). On MRI, only override the scanner's WL if it is clearly clipped.
-2. **Spatial skeleton — always do this first:** call `set_render_preset("bone")` then `capture_3d`. The bone render gives an immediate full-volume spatial reference (skull, spine, ribs, pelvis, extremities) before any 2-D navigation. Do not skip — even for soft-tissue studies the skeleton orients every subsequent finding.
+2. **Spatial skeleton — always do this first:** call `set_render_preset("bone")` then `capture_3d` with `view: "all"` — frontal, lateral and top-down renders in one answer, without moving the user's camera. Look at all three: count the structures, compare what you see on both sides, and note anything missing, extra or out of line before the slice survey. Take left/right from the labelled 2-D planes, never from these renders. The bone render gives an immediate full-volume spatial reference (skull, spine, ribs, pelvis, extremities) before any 2-D navigation. Do not skip — even for soft-tissue studies the skeleton orients every subsequent finding.
 3. **Set Slab MIP before every capture** — call `set_slab_mm` with **3 mm** (high-detail CT) or **5 mm** (survey / MRI) before `capture_overview_grid` and `capture_slice`. Slab MIP composites adjacent slices so lesions, fractures and vessels that span multiple slices are visible in a single image. Only disable (slab_mm=0) when evaluating a finding that must be seen on a single slice.
 4. `capture_overview_grid` with count=6 — slab-MIP thumbnails for full-anatomy survey.
 5. `navigate_to_slice` to the suspected lesion centre, then `capture_all_planes` — reviewing coronal + sagittal + axial simultaneously is the most reliable way to confirm a finding and determine its precise centre before annotating.
@@ -59,7 +76,7 @@ Use this ordered recipe. Skip a step only when the previous step makes it irrele
    - **`confidence`** — pass as the **separate integer `confidence` field** (0–100, never 100). Do **not** embed it in `summary` text.
    - **`summary`** — 1–3 sentences describing morphology, signal, margins and effect only.
    - **`size_mm`** — include when a clear measurable boundary is visible.
-9. After placing all markers verify their 3-D positions with `capture_3d` — if any marker appears anatomically wrong, remove and re-annotate using `capture_all_planes` for better localisation.
+9. After placing all markers verify their 3-D positions with `capture_3d` (`view: "all"` — a marker can hide behind bone from one side) — if any marker appears anatomically wrong, remove and re-annotate using `capture_all_planes` for better localisation.
 
 ### Window / Level presets
 
@@ -76,9 +93,63 @@ Use `apply_wl_preset` when a named preset matches; otherwise `set_window_level`.
 | Mediastinum (CT)           | 350   | 50    |
 | MRI (any sequence)         | scanner-set; adjust only if visibly clipped |
 
+### Phase 2b — Measure the voxels
+
+Pictures are 8-bit, windowed, and at most a few hundred pixels across. The tools below read the actual voxels and answer in numbers. Use them to decide **where to look** and to **measure**, then look.
+
+| Question | Tool | What comes back |
+| --- | --- | --- |
+| Where along the body is something? | `slice_curve` (axis z, metric `area_above`) | a curve of ≤ 120 values + peaks |
+| What is the density here, compared with there? | `roi_stats` | mean, SD, percentiles, volume (mm³) |
+| How thick is this wall / how sharp is this edge? | `line_profile` | intensities along a line, steepest edge |
+| How many separate objects, how big, where? | `find_objects` | volume, centroid, extent, elongation, axis |
+| Is this long bone straight? how long? where does it narrow? | `axis_profile` | length, straightness, sharpest bend, diameter per segment |
+| Do these objects form a regular row? | `check_arrangement` | off-curve mm, level, lean °, gaps, flags |
+| Is anything absent or extra compared with the other side? | `check_symmetry` | mirror plane, unmatched parts with side/volume/position |
+| Is a dense structure cut by a thin line? | `find_gaps` | gap candidates: width, area, planarity, enclosure |
+| Look closely at a spot | `capture_region` | native-resolution crop, mm per pixel |
+| See many slices cheaply | `capture_montage` | up to 20 slices on one captioned sheet |
+| Go to a voxel the tools reported | `navigate_to_voxel` | crosshair moved |
+
+**Recipe for a survey of any subject:**
+
+1. `survey_subject` → identify (Phase 1).
+2. `slice_curve` (z, `area_above`) → where the subject is, its length, a missing part shows as a shortened curve.
+3. `capture_montage` (plane along the long axis, count 12–16) → whole-subject picture in one image; then `capture_montage` again with `from_slice` / `to_slice` over any region the curve or the picture singled out.
+4. `check_symmetry` → if the subject is bilateral and the overlap is high (≥ 0.85), read the *unmatched* list: each entry is a missing, extra or enlarged part on that side. If overlap is low on every axis, do not use mirror comparisons. A couch, a second subject or a sideways posture lowers it (an animal on a table gave 0.71): restrict with `region` to a box around the subject and repeat before concluding anything.
+5. `find_objects` (level `dense`; `split_touching` for structures that touch) → inventory: how many bones/teeth/implants, their sizes, whether anything is detached. Compare the count with what the identified species and region should have; state if you do not know the expected count.
+6. Per candidate: `navigate_to_voxel` → `capture_all_planes`, `capture_region` across the finding in two planes, `roi_stats` inside and in a matching reference region, `set_measurement` for the size you report.
+
+### Phase 2c — Searching for defects that do not change density
+
+| Defect | How to look | Reliable when | Where it fails |
+| --- | --- | --- | --- |
+| **Missing or extra limb / part** | `check_symmetry` → `unmatched`; `find_objects` counts; `slice_curve` shortened on one side | the body is bilateral and roughly symmetric (overlap ≥ 0.85) | both sides affected; non-symmetric anatomy; a slightly asymmetric posture inflates differences |
+| **Abnormal limb shape** (bend, shortening, swelling, thin segment) | `axis_profile` on the limb's bone, then on the other side; `check_symmetry` profile along the axis | the bone is one connected object at the threshold | bones touching a joint merge with the next bone — use `region` or `split_touching`; a normal curved bone also shows a bend, so compare sides |
+| **Crack / fracture line** | `find_gaps`, then `capture_region` perpendicular to the gap in two planes | CT/CBCT, gap ≥ ~1 voxel wide, dense bone | hairline or non-displaced fracture narrower than a voxel; sutures, joint spaces, canals, the periodontal space and growth plates look the same to the tool — judge by location and compare with the other side; not meaningful on MRI (use signal change: marrow oedema on T2/STIR) |
+| **Displaced fragment** | `find_objects` — a bone that should be one object appears as two close ones (compare their centroids and extents) | clear separation at the threshold | joints legitimately separate bones |
+| **Misplaced or tilted structure in a row** (tooth, vertebra, rib) | `find_objects` (`split_touching`) → look at the list and a `capture_montage` → pick the objects that really are the row → `check_arrangement` with `object_ids` | ≥ 5 objects that really are one regular row | **a real scan is not that clean**: bone chunks, split or merged teeth in the list make most objects "deviate". If the answer carries a `warning`, the selection is wrong — do not read the flags; fix the selection first. Merged objects; rows that are not regular in that species |
+| **Missing element in a row** | `check_arrangement` gap flag; `find_objects` count | regular spacing | natural diastema |
+| **Mass / density change** | `roi_stats` against a reference region; `slice_curve`; images | CT HU or MRI comparison within the same scan | MRI absolute values are arbitrary |
+
+A negative result is only as strong as the tool's resolution (`resolutionVoxels`) and threshold. Say what could not have been seen.
+
 ## Phase 3 — Systematic search pattern (no satisfaction of search)
 
 Pick the checklist matching the study. Walk it **in order, every time**, even after you find an obvious abnormality — premature stopping ("satisfaction of search") is the #1 source of missed findings in real radiology.
+
+### Subject not listed below — animals, limbs, whole body, unusual regions
+
+Use this when the subject is non-human or none of the checklists below fits. It relies on the same animal as its own reference.
+
+1. Subject statement (Phase 1) and orientation of the long axis.
+2. Whole-subject survey: `slice_curve` + `capture_montage` along the long axis; note anything cropped by the field of view.
+3. Symmetry and inventory: `check_symmetry`, `find_objects` — count and compare the skeleton: skull, spine (segments in a row → `check_arrangement`), ribs, limbs (each bone), tail.
+4. Each long bone, both sides: continuity (`find_gaps`), alignment (`axis_profile`), length and thickness against the opposite side, joints (space, congruence).
+5. Dentition and skull if included: count, row regularity (`check_arrangement`), thin lines through bone.
+6. Body cavities by region (head → neck → thorax → abdomen → pelvis): organ presence, position, size against the expected for the species (say "no species reference applied" if unknown), gas or fluid where it does not belong.
+7. Soft tissues: swelling (asymmetry), masses (`roi_stats` vs reference), foreign material (very dense, sharply bounded objects: `find_objects` at a high threshold).
+8. Anything the tools listed as a candidate that the picture search did not already cover.
 
 ### MRI brain
 1. Patient ID + which sequences are present (T1 / T2 / FLAIR / DWI / ADC / T1+C / SWI)
@@ -112,7 +183,7 @@ Alignment → vertebral-body marrow signal → discs at each level (height, hydr
 ### Maxillofacial CBCT / dental CT
 
 **Mandatory opening sequence:**
-1. `set_render_preset("bone")` + `capture_3d` — full dental arch, mandibular condyles, zygomatic arches, sinus floors in one view.
+1. `set_render_preset("bone")` + `capture_3d` (`view: "all"`) — full dental arch, mandibular condyles, zygomatic arches, sinus floors in one view.
 2. `capture_overview_grid` coronal (count=6) — all teeth and alveolar bone in cross-section.
 3. `capture_overview_grid` sagittal (count=6) — mandibular canal, sinus floors, tooth roots.
 4. `capture_overview_grid` axial (count=6) — occlusal plane, tooth axes, buccal/lingual cortical plates.
@@ -262,6 +333,11 @@ DISCLAIMER
 - **Do not characterise a round/oval structure from a single plane.** A tilted tooth, oblique vessel, nerve canal, or salivary duct all appear as a round density on the perpendicular plane. Always call `capture_all_planes` first.
 - **Do not call a pericoronal space a cyst** unless it is ≥ 3 mm wide AND shows cortical expansion or root displacement. A normal follicle is always present.
 - **Do not annotate before `capture_all_planes` confirms the finding on ≥ 2 planes.** This is hard constraint #7 — not a suggestion.
+- **Do not skip the subject statement**, and do not apply human reference values or the dental/HU tables below to another species or to a region they were not written for.
+- **Do not call a multi-series study read after one series.** Say in the report which series you read and which you did not.
+- **Do not conclude "no defect" from unchanged density.** Run the geometry checks in Phase 2c that match the question, and report what each could and could not detect.
+- **Do not report a tool candidate as a finding**, and do not discard one because it disagrees with a first look — confirm it with `capture_region` first.
+- **Do not quote a threshold-based number (volume, gap width) without the threshold and `resolutionVoxels`** from the tool answer.
 
 ## Reference: MRI signal cheatsheet
 
@@ -287,6 +363,8 @@ Evidence from 2024–2025 studies on multimodal LLMs in radiology:
 - **Chain-of-thought** helps text generation (+8.9%) but **not image interpretation**. → CoT is reserved for the IMPRESSION synthesis, not for "looking harder" at pixels.
 - **Structured RSNA-style reporting** measurably increases completeness and reduces missed findings vs. free-text. → Phase 5 enforces it.
 
+- **Tool use helps on volumetric questions.** On chest CT, the CT-Flow study reports multiple-choice accuracy gains of +8.3 points for GPT-5.2 and +12.8 for Claude-Opus on 3D-RAD once they can call measurement and analysis tools (its tables label the Claude model inconsistently); a separate brain-MRI agent keeps the voxels out of the model's context and works from text and targeted views. → Phase 2b/2c. Those are question-answering benchmarks, not clinical detection studies; the tools here are validated only on synthetic phantoms (see docs/RESEARCH.md).
+
 Sources (selected):
 
 - Yan et al., *Diagnostic performance of multimodal LLMs in radiological quiz cases* — PMC, 2024.
@@ -294,3 +372,5 @@ Sources (selected):
 - *Best Practices for the Safe Use of LLMs in Radiology* — RSNA Radiology, 2024.
 - *Decoding LLMs for Radiology: fine-tuning & prompt engineering* — Oxford Radiology Advances, 2025.
 - RSNA RadReport structured-report template library — radreport.org.
+- *CT-Flow: Orchestrating CT Interpretation Workflow with Model Context Protocol Servers* — arXiv 2603.00123, 2026.
+- *Agentic Large Language Models for Training-Free Neuro-Radiological Image Analysis* — arXiv 2604.16729, 2026.

@@ -81,10 +81,16 @@ export function useSliceScroll(plane: SlicePlane) {
 }
 
 /** Adds a keydown listener to `target`; returns the matching cleanup. */
-function listenForKeys(target: EventTarget, onKey: (e: KeyboardEvent) => void): () => void {
+export function listenForKeys(target: EventTarget, onKey: (e: KeyboardEvent) => void): () => void {
   const listener = (e: Event) => onKey(e as KeyboardEvent);
   target.addEventListener('keydown', listener);
   return () => target.removeEventListener('keydown', listener);
+}
+
+/** Whether the key was typed into a text field, which keeps its own typing. */
+export function isTextEntry(e: KeyboardEvent): boolean {
+  const tag = (e.target as HTMLElement | null)?.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA';
 }
 
 const PLANE_FOCUS_KEYS: Record<string, SlicePlane> = {
@@ -105,9 +111,9 @@ export function usePlaneFocusKeys(): void {
   useEffect(() => {
     if (!keyboardTarget) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      const tag = (e.target as HTMLElement | null)?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (e.metaKey || e.ctrlKey || e.altKey || isTextEntry(e)) return;
+      // A focused list keeps its own typing too: a digit there selects an option.
+      if ((e.target as HTMLElement | null)?.tagName === 'SELECT') return;
       const plane = PLANE_FOCUS_KEYS[e.key];
       if (!plane) return;
       const { volume, setActivePlane } = store.getState();

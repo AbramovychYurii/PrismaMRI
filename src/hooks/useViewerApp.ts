@@ -15,6 +15,23 @@ import { useNavigate } from 'react-router-dom';
  * would re-render every consumer, ViewerPage and with it the whole viewer.
  * Store-driven effects live in `useViewerStoreEffects` instead.
  */
+/**
+ * Skipping the cache is not a user-facing failure — the volume is already open,
+ * only the next reload will be slower. Worth a line in the console though, or a
+ * silently uncached tab looks like a bug.
+ */
+function logCacheSkip(what: string, saving: Promise<volumeDb.SeriesSaveOutcome>): void {
+  saving
+    .then((outcome) => {
+      if (outcome.stored || outcome.reason === 'single-series') return;
+      const megabytes = Math.round(outcome.bytes / 1e6);
+      console.debug(`[volume-cache] ${what} not kept (${outcome.reason}) — ${megabytes} MB`);
+    })
+    .catch(() => {
+      /* unexpected storage failure — the volume still loaded */
+    });
+}
+
 export function useViewerApp() {
   const viewer = useViewer();
   const navigate = useNavigate();
@@ -23,23 +40,11 @@ export function useViewerApp() {
   // unmounting in the same frame the volume lands.
   useEffect(
     () =>
-      viewer.onVolumeLoaded(({ volume, prepared3D, histogram }) => {
+      viewer.onVolumeLoaded(({ volume, prepared3D, histogram }, series) => {
         navigate('/viewer');
-        volumeDb
-          .saveVolume(volume, prepared3D, histogram)
-          .then((outcome) => {
-            // Skipping the cache is not a user-facing failure — the volume is
-            // already open, only the next reload will be slower. Worth a line
-            // in the console though, or a silently uncached tab looks like a bug.
-            if (!outcome.stored) {
-              console.debug(
-                `[volume-cache] skipped (${outcome.reason}) — ${Math.round(outcome.bytes / 1e6)} MB`,
-              );
-            }
-          })
-          .catch(() => {
-            /* unexpected storage failure — the volume still loaded */
-          });
+        logCacheSkip('volume', volumeDb.saveVolume(volume, prepared3D, histogram));
+        // The other series of a multi-series study, so the selector survives a reload.
+        logCacheSkip('series files', volumeDb.saveSeries(series));
       }),
     [viewer, navigate],
   );

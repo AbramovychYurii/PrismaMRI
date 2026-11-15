@@ -1,8 +1,10 @@
-import { LAST_LOCAL_PORT_KEY, LOCAL_PORTS, LOCAL_PROBE_TIMEOUT_MS } from '@/lib/mcp/constants';
+import { LOCAL_PORTS, LOCAL_PROBE_TIMEOUT_MS } from '@/lib/mcp/constants';
 
 /**
- * Finding the local MCP server: it listens on the first free port of
- * LOCAL_PORTS on 127.0.0.1, so the app probes them for an open WebSocket.
+ * Finding the local MCP servers. Claude Desktop starts one server per surface
+ * (chat, Cowork and Code sessions), and each takes the first free port of
+ * LOCAL_PORTS on 127.0.0.1 — so there can be several, and the app has to talk
+ * to all of them: a command from any of them is for this one viewer.
  */
 
 function openSocket(port: number, timeoutMs: number): Promise<WebSocket> {
@@ -23,39 +25,22 @@ function openSocket(port: number, timeoutMs: number): Promise<WebSocket> {
   });
 }
 
-/** Probes every port at once, so the wait is one timeout rather than N. */
-function scanAllLocalPorts(): Promise<WebSocket | null> {
-  return new Promise((resolve) => {
-    let settled = false;
-    let pending = LOCAL_PORTS.length;
-
-    for (const port of LOCAL_PORTS) {
-      openSocket(port, LOCAL_PROBE_TIMEOUT_MS)
-        .then((ws) => {
-          if (settled) {
-            ws.close();
-            return;
-          }
-          settled = true;
-          resolve(ws);
-        })
-        .catch(() => {
-          pending--;
-          if (!settled && pending === 0) resolve(null);
-        });
-    }
-  });
+export interface LocalServer {
+  port: number;
+  ws: WebSocket;
 }
 
-/** Retries the last known port first, which keeps reloads free of failed-socket noise. */
-export async function findLocalServer(): Promise<WebSocket | null> {
-  const cached = Number(localStorage.getItem(LAST_LOCAL_PORT_KEY));
-  if ((LOCAL_PORTS as readonly number[]).includes(cached)) {
-    try {
-      return await openSocket(cached, LOCAL_PROBE_TIMEOUT_MS);
-    } catch {
-      /* stale port — fall through to the full scan */
-    }
-  }
-  return scanAllLocalPorts();
+/**
+ * Probes `ports` at once and returns an open socket for each one that answered,
+ * lowest port first. The wait is one timeout rather than one per port.
+ */
+export async function openLocalServers(
+  ports: readonly number[] = LOCAL_PORTS,
+): Promise<LocalServer[]> {
+  const settled = await Promise.allSettled(
+    ports.map((port) => openSocket(port, LOCAL_PROBE_TIMEOUT_MS)),
+  );
+  return settled.flatMap((probe, i) =>
+    probe.status === 'fulfilled' ? [{ port: ports[i], ws: probe.value }] : [],
+  );
 }

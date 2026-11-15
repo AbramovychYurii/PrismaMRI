@@ -1,4 +1,13 @@
-import { QUOTA_SHARE, fitsInQuota, recordBuffer, recordBytes } from '@/lib/volumeDb';
+import {
+  QUOTA_SHARE,
+  type StoredSeriesFiles,
+  type StoredSeriesMeta,
+  filesBytes,
+  fitsInQuota,
+  recordBuffer,
+  recordBytes,
+  seriesFromRecords,
+} from '@/lib/volumeDb';
 import type { LoadedVolume, PreparedVolumeFor3D, VolumeHistogram } from '@prisma-mri/viewer-core';
 import { describe, expect, it } from 'vitest';
 
@@ -101,5 +110,62 @@ describe('recordBuffer', () => {
     const out = recordBuffer(view);
     expect(out).not.toBe(backing.buffer);
     expect(Array.from(new Uint8Array(out))).toEqual([1, 2, 3]);
+  });
+});
+
+describe('keeping the series of a study', () => {
+  const file = (name: string, bytes: number) => new File([new Uint8Array(bytes)], name);
+  const meta = (over: Partial<StoredSeriesMeta> = {}): StoredSeriesMeta => ({
+    id: 'tab:series',
+    timestamp: 0,
+    list: [
+      { key: 'a', label: 'T1', count: 5, rows: 2, columns: 2 },
+      { key: 'b', label: 'T2', count: 5, rows: 2, columns: 2 },
+    ],
+    activeKey: 'b',
+    volumeIds: { a: 'vol-a', b: 'vol-b' },
+    rootName: 'study',
+    filesToken: 'tok',
+    ...over,
+  });
+  const files = (token = 'tok'): StoredSeriesFiles => ({
+    id: 'tab:series-files',
+    timestamp: 0,
+    token,
+    files: [{ path: 'x/1.dcm', name: '1.dcm', file: file('1.dcm', 10) }],
+  });
+
+  it('counts what the files of a study cost', () => {
+    const source = {
+      rootName: 's',
+      files: [
+        { path: 'a', name: 'a', file: file('a', 300) },
+        { path: 'b', name: 'b', file: file('b', 700) },
+      ],
+    };
+    expect(filesBytes(source)).toBe(1000);
+  });
+
+  it('rebuilds the study from its two records', () => {
+    const series = seriesFromRecords(meta(), files());
+    expect(series?.list.map((s) => s.key)).toEqual(['a', 'b']);
+    expect(series?.activeKey).toBe('b');
+    expect(series?.volumeIds).toEqual({ a: 'vol-a', b: 'vol-b' });
+    expect(series?.source.rootName).toBe('study');
+    expect(series?.source.files).toHaveLength(1);
+  });
+
+  it('gives nothing back when a record is missing', () => {
+    expect(seriesFromRecords(undefined, files())).toBeUndefined();
+    expect(seriesFromRecords(meta(), undefined)).toBeUndefined();
+  });
+
+  it('gives nothing back when the files belong to another study', () => {
+    // A write interrupted between the two records leaves a list and files that disagree.
+    expect(seriesFromRecords(meta({ filesToken: 'old' }), files('new'))).toBeUndefined();
+  });
+
+  it('gives nothing back for a single series — there is nothing to switch to', () => {
+    expect(seriesFromRecords(meta({ list: meta().list.slice(0, 1) }), files())).toBeUndefined();
   });
 });

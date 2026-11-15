@@ -33,6 +33,9 @@ export interface DicomTags {
   modality?: string;
   manufacturer?: string;
   seriesDescription?: string;
+  studyDescription?: string;
+  bodyPart?: string;
+  species?: string;
   numberOfFrames: number;
   pixelDataOffset: number;
   pixelDataLength: number;
@@ -50,6 +53,9 @@ const T = {
   StudyDate: 0x00080020,
   StudyTime: 0x00080030,
   SeriesDescription: 0x0008103e,
+  StudyDescription: 0x00081030,
+  BodyPartExamined: 0x00180015,
+  PatientSpeciesDescription: 0x00102201,
   StudyID: 0x00200010,
   SeriesInstanceUID: 0x0020000e,
   InstanceNumber: 0x00200013,
@@ -170,6 +176,15 @@ export function parseImplicitLittleEndianDicom(buffer: ArrayBuffer): DicomTags |
         break;
       case T.SeriesDescription:
         tags.seriesDescription = decodeString(view, r.valueOffset, r.length);
+        break;
+      case T.StudyDescription:
+        tags.studyDescription = decodeString(view, r.valueOffset, r.length);
+        break;
+      case T.BodyPartExamined:
+        tags.bodyPart = decodeString(view, r.valueOffset, r.length);
+        break;
+      case T.PatientSpeciesDescription:
+        tags.species = decodeString(view, r.valueOffset, r.length);
         break;
       case T.StudyID:
         tags.studyId = decodeString(view, r.valueOffset, r.length);
@@ -312,6 +327,9 @@ function finalize(t: Partial<DicomTags>): DicomTags | null {
     modality: t.modality,
     manufacturer: t.manufacturer,
     seriesDescription: t.seriesDescription,
+    studyDescription: t.studyDescription,
+    bodyPart: t.bodyPart,
+    species: t.species,
     numberOfFrames: t.numberOfFrames ?? 1,
     pixelDataOffset: t.pixelDataOffset ?? -1,
     pixelDataLength: t.pixelDataLength ?? 0,

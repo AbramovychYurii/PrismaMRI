@@ -1,9 +1,13 @@
 import type {
+  ImportHints,
+  ImportSource,
   LoadedVolume,
   PreparedVolumeFor3D,
+  SeriesChoice,
   Vec3,
   VolumeHistogram,
 } from '@prisma-mri/viewer-core';
+import type { ViewerSeriesContext } from '@prisma-mri/viewer-react';
 
 const DB_NAME = 'prisma-mri';
 const DB_VERSION = 1;
@@ -47,10 +51,11 @@ function pruneOldRecords(db: IDBDatabase, keepId: string): Promise<void> {
       const cursor = req.result;
       if (!cursor) return;
       const rec = cursor.value as StoredRecord;
-      // Always keep our own tab's record regardless of age.  Drop anything
+      // Always keep our own tab's records regardless of age.  Drop anything
       // else that's older than the retention window, AND drop the legacy
       // shared 'current' key (it can never be a per-tab record).
-      if (rec.id !== keepId && (rec.id === 'current' || rec.timestamp < cutoff)) {
+      const own = rec.id === keepId || rec.id.startsWith(`${keepId}:`);
+      if (!own && (rec.id === 'current' || rec.timestamp < cutoff)) {
         cursor.delete();
       }
       cursor.continue();
@@ -83,6 +88,54 @@ interface StoredRecord {
   p3dSourceDims: Vec3;
   /** Absent in records written before the grid moved to the worker. */
   p3dOccupancy?: ArrayBuffer;
+}
+
+/**
+ * The series of a multi-series study, kept beside the volume so the series
+ * selector survives a reload. Two records: the list and the open series are
+ * tiny and change on every switch; the files can be large and change only with
+ * the study — so a switch must not rewrite them.
+ */
+export interface StoredSeriesMeta {
+  id: string;
+  timestamp: number;
+  list: SeriesChoice[];
+  activeKey: string | null;
+  volumeIds: Record<string, string>;
+  rootName: string;
+  hints?: ImportHints;
+  /** Names the files record these belong to; a mismatch means they are another study's. */
+  filesToken: string;
+}
+
+export interface StoredSeriesFiles {
+  id: string;
+  timestamp: number;
+  token: string;
+  files: { path: string; name: string; file: File }[];
+}
+
+const seriesMetaId = (tabKey: string) => `${tabKey}:series`;
+const seriesFilesId = (tabKey: string) => `${tabKey}:series-files`;
+
+/** A name for each study opened in this page, to tell whether its files are already stored. */
+const sourceTokens = new WeakMap<ImportSource, string>();
+
+function tokenOf(source: ImportSource): string {
+  let token = sourceTokens.get(source);
+  if (!token) {
+    token = crypto.randomUUID();
+    sourceTokens.set(source, token);
+  }
+  return token;
+}
+
+/** Token of the files record this tab has in the database, if any. */
+let storedFilesToken: string | null = null;
+
+/** Bytes of the files of a study — what keeping it for a reload costs. */
+export function filesBytes(source: ImportSource): number {
+  return source.files.reduce((sum, f) => sum + f.file.size, 0);
 }
 
 function openDb(): Promise<IDBDatabase> {
@@ -159,6 +212,34 @@ async function readEstimate(): Promise<StorageEstimate | null> {
   }
 }
 
+/** Runs `work` on the store in one transaction and resolves once it has committed. */
+function write(db: IDBDatabase, work: (store: IDBObjectStore) => void): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    // A quota failure aborts the transaction rather than surfacing on the
+    // request, so this is the branch that actually fires when the disk is full.
+    tx.onabort = () => reject(tx.error);
+    work(tx.objectStore(STORE_NAME));
+  });
+}
+
+function putRecord(
+  db: IDBDatabase,
+  record: StoredRecord | StoredSeriesMeta | StoredSeriesFiles,
+): Promise<void> {
+  return write(db, (store) => {
+    store.put(record);
+  });
+}
+
+function deleteRecords(db: IDBDatabase, ids: string[]): Promise<void> {
+  return write(db, (store) => {
+    for (const id of ids) store.delete(id);
+  });
+}
+
 function isQuotaError(err: unknown): boolean {
   return err instanceof DOMException && (err.name === 'QuotaExceededError' || err.code === 22);
 }
@@ -229,15 +310,7 @@ export async function saveVolume(
       p3dOccupancy: prepared3D.occupancy ? recordBuffer(prepared3D.occupancy) : undefined,
     };
 
-    await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readwrite');
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
-      // A quota failure aborts the transaction rather than surfacing on the
-      // request, so this is the branch that actually fires when the disk is full.
-      tx.onabort = () => reject(tx.error);
-      tx.objectStore(STORE_NAME).put(record);
-    });
+    await putRecord(db, record);
 
     return { stored: true, bytes };
   } catch (err) {
@@ -248,23 +321,124 @@ export async function saveVolume(
   }
 }
 
+/**
+ * The study the two series records describe, or undefined when they do not
+ * describe one: either is missing, or the files belong to another study (a
+ * write was interrupted between the two), or there is only one series.
+ */
+export function seriesFromRecords(
+  meta: StoredSeriesMeta | undefined,
+  files: StoredSeriesFiles | undefined,
+): ViewerSeriesContext | undefined {
+  if (!meta || !files || meta.filesToken !== files.token || meta.list.length <= 1) return undefined;
+  return {
+    source: { rootName: meta.rootName, hints: meta.hints, files: files.files },
+    list: meta.list,
+    activeKey: meta.activeKey,
+    volumeIds: meta.volumeIds,
+  };
+}
+
+export type SeriesSaveOutcome =
+  | SaveOutcome
+  | { stored: false; bytes: number; reason: 'single-series' };
+
+/**
+ * Keeps the series of the open study next to the cached volume. `null` (a
+ * single-series volume) drops whatever an earlier study left.
+ *
+ * The files are written when the study changes, and only if they fit the share
+ * of the free quota the volume is held to. When they do not, the volume still
+ * reloads — only the other series are lost.
+ */
+export async function saveSeries(series: ViewerSeriesContext | null): Promise<SeriesSaveOutcome> {
+  const bytes = series ? filesBytes(series.source) : 0;
+
+  let db: IDBDatabase;
+  try {
+    db = await openDb();
+  } catch {
+    return { stored: false, bytes, reason: 'unavailable' };
+  }
+  const tabKey = getTabKey();
+  const staleIds = [seriesMetaId(tabKey), seriesFilesId(tabKey)];
+
+  try {
+    if (!series) {
+      storedFilesToken = null;
+      await deleteRecords(db, staleIds);
+      return { stored: false, bytes, reason: 'single-series' };
+    }
+
+    const token = tokenOf(series.source);
+    if (storedFilesToken !== token) {
+      if (!fitsInQuota(bytes, await readEstimate())) {
+        storedFilesToken = null;
+        await deleteRecords(db, staleIds);
+        return { stored: false, bytes, reason: 'too-large' };
+      }
+      await putRecord(db, {
+        id: seriesFilesId(tabKey),
+        timestamp: Date.now(),
+        token,
+        files: series.source.files.map(({ path, name, file }) => ({ path, name, file })),
+      });
+      storedFilesToken = token;
+    }
+
+    await putRecord(db, {
+      id: seriesMetaId(tabKey),
+      timestamp: Date.now(),
+      list: series.list,
+      activeKey: series.activeKey,
+      volumeIds: series.volumeIds,
+      rootName: series.source.rootName,
+      hints: series.source.hints,
+      filesToken: token,
+    });
+    return { stored: true, bytes };
+  } catch (err) {
+    if (isQuotaError(err)) {
+      storedFilesToken = null;
+      return { stored: false, bytes, reason: 'quota-exceeded' };
+    }
+    throw err;
+  } finally {
+    db.close();
+  }
+}
+
 export async function loadVolume(): Promise<{
   volume: LoadedVolume;
   prepared3D: PreparedVolumeFor3D;
   histogram: VolumeHistogram;
+  /** The study's series, when it had several and they were kept. */
+  series?: ViewerSeriesContext;
 } | null> {
   const db = await openDb();
   const tabKey = getTabKey();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readonly');
-    const req = tx.objectStore(STORE_NAME).get(tabKey);
-    req.onsuccess = () => {
+    const store = tx.objectStore(STORE_NAME);
+    const volumeRequest = store.get(tabKey);
+    const metaRequest = store.get(seriesMetaId(tabKey));
+    const filesRequest = store.get(seriesFilesId(tabKey));
+    tx.oncomplete = () => {
       db.close();
-      const r = req.result as StoredRecord | undefined;
+      const r = volumeRequest.result as StoredRecord | undefined;
       if (!r) return resolve(null);
 
       const voxels =
         r.voxelType === 'float32' ? new Float32Array(r.voxels) : new Int16Array(r.voxels);
+
+      // The files are already in the database: remember it, so the first series
+      // switch after the reload does not write them again.
+      const files = filesRequest.result as StoredSeriesFiles | undefined;
+      const series = seriesFromRecords(metaRequest.result as StoredSeriesMeta | undefined, files);
+      if (series && files) {
+        sourceTokens.set(series.source, files.token);
+        storedFilesToken = files.token;
+      }
 
       resolve({
         volume: {
@@ -291,11 +465,12 @@ export async function loadVolume(): Promise<{
           max: r.histMax,
           count: r.histCount,
         },
+        series,
       });
     };
-    req.onerror = () => {
+    tx.onerror = () => {
       db.close();
-      reject(req.error);
+      reject(tx.error);
     };
   });
 }
@@ -303,16 +478,10 @@ export async function loadVolume(): Promise<{
 export async function clearVolume(): Promise<void> {
   const db = await openDb();
   const tabKey = getTabKey();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    tx.oncomplete = () => {
-      db.close();
-      resolve();
-    };
-    tx.onerror = () => {
-      db.close();
-      reject(tx.error);
-    };
-    tx.objectStore(STORE_NAME).delete(tabKey);
-  });
+  storedFilesToken = null;
+  try {
+    await deleteRecords(db, [tabKey, seriesMetaId(tabKey), seriesFilesId(tabKey)]);
+  } finally {
+    db.close();
+  }
 }

@@ -1,7 +1,7 @@
 import { useBridgeLeadership } from '@/hooks/useBridgeLeadership';
-import { ACTION_LABELS, LAST_LOCAL_PORT_KEY, SESSION_IDLE_MS } from '@/lib/mcp/constants';
+import { ACTION_LABELS, LOCAL_PORTS, LOCAL_RESCAN_MS, SESSION_IDLE_MS } from '@/lib/mcp/constants';
 import { MCP_HANDLERS } from '@/lib/mcp/handlers';
-import { findLocalServer } from '@/lib/mcp/local-server';
+import { openLocalServers } from '@/lib/mcp/local-server';
 import type { IncomingMessage, OutgoingResult } from '@/lib/mcp/protocol';
 import { useAgentStore } from '@/store';
 import { useViewer } from '@prisma-mri/viewer-react';
@@ -20,18 +20,26 @@ const COMPETING_CLIENT_CODES = [1001, 1008];
 const COMPETING_BACKOFF_MS = 2_000;
 const COMPETING_JITTER_MS = 3_000;
 
+type Command = Extract<IncomingMessage, { type: 'cmd' }>;
+
 /**
- * WebSocket bridge to the local MCP server (the Claude Desktop extension on
+ * WebSocket bridge to the local MCP servers (the Claude Desktop extension on
  * 127.0.0.1). Dispatches incoming commands to {@link MCP_HANDLERS} and reports
- * each result back.
+ * each result back on the socket it came from. There can be several servers
+ * (see `local-server.ts`), and the bridge keeps a socket to every one it finds.
  */
 export function useMcpBridge() {
-  const wsRef = useRef<WebSocket | null>(null);
+  /** One socket per server, by port. */
+  const sockets = useRef(new Map<number, WebSocket>());
+  /** Ports whose server said its agent went away while the socket stays open. */
+  const agentless = useRef(new Set<number>());
+  const watchdogs = useRef(new Map<number, ReturnType<typeof setTimeout>>());
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sessionIdleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pingWatchdog = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** Guards against a second connect() while the async port scan is in flight. */
-  const connecting = useRef(false);
+  /** Guards against a second scan while the async port probe is in flight. */
+  const scanning = useRef(false);
+  /** False once the bridge is torn down, so a scan still in flight closes what it found. */
+  const active = useRef(false);
   const store = useAgentStore;
   const viewer = useViewer();
 
@@ -50,29 +58,45 @@ export function useMcpBridge() {
     }, SESSION_IDLE_MS);
   }, [clearSessionIdle, store]);
 
-  const clearPingWatchdog = useCallback(() => {
-    if (pingWatchdog.current) clearTimeout(pingWatchdog.current);
-    pingWatchdog.current = null;
+  const clearWatchdog = useCallback((port: number) => {
+    const timer = watchdogs.current.get(port);
+    if (timer) clearTimeout(timer);
+    watchdogs.current.delete(port);
   }, []);
 
-  const resetPingWatchdog = useCallback(
-    (ws: WebSocket) => {
-      clearPingWatchdog();
-      pingWatchdog.current = setTimeout(() => {
-        console.debug('[mcp-bridge] no ping in', PING_WATCHDOG_MS, 'ms — closing');
-        ws.close(4000, 'ping watchdog timeout');
-      }, PING_WATCHDOG_MS);
+  const resetWatchdog = useCallback(
+    (port: number, ws: WebSocket) => {
+      clearWatchdog(port);
+      watchdogs.current.set(
+        port,
+        setTimeout(() => {
+          console.debug('[mcp-bridge] no ping in', PING_WATCHDOG_MS, 'ms — closing', port);
+          ws.close(4000, 'ping watchdog timeout');
+        }, PING_WATCHDOG_MS),
+      );
     },
-    [clearPingWatchdog],
+    [clearWatchdog],
   );
 
-  const send = useCallback((msg: object) => {
-    const ws = wsRef.current;
-    if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
-  }, []);
+  /** Drops everything kept about the server on `port`. */
+  const forget = useCallback(
+    (port: number) => {
+      sockets.current.delete(port);
+      agentless.current.delete(port);
+      clearWatchdog(port);
+    },
+    [clearWatchdog],
+  );
+
+  /** Mirrors the open sockets into the store. */
+  const publish = useCallback(() => {
+    const ports = [...sockets.current.keys()].sort((a, b) => a - b);
+    store.getState().setLocalPorts(ports);
+    store.getState().setMcpConnected(ports.some((p) => !agentless.current.has(p)));
+  }, [store]);
 
   const handleCommand = useCallback(
-    async (msg: Extract<IncomingMessage, { type: 'cmd' }>) => {
+    async (msg: Command, ws: WebSocket) => {
       const { id, action } = msg;
 
       clearSessionIdle();
@@ -82,7 +106,7 @@ export function useMcpBridge() {
       const reply = (result: OutgoingResult) => {
         store.getState().setAgentActivity(false);
         scheduleSessionIdle();
-        send(result);
+        if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(result));
       };
       const ok = (data?: unknown) => reply({ type: 'result', id, ok: true, data });
       const fail = (error: string) => reply({ type: 'result', id, ok: false, error });
@@ -98,41 +122,20 @@ export function useMcpBridge() {
         fail((err as Error).message ?? 'Internal error');
       }
     },
-    [send, store, viewer, clearSessionIdle, scheduleSessionIdle],
+    [store, viewer, clearSessionIdle, scheduleSessionIdle],
   );
 
-  // Held in a ref so connect() keeps a stable identity and never tears down the
-  // socket just because a handler dependency changed.
+  // Held in refs so connect() and attach() keep a stable identity and never
+  // tear down a socket just because a handler dependency changed.
   const handleCommandRef = useRef(handleCommand);
   handleCommandRef.current = handleCommand;
+  const connectRef = useRef<() => void>(() => {});
 
-  const connect = useCallback(() => {
-    if (wsRef.current || connecting.current) return;
-
-    void (async () => {
-      connecting.current = true;
-      const ws = await findLocalServer();
-      if (!ws) {
-        connecting.current = false;
-        return;
-      }
-
-      const port = Number(new URL(ws.url).port);
-      if (port) {
-        store.getState().setLocalPort(port);
-        localStorage.setItem(LAST_LOCAL_PORT_KEY, String(port));
-      }
-
-      // Register before clearing the guard so no concurrent call slips between.
-      wsRef.current = ws;
-      connecting.current = false;
-      store.getState().setMcpConnected(true);
-
-      ws.addEventListener('open', () => {
-        if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
-        reconnectTimer.current = null;
-        resetPingWatchdog(ws);
-      });
+  /** Wires up a freshly opened socket for the server on `port`. */
+  const attach = useCallback(
+    (ws: WebSocket, port: number) => {
+      sockets.current.set(port, ws);
+      publish();
 
       ws.addEventListener('message', (event: MessageEvent<string>) => {
         let msg: IncomingMessage;
@@ -144,19 +147,23 @@ export function useMcpBridge() {
 
         switch (msg.type) {
           case 'ping':
-            wsRef.current?.send('{"type":"pong"}');
-            resetPingWatchdog(ws);
+            ws.send('{"type":"pong"}');
+            resetWatchdog(port, ws);
             return;
           case 'mcp_connecting':
-            store.getState().setMcpConnected(true);
+            agentless.current.delete(port);
+            publish();
             return;
           case 'mcp_disconnected':
-            store.getState().setMcpConnected(false);
-            clearSessionIdle();
-            store.getState().setAgentSessionActive(false);
+            agentless.current.add(port);
+            publish();
+            if (!store.getState().mcpConnected) {
+              clearSessionIdle();
+              store.getState().setAgentSessionActive(false);
+            }
             return;
           case 'cmd':
-            void handleCommandRef.current(msg);
+            void handleCommandRef.current(msg, ws);
             return;
           default:
             return;
@@ -165,12 +172,10 @@ export function useMcpBridge() {
 
       ws.addEventListener('close', (evt) => {
         // A newer socket already replaced this one — leave it alone.
-        if (wsRef.current !== ws) return;
+        if (sockets.current.get(port) !== ws) return;
 
-        wsRef.current = null;
-        clearPingWatchdog();
-        store.getState().setMcpConnected(false);
-        store.getState().setLocalPort(null);
+        forget(port);
+        publish();
 
         // Jitter the retry when another client is competing, so the two
         // de-synchronise and one gets to stabilise.
@@ -178,48 +183,95 @@ export function useMcpBridge() {
         const delay = competing
           ? COMPETING_BACKOFF_MS + Math.floor(Math.random() * COMPETING_JITTER_MS)
           : RECONNECT_DELAY_MS;
-        console.debug('[mcp-bridge] closed', evt.code, '— reconnecting in', delay, 'ms');
+        console.debug('[mcp-bridge] closed', port, evt.code, '— reconnecting in', delay, 'ms');
+        if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
         reconnectTimer.current = setTimeout(() => {
           reconnectTimer.current = null;
-          connect();
+          connectRef.current();
         }, delay);
       });
 
       ws.addEventListener('error', () => {
         console.debug('[mcp-bridge] socket error', ws.url);
       });
+    },
+    [store, publish, resetWatchdog, forget, clearSessionIdle],
+  );
+
+  /** Connects to every server on a port we have no socket for yet. */
+  const connect = useCallback(() => {
+    if (scanning.current) return;
+    scanning.current = true;
+
+    void (async () => {
+      try {
+        const free = LOCAL_PORTS.filter((port) => !sockets.current.has(port));
+        for (const { port, ws } of await openLocalServers(free)) {
+          if (!active.current || sockets.current.has(port)) {
+            ws.close(1000, 'not needed');
+            continue;
+          }
+          attach(ws, port);
+        }
+      } finally {
+        scanning.current = false;
+      }
     })();
-  }, [store, clearSessionIdle, resetPingWatchdog, clearPingWatchdog]);
+  }, [attach]);
+  connectRef.current = connect;
 
   useEffect(() => {
     if (!isLeader) return;
+    active.current = true;
     connect();
     return () => {
+      active.current = false;
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
+      reconnectTimer.current = null;
       clearSessionIdle();
-      clearPingWatchdog();
-      wsRef.current?.close(1000, 'unmount');
-      wsRef.current = null;
+      for (const [port, ws] of sockets.current) {
+        forget(port);
+        ws.close(1000, 'unmount');
+      }
+      publish();
     };
-  }, [isLeader, connect, clearSessionIdle, clearPingWatchdog]);
+  }, [isLeader, connect, clearSessionIdle, forget, publish]);
 
   /**
-   * Reconnects when the tab is shown again. The socket is deliberately left
-   * open while hidden: the tab backgrounds every time the user switches to
-   * Claude Desktop, and closing then would kill in-flight commands. Truly dead
+   * A server can start after the bridge connected to another one, and nothing
+   * announces it — so, while connected to any, look again now and then. Not
+   * while disconnected: nobody asked for an agent, and every probe of a free
+   * port shows as a failed socket in the console.
+   */
+  useEffect(() => {
+    if (!isLeader) return;
+    const id = setInterval(() => {
+      if (sockets.current.size > 0) connectRef.current();
+    }, LOCAL_RESCAN_MS);
+    return () => clearInterval(id);
+  }, [isLeader]);
+
+  /**
+   * Looks again when the tab is shown. The sockets are deliberately left open
+   * while hidden: the tab backgrounds every time the user switches to Claude
+   * Desktop, and closing then would kill in-flight commands. Truly dead
    * connections are caught by the ping watchdog instead.
    */
   useEffect(() => {
     if (!isLeader) return;
     const onVisibility = () => {
       if (document.visibilityState !== 'visible') return;
-      if (wsRef.current?.readyState === WebSocket.OPEN) return;
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current);
       reconnectTimer.current = null;
-      wsRef.current = null;
-      connect();
+      // Forget sockets that are closing or closed but whose `close` has not
+      // fired yet; their ports are free to reconnect.
+      for (const [port, ws] of sockets.current) {
+        if (ws.readyState !== WebSocket.OPEN) forget(port);
+      }
+      publish();
+      connectRef.current();
     };
     document.addEventListener('visibilitychange', onVisibility);
     return () => document.removeEventListener('visibilitychange', onVisibility);
-  }, [isLeader, connect]);
+  }, [isLeader, forget, publish]);
 }

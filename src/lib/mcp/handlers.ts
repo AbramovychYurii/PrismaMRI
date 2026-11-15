@@ -1,6 +1,5 @@
 import {
   type Annotation,
-  type LoadedVolume,
   type MeasurementPoint,
   type SlicePlane,
   type VolumeCursor,
@@ -14,13 +13,16 @@ import {
   sliceNumber,
   volumeCenter,
 } from '@prisma-mri/viewer-core';
-import { clamp } from '@prisma-mri/viewer-core/unstable';
-import type { ViewerInstance, ViewerSnapshot } from '@prisma-mri/viewer-react';
+import { clamp, seriesLabel } from '@prisma-mri/viewer-core/unstable';
 
+import { ANALYSIS_HANDLERS } from './analysis-handlers';
 import { captureCanvas, renderSliceForMcp, waitForPaint } from './canvas-utils';
-import { MCP_JPEG_QUALITY, MCP_MAX_EDGE, WL_PRESETS } from './constants';
+import { MAX_SLAB_MM, MCP_JPEG_QUALITY, MCP_MAX_EDGE, WL_PRESETS } from './constants';
+import { type Handler, type LoadedState, evenlySpaced, requireLoaded } from './handler-base';
+import { SERIES_HANDLERS } from './series-handlers';
 import {
   optionalNumber,
+  optionalOneOf,
   optionalSeverity,
   optionalString,
   requireFraction,
@@ -30,34 +32,6 @@ import {
   requireString,
 } from './validate';
 import { snapToAnatomy } from './voxel-utils';
-
-/** Free-form message body — handlers narrow individual fields as needed. */
-export type HandlerMessage = Record<string, unknown> & { id: string; action: string };
-
-export interface HandlerContext {
-  msg: HandlerMessage;
-  ok: (data?: unknown) => void;
-  fail: (error: string) => void;
-  /** The viewer the command acts on. */
-  viewer: ViewerInstance;
-}
-
-export type Handler = (ctx: HandlerContext) => void | Promise<void>;
-
-type LoadedState = ViewerSnapshot & { volume: LoadedVolume; cursor: VolumeCursor };
-
-/**
- * Reports "No volume loaded" and returns null unless a volume is open. The
- * viewer only ever sets a cursor alongside a volume, so both are narrowed here.
- */
-function requireLoaded(viewer: ViewerInstance, fail: (error: string) => void): LoadedState | null {
-  const state = viewer.getSnapshot();
-  if (!state.volume || !state.cursor) {
-    fail('No volume loaded');
-    return null;
-  }
-  return state as LoadedState;
-}
 
 function sliceNumbers(cursor: VolumeCursor) {
   return {
@@ -84,7 +58,14 @@ function sliceImagesAt(state: LoadedState, cursor: VolumeCursor) {
 }
 
 const handleGetState: Handler = ({ ok, viewer }) => {
-  const { volume, cursor, windowLevel: wl, renderPreset } = viewer.getSnapshot();
+  const {
+    volume,
+    cursor,
+    windowLevel: wl,
+    renderPreset,
+    seriesList,
+    activeSeriesKey,
+  } = viewer.getSnapshot();
   const dims = volume?.meta.dims ?? null;
   ok({
     volumeLoaded: volume !== null,
@@ -95,6 +76,12 @@ const handleGetState: Handler = ({ ok, viewer }) => {
     sliceTotals: dims ? sliceTotals(dims) : null,
     wl,
     preset: renderPreset,
+    series: seriesList
+      ? {
+          count: seriesList.length,
+          active: seriesLabel(seriesList, activeSeriesKey) ?? null,
+        }
+      : null,
   });
 };
 
@@ -113,6 +100,9 @@ const handleOverview: Handler = ({ ok, fail, viewer }) => {
       modality,
       scanner,
       protocol,
+      bodyPart: state.volume.meta.bodyPart,
+      species: state.volume.meta.species,
+      studyDescription: state.volume.meta.studyDescription,
       scalarMin: state.volume.scalarMin,
       scalarMax: state.volume.scalarMax,
       formatId: state.volume.formatId,
@@ -187,8 +177,6 @@ const handleSetPreset: Handler = ({ msg, ok, fail, viewer }) => {
   ok();
 };
 
-const MAX_SLAB_MM = 50;
-
 const handleSetSlabMm: Handler = ({ msg, ok, fail, viewer }) => {
   const requested = Number(msg.slab_mm);
   if (!Number.isFinite(requested) || requested < 0) {
@@ -225,14 +213,28 @@ const handleCaptureSlice: Handler = async ({ msg, ok, fail, viewer }) => {
   ok({ imageData: captureCanvas(canvas) });
 };
 
-const handleCapture3d: Handler = async ({ ok, fail, viewer }) => {
+const CAPTURE_3D_VIEWS = ['current', 'coronal', 'sagittal', 'axial', 'all'] as const;
+
+const handleCapture3d: Handler = async ({ msg, ok, fail, viewer }) => {
+  const view = optionalOneOf(msg, 'view', CAPTURE_3D_VIEWS) ?? 'current';
   const preview = viewer.surfaces.preview();
   if (!preview) {
     fail('3-D view not ready');
     return;
   }
   await waitForPaint();
-  ok({ imageData: preview.captureJpeg(MCP_MAX_EDGE, MCP_JPEG_QUALITY) });
+
+  if (view === 'current') {
+    ok({ imageData: preview.captureJpeg(MCP_MAX_EDGE, MCP_JPEG_QUALITY) });
+    return;
+  }
+  const from = (plane: SlicePlane) =>
+    preview.captureJpegFromPlane(plane, MCP_MAX_EDGE, MCP_JPEG_QUALITY);
+  if (view === 'all') {
+    ok({ coronal: from('coronal'), sagittal: from('sagittal'), axial: from('axial') });
+    return;
+  }
+  ok({ imageData: from(view), view });
 };
 
 const handleCaptureAll: Handler = ({ ok, fail, viewer }) => {
@@ -254,9 +256,7 @@ const handleOverviewGrid: Handler = ({ msg, ok, fail, viewer }) => {
   const total = sliceCount(volume.meta.dims, plane);
   const half = slabHalfSlices(plane, OVERVIEW_GRID_SLAB_MM, volume.meta.spacing);
 
-  const indices = Array.from({ length: count }, (_, i) =>
-    Math.round(1 + (i / (count - 1)) * (total - 1)),
-  );
+  const indices = evenlySpaced(1, total, count);
   const images = indices.map((slice) =>
     renderSliceForMcp(extractSliceGrayImage(volume, plane, slice - 1, wl, half)),
   );
@@ -298,6 +298,14 @@ const handleAddAnnotation: Handler = ({ msg, ok, fail, viewer }) => {
 const handleRemoveAnnotation: Handler = ({ msg, ok, fail, viewer }) => {
   const removeId = requireString(msg, 'id');
   const state = viewer.getSnapshot();
+  const elsewhere = state.otherSeriesAnnotations.find((a) => a.id === removeId);
+  if (elsewhere) {
+    const series = seriesLabel(state.seriesList, elsewhere.seriesKey) ?? elsewhere.seriesKey;
+    fail(
+      `Annotation ${removeId} is on series "${series}", which is not on screen: switch_series to it first.`,
+    );
+    return;
+  }
   if (!state.annotations.some((a) => a.id === removeId)) {
     fail(`Annotation ${removeId} not found`);
     return;
@@ -307,13 +315,17 @@ const handleRemoveAnnotation: Handler = ({ msg, ok, fail, viewer }) => {
 };
 
 const handleListAnnotations: Handler = ({ ok, viewer }) => {
-  const annotations = viewer.getSnapshot().annotations.map((a) => ({
+  const { annotations: onScreen, otherSeriesAnnotations, seriesList } = viewer.getSnapshot();
+  // `voxel` is always in the coordinates of the finding's own series.
+  const annotations = [...onScreen, ...otherSeriesAnnotations].map((a) => ({
     id: a.id,
     plane: a.plane,
     voxel: a.voxel,
     label: a.label,
     summary: a.summary ?? null,
     severity: a.severity,
+    series: seriesLabel(seriesList, a.seriesKey) ?? null,
+    onScreen: onScreen.includes(a),
   }));
   ok({ annotations, count: annotations.length });
 };
@@ -364,6 +376,8 @@ const handleClearMeasurement: Handler = ({ ok, viewer }) => {
 };
 
 export const MCP_HANDLERS: Record<string, Handler> = {
+  ...ANALYSIS_HANDLERS,
+  ...SERIES_HANDLERS,
   get_state: handleGetState,
   overview: handleOverview,
   navigate: handleNavigate,

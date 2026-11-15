@@ -181,14 +181,14 @@ const STRONG_INK2_STYLE: React.CSSProperties = { color: 'var(--ink-2)' };
 export function SessionPanel() {
   const mcpConnected = useAgentStore((s) => s.mcpConnected);
   const agentWorking = useAgentStore((s) => s.agentSessionActive);
-  const localPort = useAgentStore((s) => s.localPort);
+  const localPorts = useAgentStore((s) => s.localPorts);
   const dockOpen = useViewerSnapshot((s) => s.dockOpen);
   const activeVolumeId = useViewerSnapshot((s) => s.activeVolumeId);
   const { replaceAnnotations } = useViewer();
-  // Prefer the store's localPort over isLocalMode() — localPort is set only when
+  // Prefer the store's localPorts over isLocalMode() — they are set only when
   // the bridge actually connected directly to 127.0.0.1 (covers both PWA standalone
   // and localhost dev-server cases that isLocalMode() would miss).
-  const local = localPort !== null || isLocalMode();
+  const local = localPorts.length > 0 || isLocalMode();
   const [expanded, setExpanded] = useState(false);
   const [capOpen, setCapOpen] = useState(false);
   const [dxtState, setDxtState] = useState<BtnState>('idle');
@@ -382,8 +382,8 @@ export function SessionPanel() {
                   <InfoTip text="Claude connects directly to this app with no relay — no data leaves your machine. Lower latency, works offline." />
                 </Label>
                 <Value style={PORT_VALUE_INLINE_STYLE}>
-                  {localPort
-                    ? `PORT: ${localPort}`
+                  {localPorts.length > 0
+                    ? `${localPorts.length > 1 ? 'PORTS' : 'PORT'}: ${localPorts.join(', ')}`
                     : `PORT: ${LOCAL_PORTS[0]}–${LOCAL_PORTS[LOCAL_PORTS.length - 1]}`}
                 </Value>
               </Row>

@@ -38,6 +38,14 @@ const SECTIONS: Array<{ label: string; rows: ShortcutRow[] }> = [
     ],
   },
   {
+    label: 'Series',
+    rows: [
+      { keys: ['[ / ]'], action: 'Previous / next series' },
+      { keys: ['Tab'], action: 'Focus the series selector' },
+      { keys: ['↑ / ↓'], action: 'Choose a series (selector focused)' },
+    ],
+  },
+  {
     label: '3D View',
     rows: [
       { keys: ['Drag'], action: 'Orbit' },

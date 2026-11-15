@@ -89,7 +89,7 @@ export function ViewerPage() {
       .then((result) => {
         if (!alive) return;
         if (result) {
-          viewer.restoreVolume(result);
+          viewer.restoreVolume(result, result.series);
           setRestoring(false);
         } else {
           navigate('/', { replace: true });

@@ -15,14 +15,28 @@ function optionLabel(s: SeriesChoice): string {
   return bits.join(' · ');
 }
 
-export function StageSeriesSelect() {
+/** The series the selector offers, or null when there is nothing to choose from. */
+function useSeriesOnOffer(): SeriesChoice[] | null {
   const seriesList = useViewerStore((s) => s.seriesList);
+  const { seriesSelect } = useViewerFeatures();
+  return seriesSelect && seriesList && seriesList.length > 1 ? seriesList : null;
+}
+
+/**
+ * Whether the selector is on screen. The findings panel sits in the same
+ * corner, so it needs to know to put itself below.
+ */
+export function useSeriesSelectVisible(): boolean {
+  return useSeriesOnOffer() !== null;
+}
+
+export function StageSeriesSelect() {
+  const seriesList = useSeriesOnOffer();
   const activeSeriesKey = useViewerStore((s) => s.activeSeriesKey);
-  const loading = useViewerStore((s) => s.loading.active);
+  const switching = useViewerStore((s) => s.switchingSeriesKey);
   const { switchSeries } = useViewer();
 
-  const { seriesSelect } = useViewerFeatures();
-  if (!seriesSelect || !seriesList || seriesList.length <= 1) return null;
+  if (!seriesList) return null;
 
   return (
     <div className={styles.wrap}>
@@ -33,8 +47,11 @@ export function StageSeriesSelect() {
         <select
           className={styles.select}
           aria-label="Switch series"
-          value={activeSeriesKey ?? ''}
-          disabled={loading}
+          title="Switch series — [ and ] step through them"
+          // The pending choice while a series loads. Not `disabled` then: that
+          // would drop the keyboard focus, and a second choice replaces the load.
+          value={switching ?? activeSeriesKey ?? ''}
+          aria-busy={switching !== null || undefined}
           onChange={(e) => switchSeries(e.target.value)}
         >
           {seriesList.map((s) => (

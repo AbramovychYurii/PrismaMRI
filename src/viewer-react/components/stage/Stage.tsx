@@ -4,6 +4,7 @@ import { useViewerHost, useViewerLabels, useViewerStore } from '../../viewer';
 import { AnnotationHud } from '../annotations/AnnotationHud';
 import styles from './Stage.module.css';
 import { StageAlert } from './StageAlert';
+import { StageSeriesLoading } from './StageSeriesLoading';
 import { StageSeriesSelect } from './StageSeriesSelect';
 import { ToolbarPill } from './ToolbarPill';
 
@@ -45,6 +46,7 @@ export function Stage() {
           </>
         )}
       </output>
+      <StageSeriesLoading />
       <StageSeriesSelect />
       <StageAlert />
       <ToolbarPill previewRef={previewRef} has3D={status !== 'unavailable'} />

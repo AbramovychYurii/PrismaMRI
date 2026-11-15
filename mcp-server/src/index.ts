@@ -36,6 +36,20 @@
  *    capture_overview_grid N evenly-spaced slices across one plane
  *    capture_3d            screenshot of the 3-D render
  *
+ *  Voxel analysis (numbers computed from the voxels, not read off a picture)
+ *    survey_subject        size, shape, symmetry, declared body part / species
+ *    roi_stats             mean, SD, percentiles, volume of a sphere or box
+ *    line_profile          intensities along a line (edges, wall thickness)
+ *    slice_curve           one number per slice — where along an axis it happens
+ *    find_objects          separate objects: volume, position, long axis, shape
+ *    axis_profile          follow one object: length, thickness, bends
+ *    check_arrangement     does a row of objects (teeth, vertebrae) keep its order
+ *    check_symmetry        what has no counterpart on the other side
+ *    find_gaps             thin gaps in dense material (crack / fracture candidates)
+ *    navigate_to_voxel     move the crosshair to a voxel
+ *    capture_region        close-up at native resolution
+ *    capture_montage       up to 20 slices on one sheet
+ *
  *  Annotations (severity-coded findings, anchored in 2-D and 3-D)
  *    add_annotation        place a finding (severity + summary, returns id)
  *    remove_annotation     remove a specific finding by id
@@ -136,7 +150,7 @@ if (SKILL_INSTRUCTIONS && SKILL_INSTRUCTIONS.length > 0) {
 //
 // Skip by setting PRISMAMRI_SKIP_SKILL_INSTALL=1.
 const SKILL_NAME = 'prisma-mri-radiology';
-const SKILL_VERSION = '1.2.0'; // bump when SKILL.md changes substantively
+const SKILL_VERSION = '1.4.0'; // bump when SKILL.md changes substantively
 
 function claudeCodeDir(): string {
   return path.join(os.homedir(), '.claude');
@@ -296,6 +310,10 @@ function startLocalServer(): void {
       },
     });
 
+    // `ws` re-emits the HTTP server's errors here; without a listener a busy
+    // port kills the process before the handler below can try the next one.
+    srv.on('error', () => {});
+
     httpServer.once('error', (e: NodeJS.ErrnoException) => {
       if (e.code === 'EADDRINUSE') {
         process.stderr.write(`[prismamri] Port ${port} busy, trying ${LOCAL_PORTS[portIndex] ?? 'none'}…\n`);
@@ -432,13 +450,27 @@ function connectRelay(): void {
 // ── Tool definitions ──────────────────────────────────────────────────────────
 
 const PLANES = { type: 'string', enum: ['coronal', 'sagittal', 'axial'] } as const;
+const VOXEL = {
+  type: 'object',
+  description: 'A voxel position (zero-based x, y, z).',
+  properties: { x: { type: 'number' }, y: { type: 'number' }, z: { type: 'number' } },
+  required: ['x', 'y', 'z'],
+} as const;
+const voxelBox = (description: string) =>
+  ({
+    type: 'object',
+    description,
+    properties: { min: VOXEL, max: VOXEL },
+    required: ['min', 'max'],
+  }) as const;
 
 const TOOLS: Tool[] = [
   // ── Overview / state ───────────────────────────────────────────────────────
   {
     name: 'get_viewer_state',
     description: 'Return the current viewer state: volume dims, voxel spacing, crosshair ' +
-      'position, slice indices/totals for every plane, window/level and 3-D render preset.',
+      'position, slice indices/totals for every plane, window/level and 3-D render preset. ' +
+      'When the study has several series it also says how many and which one is open.',
     inputSchema: { type: 'object', properties: {}, required: [] },
   },
   {
@@ -448,6 +480,36 @@ const TOOLS: Tool[] = [
       'spacing, modality, scalar range, format) PLUS PNG captures of the centre slice on ' +
       'all three anatomical planes.  Call this first when a volume is loaded.',
     inputSchema: { type: 'object', properties: {}, required: [] },
+  },
+
+  // ── Series ─────────────────────────────────────────────────────────────────
+  {
+    name: 'list_series',
+    description:
+      'List the series of the open study (a DICOM folder often holds several: T1, T2, FLAIR, ' +
+      'axial, sagittal, a localizer …) with position, label, orientation, slice count, which ' +
+      'one is open and how many findings each has. Empty for a single-series volume. Call it ' +
+      'early on a MRI study: the lesion may be best seen on a series that is not open.',
+    inputSchema: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'switch_series',
+    description:
+      'Open another series of the study. Everything after it (captures, measurements, ' +
+      'analysis, annotations) applies to that series; the crosshair, window/level and 3-D ' +
+      'preset go back to its defaults. Findings stay with the series they were placed on. ' +
+      'It re-assembles the series from the loaded files, so it can take several seconds.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        series: {
+          description:
+            'Position in list_series (1 = first), or the series label, or its key.',
+          anyOf: [{ type: 'number' }, { type: 'string' }],
+        },
+      },
+      required: ['series'],
+    },
   },
 
   // ── Navigation ─────────────────────────────────────────────────────────────
@@ -571,10 +633,25 @@ const TOOLS: Tool[] = [
   {
     name: 'capture_3d',
     description:
-      'Capture a PNG screenshot of the 3-D volume render exactly as shown — including the ' +
-      'current render preset, cursor planes, clipping and any AI finding markers. Useful ' +
-      'for conveying the overall spatial picture. Set the render preset first if needed.',
-    inputSchema: { type: 'object', properties: {}, required: [] },
+      'Capture a screenshot of the 3-D volume render — including the current render preset, ' +
+      'cursor planes, clipping and any AI finding markers. Useful for conveying the overall ' +
+      'spatial picture. Set the render preset first if needed. By default it is the camera ' +
+      'exactly as the user left it. Pass view = "coronal" | "sagittal" | "axial" to see it ' +
+      'from the standard view of that plane (frontal, lateral, top-down), or view = "all" for ' +
+      'all three in one answer — the fastest way to check the overall shape, count structures ' +
+      'and notice a missing or misplaced part from three sides. The user\'s camera is not moved. ' +
+      'Do not read left/right from these views; use the labelled 2-D planes for that.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        view: {
+          type: 'string',
+          enum: ['current', 'coronal', 'sagittal', 'axial', 'all'],
+          description: 'Which camera to use (default "current").',
+        },
+      },
+      required: [],
+    },
   },
   {
     name: 'capture_all_planes',
@@ -599,13 +676,253 @@ const TOOLS: Tool[] = [
     },
   },
 
+  // ── Voxel analysis ─────────────────────────────────────────────────────────
+  {
+    name: 'survey_subject',
+    description:
+      'FIRST STEP of every study. Returns what the volume contains in numbers, without ' +
+      'deciding what it is: grid size and field of view, what the file declares (modality, ' +
+      'body part, species, series description — any of which may be missing or wrong), ' +
+      'intensity statistics and whether the values look like Hounsfield units, the size, ' +
+      'elongation and principal axes of the subject, how much of it is dense, separate ' +
+      'pieces, and how mirror-symmetric it is. Use it together with the overview images to ' +
+      'say what is being examined (species, body region, orientation) BEFORE reading it.',
+    inputSchema: { type: 'object', properties: {}, required: [] },
+  },
+  {
+    name: 'roi_stats',
+    description:
+      'Intensity statistics inside a region, from the voxels: count, volume (mm³), mean, SD, ' +
+      'min, max, percentiles (5/25/50/75/95) and a 12-bin histogram. Give a sphere ' +
+      '(center + radius_mm; default: the crosshair, 5 mm) or a box (min + max, voxels). Use it ' +
+      'to compare a suspicious area with normal tissue instead of judging brightness by eye. ' +
+      'MR values are arbitrary units — compare regions of the same scan only.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        center: VOXEL,
+        radius_mm: { type: 'number', description: 'Sphere radius in mm (0.5–60, default 5).' },
+        min: VOXEL,
+        max: VOXEL,
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'line_profile',
+    description:
+      'Intensities sampled along a straight line between two voxels (trilinear, up to 256 ' +
+      'samples) with the position of the steepest edge. Use it for the thickness of a cortex ' +
+      'or wall, the sharpness of a margin, or to see whether a dark line crosses a bone.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        from: VOXEL,
+        to: VOXEL,
+        samples: { type: 'number', description: 'Number of samples (default 64, max 256).' },
+      },
+      required: ['from', 'to'],
+    },
+  },
+  {
+    name: 'slice_curve',
+    description:
+      'One number per slice along an axis, as a short curve (≤ 120 values) plus its three ' +
+      'highest peaks. metric: "area_above" = area (mm²) of voxels above a threshold (default: ' +
+      'the tissue threshold) — shows where along the axis the body, a bone or a mass is; ' +
+      '"mean"; "max". A cheap way to find WHERE to look before capturing images. axis x = ' +
+      'left–right, y = front–back, z = head–foot (after patient alignment).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        axis: { type: 'string', enum: ['x', 'y', 'z'] },
+        metric: { type: 'string', enum: ['area_above', 'mean', 'max'] },
+        threshold: { type: 'number', description: 'For area_above; default = tissue threshold.' },
+        max_points: { type: 'number', description: 'Values to return (default 120).' },
+      },
+      required: ['axis', 'metric'],
+    },
+  },
+  {
+    name: 'find_objects',
+    description:
+      'Finds the separate connected objects above an intensity threshold and describes each ' +
+      'from its voxels: volume (mm³), centroid (voxel), bounding box, extent, length, ' +
+      'elongation (1 = ball, large = rod), flatness (large = sheet) and long-axis direction. ' +
+      'level "dense" (default) takes the soft/dense Otsu threshold — bone, teeth, implants; ' +
+      '"subject" takes the air/tissue one; or give threshold (and threshold_max). ' +
+      'split_touching splits objects joined by a narrow neck (teeth in contact). Objects are ' +
+      'numbered by size; later calls (axis_profile, check_arrangement) refer to these ids. ' +
+      'Use it to count structures, measure true volumes, and notice a part that is missing, ' +
+      'extra or detached. Density is only the way objects are separated — what you conclude ' +
+      'from their position and shape is up to you.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        level: { type: 'string', enum: ['dense', 'subject'] },
+        threshold: { type: 'number' },
+        threshold_max: { type: 'number' },
+        min_volume_mm3: { type: 'number', description: 'Ignore smaller objects (default 5).' },
+        split_touching: { type: 'boolean' },
+        max_objects: { type: 'number', description: 'Objects to list (default 25, max 60).' },
+        region: voxelBox('Limit the search to a voxel box.'),
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'axis_profile',
+    description:
+      'Follows one object from find_objects along its long axis: length, straightness, the ' +
+      'sharpest bend (angle and where), and equivalent diameter per segment with the ' +
+      'narrowest and widest points. Use it for a long bone or a limb: angulation after a ' +
+      'fracture, a deformity, a constriction. Compare with the mirrored structure ' +
+      '(check_symmetry) before calling a bend abnormal.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        object_id: { type: 'number', description: 'An id from the last find_objects.' },
+        segments: { type: 'number', description: 'Segments along the axis (default 24).' },
+      },
+      required: ['object_id'],
+    },
+  },
+  {
+    name: 'check_arrangement',
+    description:
+      'For objects that should form a regular row — teeth along an arch, vertebrae, ribs — ' +
+      'fits a curve through them (robust to outliers) and reports for each: distance off the ' +
+      'curve (mm), distance from the row\'s usual level, how much it leans against its ' +
+      'neighbours (degrees), the gap to the next one, and plain-language flags. It never ' +
+      'looks at density, so a normal-looking structure in the wrong place or at the wrong ' +
+      'angle is still found. Run find_objects first (split_touching: true when they touch); ' +
+      'needs ≥ 5 objects. plane = the plane the row lies in (axial for a dental arch). Flags ' +
+      'are candidates: a wisdom tooth may legitimately lean, a gap may be a normal diastema.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        plane: { type: 'string', enum: ['axial', 'coronal', 'sagittal'] },
+        object_ids: {
+          type: 'array',
+          items: { type: 'number' },
+          description: 'Which objects form the row (default: those of typical size).',
+        },
+        min_offset_mm: { type: 'number', description: 'Default 3.' },
+        min_tilt_excess_deg: { type: 'number', description: 'Default 20.' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'check_symmetry',
+    description:
+      'Finds the plane that best mirrors the subject (tried on all three axes; reports the ' +
+      'overlap for each) and lists what has no counterpart on the other side — with side, ' +
+      'volume, position and extent — plus left/right volumes and an asymmetry profile along ' +
+      'the long axis. A missing or extra limb, a swelling, an absent structure show up here. ' +
+      'Meaningful for bilateral anatomy only; low overlap on every axis means the subject is ' +
+      'not mirror-symmetric, so differences prove nothing. Resolution is coarse ' +
+      '(resolutionVoxels): small differences are not seen. Always confirm on images.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        axis: { type: 'string', enum: ['x', 'y', 'z'] },
+        region: voxelBox(
+          'Voxel box around the subject. Use it when a couch, a second subject or an off-centre posture drags the overlap down.',
+        ),
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'find_gaps',
+    description:
+      'Looks for thin, flat gaps inside dense material — candidate cracks and fracture ' +
+      'lines. For each: position, width (mm), area (mm²), planarity (≈0 flat sheet), ' +
+      'enclosure (share with dense material on both faces) and the normal of the gap. ' +
+      'Works on CT / CBCT (bone is bright). It also reports joint spaces, sutures, the ' +
+      'periodontal space and thin canals, so every candidate must be checked with ' +
+      'capture_region across the gap, and compared with the other side. Hairline or ' +
+      'non-displaced fractures narrower than the voxel are invisible to it, and on MRI it is ' +
+      'not meaningful. Sees gaps up to max_gap_mm (default 2). `smoothed` in the answer ' +
+      'means noise forced a blur first, which hides the thinnest gaps.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        threshold: { type: 'number', description: 'Dense-material threshold (default: automatic).' },
+        max_gap_mm: { type: 'number', description: 'Widest gap to look for (0.3–8, default 2).' },
+        min_area_mm2: { type: 'number', description: 'Default 15.' },
+        max_voxels: {
+          type: 'number',
+          description: 'Most voxels analysed at full resolution (default 40 million); larger volumes are analysed on a coarser grid — use region instead.',
+        },
+        region: voxelBox('Limit the search to a voxel box — faster and finer on big volumes.'),
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'navigate_to_voxel',
+    description:
+      'Move the crosshair to a voxel (x, y, z), e.g. the centroid of an object from ' +
+      'find_objects or a candidate from find_gaps. Then capture_all_planes shows it in all ' +
+      'three planes.',
+    inputSchema: {
+      type: 'object',
+      properties: { voxel: VOXEL },
+      required: ['voxel'],
+    },
+  },
+  {
+    name: 'capture_region',
+    description:
+      'A close-up of one plane around a voxel, cropped from the FULL-RESOLUTION slice (not a ' +
+      'magnified thumbnail): fov_mm wide (5–400, default 40), up to 1280 px. The answer says ' +
+      'mm per pixel and the native voxel size. Use it to examine a candidate, a margin or ' +
+      'a thin line at the resolution the scanner actually recorded. Does not move the ' +
+      'crosshair. Optional slab_mm for a MIP slab.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        plane: PLANES,
+        center: VOXEL,
+        fov_mm: { type: 'number' },
+        size: { type: 'number', description: 'Long edge in pixels (128–1280, default 640).' },
+        slab_mm: { type: 'number' },
+      },
+      required: ['plane'],
+    },
+  },
+  {
+    name: 'capture_montage',
+    description:
+      'Up to 20 slices of one plane on a single captioned contact sheet (default 12, ' +
+      'slab MIP 3 mm). One image costs about as many tokens as three single captures, so ' +
+      'this is the way to survey a whole plane. from_slice / to_slice narrow the range ' +
+      '(1-based) — use them to zoom into the region a slice_curve pointed at.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        plane: PLANES,
+        count: { type: 'number', description: '2–20, default 12.' },
+        from_slice: { type: 'number' },
+        to_slice: { type: 'number' },
+        slab_mm: { type: 'number' },
+        size: { type: 'number', description: 'Sheet long edge in pixels (400–1280).' },
+      },
+      required: ['plane'],
+    },
+  },
+
   // ── Annotations ────────────────────────────────────────────────────────────
   {
     name: 'add_annotation',
     description:
       'Place a finding marker on the volume so the user can see it on the 2-D panels AND ' +
       'the 3-D model. The marker is anchored to the slice you place it on and to a 3-D ' +
-      'point. Capture the relevant slice first to read the coordinates. Returns the id.',
+      'point. Capture the relevant slice first to read the coordinates. Returns the id. ' +
+      'The finding belongs to the series that is open now — in a multi-series study, ' +
+      'switch_series to the right one first.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -656,12 +973,15 @@ const TOOLS: Tool[] = [
     name: 'list_annotations',
     description:
       'List every finding currently placed, with id, label, severity, plane, voxel ' +
-      'position and summary. Use to review or before removing a specific one.',
+      'position and summary. In a multi-series study it lists the findings of every series ' +
+      'shown this session: `series` names the series, `onScreen` says whether it is the ' +
+      'open one, and `voxel` is in that series\' own coordinates. Use to review or before ' +
+      'removing a specific one.',
     inputSchema: { type: 'object', properties: {}, required: [] },
   },
   {
     name: 'clear_annotations',
-    description: 'Remove every AI finding marker from the viewer.',
+    description: 'Remove every AI finding marker from the series that is open.',
     inputSchema: { type: 'object', properties: {}, required: [] },
   },
 
@@ -725,6 +1045,8 @@ type ContentBlock =
 // Every capture the app returns is JPEG (canvas-utils / ThreePreview.captureJpeg).
 const img = (data: string): ContentBlock => ({ type: 'image', data, mimeType: 'image/jpeg' });
 const txt = (text: string): ContentBlock => ({ type: 'text', text });
+const jsonBlock = (value: unknown): ContentBlock =>
+  txt('```json\n' + JSON.stringify(value) + '\n```');
 
 // ── Types returned by the app ─────────────────────────────────────────────────
 
@@ -851,8 +1173,27 @@ async function handleTool(
 
     // ── capture_3d ───────────────────────────────────────────────────────────
     case 'capture_3d': {
-      const { imageData } = await command<{ imageData: string }>({ action: 'capture_3d' }, 25_000);
-      return { content: [txt('3-D render:'), img(imageData)] };
+      const { view = 'current' } = args as { view?: string };
+      if (view === 'all') {
+        const r = await command<{ coronal: string; sagittal: string; axial: string }>(
+          { action: 'capture_3d', view },
+          40_000,
+        );
+        return {
+          content: [
+            txt('3-D render, coronal view (frontal):'),   img(r.coronal),
+            txt('3-D render, sagittal view (lateral):'),  img(r.sagittal),
+            txt('3-D render, axial view (top-down):'),    img(r.axial),
+          ],
+        };
+      }
+      const { imageData } = await command<{ imageData: string }>(
+        { action: 'capture_3d', view },
+        25_000,
+      );
+      return {
+        content: [txt(view === 'current' ? '3-D render:' : `3-D render, ${view} view:`), img(imageData)],
+      };
     }
 
     // ── capture_all_planes ───────────────────────────────────────────────────
@@ -981,6 +1322,42 @@ async function handleTool(
       return { content: [txt('Measurement cleared.')] };
     }
 
+    // ── Voxel analysis ───────────────────────────────────────────────────────
+    case 'survey_subject':
+    case 'roi_stats':
+    case 'line_profile':
+    case 'slice_curve':
+    case 'find_objects':
+    case 'axis_profile':
+    case 'check_arrangement':
+    case 'check_symmetry':
+    case 'find_gaps':
+      return { content: [jsonBlock(await command({ action: name, ...args }, 60_000))] };
+
+    case 'list_series':
+      return { content: [jsonBlock(await command({ action: name }))] };
+
+    // Re-assembling a large series takes a while.
+    case 'switch_series':
+      return { content: [jsonBlock(await command({ action: name, ...args }, 90_000))] };
+
+    case 'navigate_to_voxel': {
+      const { cursor } = await command<{ cursor: { x: number; y: number; z: number } }>({
+        action: 'navigate_to_voxel',
+        ...args,
+      });
+      return { content: [txt(`Crosshair at voxel (${cursor.x}, ${cursor.y}, ${cursor.z}).`)] };
+    }
+
+    case 'capture_region':
+    case 'capture_montage': {
+      const { imageData, ...info } = await command<{ imageData: string } & Record<string, unknown>>(
+        { action: name, ...args },
+        name === 'capture_montage' ? 60_000 : 30_000,
+      );
+      return { content: [jsonBlock(info), img(imageData)] };
+    }
+
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
@@ -989,7 +1366,7 @@ async function handleTool(
 // ── MCP server wiring ─────────────────────────────────────────────────────────
 
 const server = new Server(
-  { name: 'prismamri', version: '2.1.0' },
+  { name: 'prismamri', version: '2.2.0' },
   {
     capabilities: { tools: {} },
     // Skill text is delivered to Claude during the MCP `initialize` handshake.
