@@ -225,6 +225,11 @@ export function useViewerTheme(): ViewerTheme {
   return useViewerContext().theme;
 }
 
+/** The element the surrounding viewer is drawn in; null outside a viewer or before it mounts. */
+export function useViewerRootElement(): HTMLElement | null {
+  return useContext(ViewerContext)?.rootElement ?? null;
+}
+
 export function useViewerLayout(): ViewerLayout {
   return useViewerContext().layout;
 }

@@ -16,8 +16,9 @@
  */
 
 import { X } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { isTopLayer } from '../../hooks/layers';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
 import styles from './ConfirmModal.module.css';
 
@@ -41,10 +42,13 @@ export function ConfirmModal({
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
-  // Esc → cancel
+  // Esc → cancel, but only for the topmost dialog on the page: with two
+  // viewers open, Esc closes the newest one, not both.
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const titleId = useId();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onCancel();
+      if (e.key === 'Escape' && isTopLayer(dialogRef.current)) onCancel();
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
@@ -62,7 +66,6 @@ export function ConfirmModal({
 
   // Trap Tab/Shift+Tab navigation inside the dialog so keyboard users can't
   // accidentally tab back to the page underneath.
-  const dialogRef = useRef<HTMLDivElement | null>(null);
   useFocusTrap(dialogRef);
 
   return createPortal(
@@ -79,10 +82,10 @@ export function ConfirmModal({
         // biome-ignore lint/a11y/useSemanticElements: a <dialog> would bring its own top layer and backdrop; this one is positioned by the backdrop above
         role="dialog"
         aria-modal="true"
-        aria-labelledby="confirm-modal-title"
+        aria-labelledby={titleId}
       >
         <div className={styles.head}>
-          <h2 className={styles.title} id="confirm-modal-title">
+          <h2 className={styles.title} id={titleId}>
             {title}
           </h2>
           <button className={styles.closeBtn} type="button" aria-label="Cancel" onClick={onCancel}>

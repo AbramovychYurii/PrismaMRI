@@ -1,17 +1,24 @@
 import { useEffect } from 'react';
+import { useViewerEnvironment } from '../viewer';
 
 /**
- * Calls `onEscape` while mounted. Listens on the document rather than an
- * element so it works for overlays that never take focus.
+ * Calls `onEscape` on Esc while `active`. Listens where the viewer's shortcuts
+ * do (`keyboardTarget`) rather than on the document, so one viewer's Esc never
+ * reaches another viewer on the page; with shortcuts off it listens on the
+ * viewer's own element. It works for overlays that never take focus as long as
+ * focus is inside the viewer, or the host chose `window`.
  *
  * Pass a stable callback — an inline arrow re-subscribes on every render.
  */
-export function useEscapeKey(onEscape: () => void): void {
+export function useEscapeKey(onEscape: () => void, active = true): void {
+  const { keyboardTarget, rootElement } = useViewerEnvironment();
+  const target = keyboardTarget ?? rootElement;
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onEscape();
+    if (!active || !target) return;
+    const onKey = (e: Event) => {
+      if ((e as KeyboardEvent).key === 'Escape') onEscape();
     };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onEscape]);
+    target.addEventListener('keydown', onKey);
+    return () => target.removeEventListener('keydown', onKey);
+  }, [active, target, onEscape]);
 }

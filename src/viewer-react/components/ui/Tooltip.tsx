@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { usePortalContainer } from '../../viewer';
+import { usePortalContainer, useViewerRootElement } from '../../viewer';
 import styles from './Tooltip.module.css';
 
 /** Where the tip goes for an element: centred under it, or above it. */
@@ -16,16 +16,21 @@ function anchorOf(el: Element, above: boolean): { x: number; y: number } {
  * on to whatever the focused control sits in (a fullscreen panel, a dialog).
  */
 function useDismissOnEscape(shown: boolean, hide: () => void): void {
+  const own = useViewerRootElement();
   useEffect(() => {
     if (!shown) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
+      // A key pressed inside another viewer is that viewer's: its Esc must
+      // not hide this tip, nor be swallowed here.
+      const from = e.target instanceof Element ? e.target.closest('.pmri-root') : null;
+      if (from && from !== own) return;
       e.stopPropagation();
       hide();
     };
     document.addEventListener('keydown', onKey, true);
     return () => document.removeEventListener('keydown', onKey, true);
-  }, [shown, hide]);
+  }, [shown, hide, own]);
 }
 
 /**
