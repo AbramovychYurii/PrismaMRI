@@ -71,21 +71,45 @@ function target(spec, file) {
 
 const problems = [];
 
+/** Store internals: in `viewer-react/unstable` for the viewer's own components, never for a host. */
+const STORE_NAMES = new Set([
+  'createViewerStore',
+  'getViewerStore',
+  'useViewerStore',
+  'useViewerStoreApi',
+  'ViewerStore',
+  'ViewerStoreState',
+  'ViewerState',
+  'ViewerActions',
+]);
+const UNSTABLE_IMPORT =
+  /import\s+(?:type\s+)?\{([^}]*)\}\s*from\s*['"]@prisma-mri\/viewer-react\/unstable['"]/g;
+
 for (const abs of walk(SRC)) {
   const file = rel(abs);
   const home = packageOf(file);
   const isTest = /\.test\.tsx?$/.test(file);
   const text = readFileSync(abs, 'utf8');
+  if (home === 'app') {
+    for (const m of text.matchAll(UNSTABLE_IMPORT)) {
+      for (const raw of m[1].split(',')) {
+        const name = raw
+          .trim()
+          .replace(/^type\s+/, '')
+          .split(/\s+as\s+/)[0];
+        if (STORE_NAMES.has(name)) {
+          problems.push(
+            `${file}: "${name}" — the app goes through the viewer's methods and useViewerSnapshot, not its store`,
+          );
+        }
+      }
+    }
+  }
   const specs = new Set(IMPORT.flatMap((re) => [...text.matchAll(re)].map((m) => m[1])));
 
   for (const spec of specs) {
     const to = target(spec, file);
     if (home === 'app') {
-      if (/^@prisma-mri\/viewer-[a-z]+\/unstable\b/.test(spec)) {
-        problems.push(
-          `${file}: "${spec}" — the app goes through the viewer's methods and useViewerSnapshot, not its store`,
-        );
-      }
       if (to && packageOf(to) !== 'app') {
         problems.push(
           `${file}: "${spec}" reaches into ${PACKAGES[packageOf(to)].dir} — import from @prisma-mri/viewer-${packageOf(to)} instead`,

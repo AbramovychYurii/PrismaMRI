@@ -1,4 +1,5 @@
-import { type SlicePlane, clamp, sliceAxis, sliceCount } from '@prisma-mri/viewer-core';
+import { type SlicePlane, sliceAxis, sliceCount } from '@prisma-mri/viewer-core';
+import { clamp } from '@prisma-mri/viewer-core/unstable';
 import { useCallback, useEffect, useRef } from 'react';
 import {
   type ViewerStore,

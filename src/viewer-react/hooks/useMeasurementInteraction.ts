@@ -1,14 +1,13 @@
 import {
   type ActiveMeasurement,
-  type LetterboxRect,
   type MeasurementPoint,
   type SlicePlane,
   type VolumeCursor,
   fracToVoxel,
-  pointerToImageFrac,
   sliceIndex,
   voxelToFrac,
 } from '@prisma-mri/viewer-core';
+import { type LetterboxRect, pointerToImageFrac } from '@prisma-mri/viewer-core/unstable';
 import { useCallback, useMemo, useState } from 'react';
 import { useViewerFeatures, useViewerStore } from '../viewer';
 

@@ -4,10 +4,10 @@ import {
   type LoadResult,
   type SeriesChoice,
   describeLoadError,
-  fetchBlobWithProgress,
   fromFileList,
   loadVolumeInWorker,
 } from '@prisma-mri/viewer-core';
+import { fetchBlobWithProgress } from '@prisma-mri/viewer-core/unstable';
 import { flushSync } from 'react-dom';
 import type { ViewerStore } from './store';
 

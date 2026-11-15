@@ -4,7 +4,6 @@ import {
   type MeasurementPoint,
   type SlicePlane,
   type VolumeCursor,
-  clamp,
   clampToDims,
   extractSliceGrayImage,
   fracToVoxel,
@@ -15,6 +14,7 @@ import {
   sliceNumber,
   volumeCenter,
 } from '@prisma-mri/viewer-core';
+import { clamp } from '@prisma-mri/viewer-core/unstable';
 import type { ViewerInstance, ViewerSnapshot } from '@prisma-mri/viewer-react';
 
 import { captureCanvas, renderSliceForMcp, waitForPaint } from './canvas-utils';

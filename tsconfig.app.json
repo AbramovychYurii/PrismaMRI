@@ -18,6 +18,8 @@
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {
+      "@prisma-mri/viewer-core/unstable": ["src/viewer-core/unstable.ts"],
+      "@prisma-mri/viewer-react/unstable": ["src/viewer-react/unstable.ts"],
       "@prisma-mri/viewer-core": ["src/viewer-core/index.ts"],
       "@prisma-mri/viewer-react": ["src/viewer-react/index.ts"],
       "@/*": ["src/*"]

@@ -18,15 +18,17 @@ import {
   sliceNumber,
 } from '@prisma-mri/viewer-core';
 import {
-  AuroraSparkles,
-  SEVERITY_HEX,
   defaultLabels,
-  downloadBlob,
-  useFocusTrap,
   useViewer,
   useViewerSnapshot,
   useViewerSurfaces,
 } from '@prisma-mri/viewer-react';
+import {
+  AuroraSparkles,
+  SEVERITY_HEX,
+  downloadBlob,
+  useFocusTrap,
+} from '@prisma-mri/viewer-react/unstable';
 import { Download, FileText, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';

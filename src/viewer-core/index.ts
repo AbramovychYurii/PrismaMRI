@@ -10,14 +10,6 @@ export {
 export type { ImportHints, ImportSource, SeriesChoice } from './import/types';
 export { type LoadResult, loadVolumeInWorker, type LoadWorkerResult } from './import/volume-client';
 export type * from './types';
-export { fetchBlobWithProgress } from './util/fetch-with-progress';
-export {
-  imageToPanel,
-  type LetterboxRect,
-  letterboxRect,
-  pointerToImageFrac,
-} from './volume/letterbox';
-export { clamp } from './volume/math';
 export { MAX_3D_TEXTURE_EDGE, prepareVolumeFor3D } from './volume/preview-3d';
 export {
   clampToDims,

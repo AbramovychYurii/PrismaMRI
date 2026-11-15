@@ -1,18 +1,20 @@
 import {
-  type LetterboxRect,
   type SlicePlane,
   type Vec3,
   type VolumeCursor,
   fracToVoxel,
-  imageToPanel,
-  letterboxRect,
   planeAspect,
-  pointerToImageFrac,
   sliceAxis,
   sliceCount,
   sliceNumber,
   voxelToFrac,
 } from '@prisma-mri/viewer-core';
+import {
+  type LetterboxRect,
+  imageToPanel,
+  letterboxRect,
+  pointerToImageFrac,
+} from '@prisma-mri/viewer-core/unstable';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { ACCENT_VAR, AXIS_ACCENT, type Axis } from '../constants';
 import { accentAlpha, useViewerStore, useViewerSurfaces, useViewerTheme } from '../viewer';

@@ -1,4 +1,5 @@
-import { AuroraSparkles, useHover, useViewer, useViewerSnapshot } from '@prisma-mri/viewer-react';
+import { useViewer, useViewerSnapshot } from '@prisma-mri/viewer-react';
+import { AuroraSparkles, useHover } from '@prisma-mri/viewer-react/unstable';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';

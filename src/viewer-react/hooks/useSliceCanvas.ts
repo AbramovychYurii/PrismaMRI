@@ -1,4 +1,5 @@
-import type { LetterboxRect, SliceImage } from '@prisma-mri/viewer-core';
+import type { SliceImage } from '@prisma-mri/viewer-core';
+import type { LetterboxRect } from '@prisma-mri/viewer-core/unstable';
 import { useEffect, useRef, useState } from 'react';
 
 /** CSS size of a slice canvas, tracked with a ResizeObserver. */

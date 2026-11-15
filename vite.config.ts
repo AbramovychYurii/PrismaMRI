@@ -121,6 +121,8 @@ export default defineConfig({
     // The viewer packages resolve to their sources until they move into
     // their own workspaces (stage 3).
     alias: {
+      "@prisma-mri/viewer-core/unstable": path.resolve(root, "src/viewer-core/unstable.ts"),
+      "@prisma-mri/viewer-react/unstable": path.resolve(root, "src/viewer-react/unstable.ts"),
       "@prisma-mri/viewer-core": path.resolve(root, "src/viewer-core/index.ts"),
       "@prisma-mri/viewer-react": path.resolve(root, "src/viewer-react/index.ts"),
       "@": path.resolve(root, "src"),
