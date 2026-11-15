@@ -1,4 +1,5 @@
 import {
+  type ImportHints,
   type ImportSource,
   type LoadResult,
   type SeriesChoice,
@@ -32,7 +33,7 @@ export interface ViewerLoader {
    */
   load: (source: ImportSource, seriesKey?: string) => Promise<void>;
   /** Fetches a file by URL, with progress, then loads it. */
-  loadUrl: (url: string, filename: string) => Promise<void>;
+  loadUrl: (url: string, filename: string, hints?: ImportHints) => Promise<void>;
   /** Dismisses the series choice if one is open, otherwise aborts the load. */
   cancel: () => void;
   /** Re-assembles another series of the current source in place. */
@@ -162,7 +163,7 @@ export function createViewerLoader(
   return {
     load: (source, seriesKey) => loadSource(source, seriesKey),
 
-    async loadUrl(url, filename) {
+    async loadUrl(url, filename, hints) {
       const controller = beginLoad('Fetching…');
       try {
         const blob = await fetchBlobWithProgress(
@@ -173,7 +174,7 @@ export function createViewerLoader(
           },
           controller.signal,
         );
-        void loadSource(fromFileList([new File([blob], filename)]));
+        void loadSource({ ...fromFileList([new File([blob], filename)]), hints });
       } catch (err) {
         failLoad(err, 'Failed to fetch example.');
       } finally {

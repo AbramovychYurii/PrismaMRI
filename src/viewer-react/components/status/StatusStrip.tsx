@@ -48,7 +48,8 @@ export function StatusStrip() {
   }
 
   return (
-    <div className={styles.stripGrid}>
+    // `pmri-root`: placed in the host's own markup, so it brings the viewer's base styles.
+    <div className={`pmri-root ${styles.stripGrid}`}>
       <RunCell k="Scanner" v={meta?.scanner ?? '—'} />
       <RunCell
         k="Volume"

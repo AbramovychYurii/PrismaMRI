@@ -456,7 +456,10 @@ export function ExamplesSection() {
   };
 
   const handleLoad = (ex: ExampleMeta) => () =>
-    void viewer.loadUrl(`${NRRD_BASE}/examples/${ex.file}`, ex.file);
+    void viewer.loadUrl(`${NRRD_BASE}/examples/${ex.file}`, ex.file, {
+      // NRRD files carry no modality; the card knows what it shows.
+      modality: ex.tag === 'MRI' ? 'MR' : ex.tag,
+    });
 
   return (
     <ExamplesSectionWrap aria-label="Example datasets">

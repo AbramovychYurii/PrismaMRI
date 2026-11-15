@@ -9,9 +9,16 @@ export interface ImportFile {
   file: File;
 }
 
+/** What the caller knows about the data that the files themselves do not say. */
+export interface ImportHints {
+  /** DICOM modality code (CT, MR, …) for formats that carry none, such as NRRD. */
+  modality?: string;
+}
+
 export interface ImportSource {
   rootName: string;
   files: ImportFile[];
+  hints?: ImportHints;
 }
 
 export type ProgressFn = (p: Partial<ImportProgress>) => void;

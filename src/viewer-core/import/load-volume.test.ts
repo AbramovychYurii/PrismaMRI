@@ -179,6 +179,29 @@ describe('loadVolumeFromSource orientation', () => {
     expect(Array.from(scanner.voxels)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
   });
 
+  it('does not call an NRRD a CT: header key, then caller hint, else unknown', async () => {
+    const nrrd = (extra: string[]) =>
+      concat(
+        ascii(
+          ['NRRD0004', 'type: short', 'sizes: 2 2 2', ...extra, 'encoding: raw', '\n'].join('\n'),
+        ),
+        pack('i16', [1, 2, 3, 4, 5, 6, 7, 8]),
+      );
+    const modality = async (extra: string[], hints?: { modality: string }) => {
+      const source = sourceOf({ name: 'v.nrrd', bytes: nrrd(extra) });
+      const out = await loadVolumeFromSource({ ...source, hints }, noop);
+      if (out.kind !== 'volume') throw new Error('expected a volume');
+      return out.volume.meta.modality;
+    };
+    expect(await modality([])).toBeUndefined();
+    expect(await modality([], { modality: 'MR' })).toBe('MR');
+    expect(await modality(['modality:=mr'])).toBe('MR');
+    // The file wins over the caller.
+    expect(await modality(['DICOM.Modality:=CT'], { modality: 'MR' })).toBe('CT');
+    // Junk in the key is not a modality.
+    expect(await modality(['modality:=not a code'])).toBeUndefined();
+  });
+
   it('reads the MetaImage direction matrix one axis per triple', async () => {
     const mha = concat(
       ascii(

@@ -38,8 +38,8 @@ describe('nrrdAdapter', () => {
     expect(v.scalarMax).toBe(7);
     expect(v.windowLevel).toEqual(resolveWindowLevel(-5, 7));
     expect(v.formatId).toBe('nrrd');
+    // No modality in the file and none given: unknown, not CT.
     expect(v.meta).toEqual({
-      modality: 'CT',
       protocol: 'vol.nrrd',
       spacing: [0.5, 0.5, 2],
       origin: [0, 0, 0],

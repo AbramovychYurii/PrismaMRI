@@ -52,6 +52,21 @@ const TYPE_MAP: Record<string, ScalarKind> = {
   double: 'f64',
 };
 
+/** Header keys other tools write for the modality (NRRD has no standard one). */
+const MODALITY_KEYS = ['modality', 'dicom.modality', 'dicom_modality'];
+
+/**
+ * The modality from the header, else what the caller said, else unknown — never
+ * a guess: "CT" would make every report print Hounsfield units for an MR file.
+ */
+function modalityOf(fields: Map<string, string>, source: ImportSource): string | undefined {
+  for (const key of MODALITY_KEYS) {
+    const value = fields.get(key)?.trim().toUpperCase();
+    if (value && /^[A-Z]{2,4}$/.test(value)) return value;
+  }
+  return source.hints?.modality;
+}
+
 export const nrrdAdapter: ImportFormatAdapter = {
   id: 'nrrd',
   label: 'NRRD',
@@ -193,7 +208,7 @@ export const nrrdAdapter: ImportFormatAdapter = {
     return {
       voxels: out,
       meta: {
-        modality: 'CT',
+        modality: modalityOf(fields, source),
         protocol: file.name,
         spacing,
         origin: [0, 0, 0],

@@ -1,26 +1,54 @@
-@import "tailwindcss";
-
-@theme {
-  --color-bg: #0c0b09;
-  --color-panel: #15130e;
-  --color-panel-2: #1c1a14;
-  --color-rule: #2a261d;
-  --color-rule-2: #3a3527;
-  --color-ink: #ece6d8;
-  --color-ink-2: #b6ad99;
-  --color-ink-3: #8a8068;
-  --color-ink-4: #534b3a;
-  --color-amber: #ffb547;
-  --color-amber-dim: #b67e2c;
-  --color-teal: #7fd1c5;
-  --color-teal-dim: #4d8a83;
-  --color-violet: #b59dd1;
-  --color-azure: #82a8d4;
-  --color-rose: #d97a6b;
-
-  --font-serif: "IBM Plex Serif", Georgia, serif;
-  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
-  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+/*
+ * Reset (the part of Tailwind's preflight this app relied on, now that Tailwind
+ * is gone). Zero specificity via :where(), so any component rule wins.
+ */
+:where(*, *::before, *::after, ::backdrop, ::file-selector-button) {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: 0 solid;
+}
+:where(html) {
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+  tab-size: 4;
+  -webkit-tap-highlight-color: transparent;
+}
+:where(h1, h2, h3, h4, h5, h6) {
+  font-size: inherit;
+  font-weight: inherit;
+}
+:where(a) {
+  color: inherit;
+  text-decoration: inherit;
+}
+:where(b, strong) {
+  font-weight: bolder;
+}
+:where(ol, ul, menu) {
+  list-style: none;
+}
+:where(img, svg, video, canvas, audio, iframe, embed, object) {
+  display: block;
+  vertical-align: middle;
+}
+:where(img, video) {
+  max-width: 100%;
+  height: auto;
+}
+:where(button, input, select, optgroup, textarea, ::file-selector-button) {
+  font: inherit;
+  letter-spacing: inherit;
+  color: inherit;
+  border-radius: 0;
+  background-color: transparent;
+  opacity: 1;
+}
+:where(textarea) {
+  resize: vertical;
+}
+:where([hidden]:not([hidden="until-found"])) {
+  display: none !important;
 }
 
 :root {
@@ -147,17 +175,6 @@ textarea {
 }
 ::-webkit-scrollbar-track {
   background: transparent;
-}
-
-.font-serif {
-  font-family: var(--serif);
-}
-.font-sans {
-  font-family: var(--sans);
-}
-.font-mono {
-  font-family: var(--mono);
-  font-variant-numeric: tabular-nums;
 }
 
 /* ── Mobile overrides (≤ 767px) ────────────────────────────────────────────── */
