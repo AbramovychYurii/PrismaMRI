@@ -15,7 +15,7 @@ import {
   sliceNumber,
   volumeCenter,
 } from '@prisma-mri/viewer-core';
-import type { ViewerInstance, ViewerStoreState } from '@prisma-mri/viewer-react';
+import type { ViewerInstance, ViewerSnapshot } from '@prisma-mri/viewer-react';
 
 import { captureCanvas, renderSliceForMcp, waitForPaint } from './canvas-utils';
 import { MCP_JPEG_QUALITY, MCP_MAX_EDGE, WL_PRESETS } from './constants';
@@ -44,14 +44,14 @@ export interface HandlerContext {
 
 export type Handler = (ctx: HandlerContext) => void | Promise<void>;
 
-type LoadedState = ViewerStoreState & { volume: LoadedVolume; cursor: VolumeCursor };
+type LoadedState = ViewerSnapshot & { volume: LoadedVolume; cursor: VolumeCursor };
 
 /**
  * Reports "No volume loaded" and returns null unless a volume is open. The
- * store only ever sets a cursor alongside a volume, so both are narrowed here.
+ * viewer only ever sets a cursor alongside a volume, so both are narrowed here.
  */
 function requireLoaded(viewer: ViewerInstance, fail: (error: string) => void): LoadedState | null {
-  const state = viewer.store.getState();
+  const state = viewer.getSnapshot();
   if (!state.volume || !state.cursor) {
     fail('No volume loaded');
     return null;
@@ -78,13 +78,13 @@ function sliceTotals(dims: readonly [number, number, number]) {
 function sliceImagesAt(state: LoadedState, cursor: VolumeCursor) {
   const render = (plane: SlicePlane) =>
     renderSliceForMcp(
-      extractSliceGrayImage(state.volume, plane, sliceIndex(cursor, plane), state.wl, 0),
+      extractSliceGrayImage(state.volume, plane, sliceIndex(cursor, plane), state.windowLevel, 0),
     );
   return { coronal: render('coronal'), sagittal: render('sagittal'), axial: render('axial') };
 }
 
 const handleGetState: Handler = ({ ok, viewer }) => {
-  const { volume, cursor, wl, renderPreset } = viewer.store.getState();
+  const { volume, cursor, windowLevel: wl, renderPreset } = viewer.getSnapshot();
   const dims = volume?.meta.dims ?? null;
   ok({
     volumeLoaded: volume !== null,
@@ -104,7 +104,7 @@ const handleOverview: Handler = ({ ok, fail, viewer }) => {
 
   const { dims, spacing, modality, scanner, protocol } = state.volume.meta;
   const center = volumeCenter(dims);
-  state.setCursor(center);
+  viewer.setCursor(center);
 
   ok({
     meta: {
@@ -129,7 +129,7 @@ const handleNavigate: Handler = ({ msg, ok, fail, viewer }) => {
   const plane = requirePlane(msg);
   const slice = requireNumber(msg, 'slice');
   const dims = state.volume.meta.dims;
-  state.setCursor(clampToDims({ ...state.cursor, [sliceAxis(plane)]: slice - 1 }, dims));
+  viewer.setCursor(clampToDims({ ...state.cursor, [sliceAxis(plane)]: slice - 1 }, dims));
   ok();
 };
 
@@ -143,7 +143,7 @@ const handleStep: Handler = ({ msg, ok, fail, viewer }) => {
     { ...state.cursor, [sliceAxis(plane)]: sliceIndex(state.cursor, plane) + steps },
     dims,
   );
-  state.setCursor(next);
+  viewer.setCursor(next);
   ok({ slice: sliceNumber(next, plane), total: sliceCount(dims, plane) });
 };
 
@@ -151,15 +151,13 @@ const handleNavigateCenter: Handler = ({ ok, fail, viewer }) => {
   const state = requireLoaded(viewer, fail);
   if (!state) return;
   const center = volumeCenter(state.volume.meta.dims);
-  state.setCursor(center);
+  viewer.setCursor(center);
   ok({ sliceIndices: sliceNumbers(center) });
 };
 
 const handleSetWl: Handler = ({ msg, ok, viewer }) => {
   const wl = { window: requireNumber(msg, 'window'), level: requireNumber(msg, 'level') };
-  const { setWL, setWLDraft } = viewer.store.getState();
-  setWL(wl);
-  setWLDraft(wl);
+  viewer.setWindowLevel(wl);
   ok();
 };
 
@@ -172,8 +170,7 @@ const handleApplyWlPreset: Handler = ({ msg, ok, fail, viewer }) => {
   const [windowFrac, levelFrac] = WL_PRESETS[preset];
   const range = state.volume.scalarMax - state.volume.scalarMin;
   const wl = { window: range * windowFrac, level: state.volume.scalarMin + range * levelFrac };
-  state.setWL(wl);
-  state.setWLDraft(wl);
+  viewer.setWindowLevel(wl);
   ok(wl);
 };
 
@@ -186,7 +183,7 @@ const handleSetPreset: Handler = ({ msg, ok, fail, viewer }) => {
     );
     return;
   }
-  viewer.store.getState().setRenderPreset(requireOneOf(msg, 'preset', ['mip', 'bone'] as const));
+  viewer.setRenderPreset(requireOneOf(msg, 'preset', ['mip', 'bone'] as const));
   ok();
 };
 
@@ -199,7 +196,7 @@ const handleSetSlabMm: Handler = ({ msg, ok, fail, viewer }) => {
     return;
   }
   const slabMm = Math.min(MAX_SLAB_MM, requested);
-  viewer.store.getState().setSlabMm(slabMm);
+  viewer.setSlabMm(slabMm);
   ok({ slabMm });
 };
 
@@ -212,7 +209,7 @@ const handleCaptureSlice: Handler = async ({ msg, ok, fail, viewer }) => {
   if (slabMm > 0) {
     const state = requireLoaded(viewer, fail);
     if (!state) return;
-    const { volume, cursor, wl } = state;
+    const { volume, cursor, windowLevel: wl } = state;
     const half = slabHalfSlices(plane, slabMm, volume.meta.spacing);
     const image = extractSliceGrayImage(volume, plane, sliceIndex(cursor, plane), wl, half);
     ok({ imageData: renderSliceForMcp(image), slabMm });
@@ -253,7 +250,7 @@ const handleOverviewGrid: Handler = ({ msg, ok, fail, viewer }) => {
   const plane = requirePlane(msg);
   // The range the MCP tool advertises (and the radiology skill asks for, 6).
   const count = clamp(optionalNumber(msg, 'count', 5), 2, 8);
-  const { volume, wl } = state;
+  const { volume, windowLevel: wl } = state;
   const total = sliceCount(volume.meta.dims, plane);
   const half = slabHalfSlices(plane, OVERVIEW_GRID_SLAB_MM, volume.meta.spacing);
 
@@ -293,24 +290,24 @@ const handleAddAnnotation: Handler = ({ msg, ok, fail, viewer }) => {
     sizeMm: msg.size_mm != null ? Number(msg.size_mm) : undefined,
   };
 
-  state.addAnnotation(annotation);
-  state.setActiveAnnotation(annotation.id);
+  viewer.addAnnotation(annotation);
+  viewer.setActiveAnnotation(annotation.id);
   ok({ id: annotation.id });
 };
 
 const handleRemoveAnnotation: Handler = ({ msg, ok, fail, viewer }) => {
   const removeId = requireString(msg, 'id');
-  const state = viewer.store.getState();
+  const state = viewer.getSnapshot();
   if (!state.annotations.some((a) => a.id === removeId)) {
     fail(`Annotation ${removeId} not found`);
     return;
   }
-  state.removeAnnotation(removeId);
+  viewer.removeAnnotation(removeId);
   ok();
 };
 
 const handleListAnnotations: Handler = ({ ok, viewer }) => {
-  const annotations = viewer.store.getState().annotations.map((a) => ({
+  const annotations = viewer.getSnapshot().annotations.map((a) => ({
     id: a.id,
     plane: a.plane,
     voxel: a.voxel,
@@ -322,7 +319,7 @@ const handleListAnnotations: Handler = ({ ok, viewer }) => {
 };
 
 const handleClearAnnotations: Handler = ({ ok, viewer }) => {
-  viewer.store.getState().clearAnnotations();
+  viewer.clearAnnotations();
   ok();
 };
 
@@ -347,14 +344,12 @@ const handleSetMeasurement: Handler = ({ msg, ok, fail, viewer }) => {
     return;
   }
 
-  // Setting `from` wipes any prior `to`, so the pair always lands atomically.
-  state.setMeasurementFrom(from);
-  state.setMeasurementTo(to);
-  ok({ from, to, distanceMm: viewer.store.getState().measurement?.distanceMm ?? null });
+  viewer.setMeasurement(from, to);
+  ok({ from, to, distanceMm: viewer.getSnapshot().measurement?.distanceMm ?? null });
 };
 
 const handleGetMeasurement: Handler = ({ ok, viewer }) => {
-  const measurement = viewer.store.getState().measurement;
+  const measurement = viewer.getSnapshot().measurement;
   ok({
     hasMeasurement: measurement !== null,
     from: measurement?.from ?? null,
@@ -364,7 +359,7 @@ const handleGetMeasurement: Handler = ({ ok, viewer }) => {
 };
 
 const handleClearMeasurement: Handler = ({ ok, viewer }) => {
-  viewer.store.getState().clearMeasurement();
+  viewer.clearMeasurement();
   ok();
 };
 

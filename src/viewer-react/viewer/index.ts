@@ -1,4 +1,17 @@
-export { type ViewerInstance, type ViewerOptions, createViewer } from './createViewer';
+export {
+  type ViewerInstance,
+  type ViewerOptions,
+  createViewer,
+  getViewerStore,
+} from './createViewer';
+export {
+  type ViewerApi,
+  type ViewerLoadingState,
+  type ViewerSnapshot,
+  type ViewerSnapshotListener,
+  type ViewerStatus,
+  createViewerApi,
+} from './api';
 export {
   type AnnotationActionContext,
   type ViewerEnvironment,
@@ -15,6 +28,7 @@ export {
   useViewerTheme,
   useViewerFeatures,
   useViewerLabels,
+  useViewerSnapshot,
   useViewerStore,
   useViewerStoreApi,
   useViewerSurfaces,

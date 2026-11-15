@@ -1,4 +1,4 @@
-import { AuroraSparkles, useHover, useViewer, useViewerStore } from '@prisma-mri/viewer-react';
+import { AuroraSparkles, useHover, useViewer, useViewerSnapshot } from '@prisma-mri/viewer-react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import styled from 'styled-components';
@@ -420,7 +420,7 @@ function ExampleCard({
 
 export function ExamplesSection() {
   const viewer = useViewer();
-  const examplesDisabled = useViewerStore((s) => s.loading.active);
+  const examplesDisabled = useViewerSnapshot((s) => s.loading.active);
 
   const trackRef = useRef<HTMLUListElement>(null);
   const [canPrev, setCanPrev] = useState(false);

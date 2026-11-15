@@ -11,7 +11,7 @@
  *
  * To add a new demo report:
  *  1. Open the file in the viewer.
- *  2. Copy `volumeStore.getState().activeVolumeId` from the console.
+ *  2. Copy `__prismaViewer.getSnapshot().activeVolumeId` from the console.
  *  3. Add a new entry below with the recorded annotations array.
  */
 

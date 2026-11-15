@@ -9,7 +9,7 @@ import { appViewer } from '@/store';
 import { ViewerProvider } from '@prisma-mri/viewer-react';
 
 if (import.meta.env.DEV) {
-  (window as unknown as { __prismaStore?: unknown }).__prismaStore = appViewer.store;
+  (window as unknown as { __prismaViewer?: unknown }).__prismaViewer = appViewer;
 }
 
 createRoot(document.getElementById('root')!).render(

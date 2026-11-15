@@ -1,7 +1,8 @@
 import type { Annotation } from '@prisma-mri/viewer-core';
-import { type ReactNode, createContext, useContext, useMemo } from 'react';
+import { type ReactNode, createContext, useContext, useMemo, useSyncExternalStore } from 'react';
 import { useStore } from 'zustand';
-import type { ViewerInstance } from './createViewer';
+import type { ViewerSnapshot } from './api';
+import { type ViewerInstance, getViewerStore } from './createViewer';
 import { type ViewerFeatures, defaultFeatures } from './features';
 import { type ViewerLabels, defaultLabels } from './labels';
 import type { ViewerStore, ViewerStoreState } from './store';
@@ -138,14 +139,27 @@ export function useViewer(): ViewerInstance {
   return useViewerContext().viewer;
 }
 
-/** Subscribes to a slice of the surrounding viewer's state. */
+/**
+ * Subscribes to a slice of the surrounding viewer's snapshot. The selector must
+ * return a value that stays the same object until it changes — a field of the
+ * snapshot or a primitive, not a freshly built object.
+ */
+export function useViewerSnapshot<T>(selector: (snapshot: ViewerSnapshot) => T): T {
+  const viewer = useViewerContext().viewer;
+  return useSyncExternalStore(
+    (onChange) => viewer.subscribe(onChange),
+    () => selector(viewer.getSnapshot()),
+  );
+}
+
+/** Subscribes to a slice of the surrounding viewer's store — the viewer's own components only. */
 export function useViewerStore<T>(selector: (state: ViewerStoreState) => T): T {
-  return useStore(useViewerContext().viewer.store, selector);
+  return useStore(getViewerStore(useViewerContext().viewer), selector);
 }
 
 /** The surrounding viewer's store, for reads and writes outside render. */
 export function useViewerStoreApi(): ViewerStore {
-  return useViewerContext().viewer.store;
+  return getViewerStore(useViewerContext().viewer);
 }
 
 export function useViewerSurfaces(): ViewerSurfaces {
