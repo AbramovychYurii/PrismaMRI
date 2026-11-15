@@ -1,4 +1,5 @@
 import { type ViewerApi, createViewerApi } from './api';
+import { type ViewerEventApi, createViewerEvents } from './events';
 import { type ViewerLoader, type ViewerLoaderOptions, createViewerLoader } from './loader';
 import { type ViewerStore, type ViewerStoreOptions, createViewerStore } from './store';
 import { type ViewerSurfaces, createViewerSurfaces } from './surfaces';
@@ -8,7 +9,7 @@ import { type ViewerSurfaces, createViewerSurfaces } from './surfaces';
  * (`ViewerLoader`) and the surfaces it draws on. The store behind it is not
  * part of this object — see `getViewerStore`.
  */
-export interface ViewerInstance extends ViewerApi, ViewerLoader {
+export interface ViewerInstance extends ViewerApi, ViewerLoader, ViewerEventApi {
   surfaces: ViewerSurfaces;
 }
 
@@ -18,10 +19,21 @@ const stores = new WeakMap<ViewerInstance, ViewerStore>();
 
 export function createViewer(options: ViewerOptions = {}): ViewerInstance {
   const store = createViewerStore(options);
+  const subscriptions = new Set<() => void>();
+  const api = createViewerApi(store, subscriptions);
+  const loader = createViewerLoader(store, options);
   const viewer: ViewerInstance = {
-    ...createViewerApi(store),
-    ...createViewerLoader(store, options),
+    ...api,
+    ...loader,
+    ...createViewerEvents(api, loader),
     surfaces: createViewerSurfaces(),
+    dispose() {
+      // Everything the host attached or started: the load in flight, the
+      // `on` / `subscribe` / `onVolumeLoaded` listeners. The state stays, and
+      // the viewer can be used again — it just has no listeners left.
+      loader.dispose();
+      for (const off of [...subscriptions]) off();
+    },
   };
   stores.set(viewer, store);
   return viewer;

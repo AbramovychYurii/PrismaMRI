@@ -4,6 +4,7 @@ export {
   createViewer,
   getViewerStore,
 } from './createViewer';
+export { type ViewerEventApi, type ViewerEvents, createViewerEvents } from './events';
 export {
   type ViewerApi,
   type ViewerLoadingState,
@@ -28,6 +29,7 @@ export {
   useViewerTheme,
   useViewerFeatures,
   useViewerLabels,
+  useViewerEvent,
   useViewerSnapshot,
   useViewerStore,
   useViewerStoreApi,

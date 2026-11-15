@@ -1,8 +1,17 @@
 import type { Annotation } from '@prisma-mri/viewer-core';
-import { type ReactNode, createContext, useContext, useMemo, useSyncExternalStore } from 'react';
+import {
+  type ReactNode,
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useSyncExternalStore,
+} from 'react';
 import { useStore } from 'zustand';
 import type { ViewerSnapshot } from './api';
 import { type ViewerInstance, getViewerStore } from './createViewer';
+import type { ViewerEvents } from './events';
 import { type ViewerFeatures, defaultFeatures } from './features';
 import { type ViewerLabels, defaultLabels } from './labels';
 import type { ViewerStore, ViewerStoreState } from './store';
@@ -150,6 +159,23 @@ export function useViewerSnapshot<T>(selector: (snapshot: ViewerSnapshot) => T):
     (onChange) => viewer.subscribe(onChange),
     () => selector(viewer.getSnapshot()),
   );
+}
+
+/**
+ * Listens to one of the surrounding viewer's events for as long as the
+ * component is mounted. The handler can change on every render without
+ * resubscribing.
+ */
+export function useViewerEvent<K extends keyof ViewerEvents>(
+  type: K,
+  handler: (payload: ViewerEvents[K]) => void,
+): void {
+  const viewer = useViewerContext().viewer;
+  const latest = useRef(handler);
+  useEffect(() => {
+    latest.current = handler;
+  });
+  useEffect(() => viewer.on(type, (payload) => latest.current(payload)), [viewer, type]);
 }
 
 /** Subscribes to a slice of the surrounding viewer's store — the viewer's own components only. */
