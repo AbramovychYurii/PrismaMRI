@@ -58,13 +58,29 @@ export interface ViewerState {
   activeAnnotationId: string | null;
   /**
    * Multi-series import context — retained so the stage series-switcher can
-   * re-assemble a different series without re-importing. Session-only (holds
-   * File objects; never persisted). Null unless the active volume came from a
-   * multi-series source in this session.
+   * re-assemble a different series without re-importing. Holds File objects, so
+   * it is not part of the persisted UI state; a host that caches the volume
+   * hands it back through `restoreVolume`. Null for a single-series volume.
    */
   seriesSource: ImportSource | null;
   seriesList: SeriesChoice[] | null;
   activeSeriesKey: string | null;
+  /**
+   * Volume ID of each series of the open source that has been shown, by series
+   * key — how the findings of a series that is not on screen are found again.
+   */
+  seriesVolumeIds: Record<string, string>;
+  /**
+   * Key of the series being switched to until it is on screen; null otherwise.
+   * `loading.active` cannot tell: a viewer already on screen clears it at once,
+   * and an in-place switch can freeze the page for seconds.
+   */
+  switchingSeriesKey: string | null;
+  /**
+   * Findings on the other series of the open source (the ones not on screen),
+   * each tagged with its `seriesKey`. Empty unless several series were shown.
+   */
+  otherSeriesAnnotations: Annotation[];
   /**
    * Series of a source being loaded, while the load waits for the user to pick
    * one (answered with `viewer.resolveSeries`). Null otherwise.
@@ -108,11 +124,41 @@ export interface ViewerActions {
   setActiveAnnotation: (id: string | null) => void;
   /** Jump the cursor/active plane to a finding and mark it active. */
   focusAnnotation: (id: string) => void;
-  /** Retain the source + series list so the stage can switch series in place. */
-  setSeriesContext: (source: ImportSource, list: SeriesChoice[], activeKey: string | null) => void;
+  /**
+   * Retain the study of the volume just opened, so the stage can switch series
+   * in place. Call it after `setVolume` / `restoreVolume`, in the same commit.
+   */
+  setSeriesContext: (series: ViewerSeriesContext) => void;
   /** Drop the series context (single-series / non-DICOM load). */
   clearSeriesContext: () => void;
+  /** Marks the series being switched to, or null once the switch is over. */
+  setSwitchingSeries: (key: string | null) => void;
   reset: () => void;
+}
+
+/**
+ * What a viewer needs to keep switching between the series of a study: the
+ * files it was opened from, the series in them, which is on screen, and the
+ * volume ID of each series shown so far (how the findings placed on a series
+ * are found again). A host that caches the volume for reloads hands it back to
+ * `restoreVolume`, so the series selector survives the reload.
+ */
+export interface ViewerSeriesContext {
+  source: ImportSource;
+  list: SeriesChoice[];
+  activeKey: string | null;
+  volumeIds: Record<string, string>;
+}
+
+/** The study the open volume belongs to, when it has several series. */
+export function seriesContextOf(state: ViewerState): ViewerSeriesContext | null {
+  if (!state.seriesSource || !state.seriesList) return null;
+  return {
+    source: state.seriesSource,
+    list: state.seriesList,
+    activeKey: state.activeSeriesKey,
+    volumeIds: state.seriesVolumeIds,
+  };
 }
 
 export type ViewerStoreState = ViewerState & ViewerActions;
@@ -144,6 +190,15 @@ function memoryAnnotationStorage(): AnnotationStorage {
     save: (id, list) => void slots.set(id, list),
     clear: (id) => void slots.delete(id),
   };
+}
+
+/** A finding as it is kept: on the open volume and, in a multi-series study, on the open series. */
+function placed(
+  finding: Omit<Annotation, 'volumeId'>,
+  volumeId: string,
+  seriesKey: string | null,
+): Annotation {
+  return { ...finding, volumeId, ...(seriesKey && { seriesKey }) };
 }
 
 const DEFAULT_SPACING: [number, number, number] = [1, 1, 1];
@@ -186,6 +241,9 @@ const initialState: ViewerState = {
   seriesSource: null,
   seriesList: null,
   activeSeriesKey: null,
+  seriesVolumeIds: {},
+  switchingSeriesKey: null,
+  otherSeriesAnnotations: [],
   pendingSeries: null,
 };
 
@@ -352,8 +410,7 @@ function viewerState(
     addAnnotation: (a) =>
       set((state) => {
         if (!state.activeVolumeId) return {};
-        const tagged = { ...a, volumeId: state.activeVolumeId };
-        const next = [...state.annotations, tagged];
+        const next = [...state.annotations, placed(a, state.activeVolumeId, state.activeSeriesKey)];
         annotationStorage.save(state.activeVolumeId, next);
         return { annotations: next };
       }),
@@ -362,7 +419,7 @@ function viewerState(
       set((state) => {
         if (!state.activeVolumeId) return {};
         const volumeId = state.activeVolumeId;
-        const tagged = list.map((a) => ({ ...a, volumeId }));
+        const tagged = list.map((a) => placed(a, volumeId, state.activeSeriesKey));
         annotationStorage.save(volumeId, tagged);
         return { annotations: tagged, activeAnnotationId: null };
       }),
@@ -397,9 +454,48 @@ function viewerState(
         };
       }),
 
-    setSeriesContext: (seriesSource, seriesList, activeSeriesKey) =>
-      set({ seriesSource, seriesList, activeSeriesKey }),
-    clearSeriesContext: () => set({ seriesSource: null, seriesList: null, activeSeriesKey: null }),
+    setSeriesContext: ({ source, list, activeKey: activeSeriesKey, volumeIds }) =>
+      set((state) => {
+        // Another source is another study: forget the series of the last one.
+        const known = {
+          ...(source === state.seriesSource ? state.seriesVolumeIds : {}),
+          ...volumeIds,
+        };
+        const seriesVolumeIds =
+          activeSeriesKey && state.activeVolumeId
+            ? { ...known, [activeSeriesKey]: state.activeVolumeId }
+            : known;
+        return {
+          seriesSource: source,
+          seriesList: list,
+          activeSeriesKey,
+          seriesVolumeIds,
+          otherSeriesAnnotations: list.flatMap((s) =>
+            s.key === activeSeriesKey || !seriesVolumeIds[s.key]
+              ? []
+              : annotationStorage
+                  .load(seriesVolumeIds[s.key])
+                  .map((a) => ({ ...a, seriesKey: s.key })),
+          ),
+          // A stored finding without a key is on the open series.
+          annotations: activeSeriesKey
+            ? state.annotations.map((a) =>
+                a.seriesKey === activeSeriesKey ? a : { ...a, seriesKey: activeSeriesKey },
+              )
+            : state.annotations,
+        };
+      }),
+
+    setSwitchingSeries: (switchingSeriesKey) => set({ switchingSeriesKey }),
+
+    clearSeriesContext: () =>
+      set({
+        seriesSource: null,
+        seriesList: null,
+        activeSeriesKey: null,
+        seriesVolumeIds: {},
+        otherSeriesAnnotations: [],
+      }),
 
     reset: () => set(initialState),
   };

@@ -24,7 +24,8 @@ import {
   type VolumeCursor,
   sliceNumber,
 } from '@prisma-mri/viewer-core';
-import { ChevronLeft, ChevronRight, Sparkles, Trash2, X } from 'lucide-react';
+import { seriesLabel } from '@prisma-mri/viewer-core/unstable';
+import { ChevronLeft, ChevronRight, Layers, Sparkles, Trash2, X } from 'lucide-react';
 import {
   type ButtonHTMLAttributes,
   type CSSProperties,
@@ -39,12 +40,14 @@ import {
 import { SEVERITY_RANK } from '../../constants';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
 import {
+  useViewer,
   useViewerFeatures,
   useViewerHost,
   useViewerLabels,
   useViewerStore,
   useViewerTheme,
 } from '../../viewer';
+import { useSeriesSelectVisible } from '../stage/StageSeriesSelect';
 import { AuroraSparkles } from '../ui/AuroraSparkles';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import styles from './AnnotationHud.module.css';
@@ -116,9 +119,20 @@ export function AnnotationActionButton({
 }
 
 export function AnnotationHud() {
-  const annotations = useViewerStore((s) => s.annotations);
+  // Findings on the series on screen, and on the study's other series: the
+  // panel steps through all of them, switching series when it has to.
+  const onScreen = useViewerStore((s) => s.annotations);
+  const otherSeries = useViewerStore((s) => s.otherSeriesAnnotations);
+  const seriesList = useViewerStore((s) => s.seriesList);
+  const annotations = useMemo(
+    () => (otherSeries.length > 0 ? [...onScreen, ...otherSeries] : onScreen),
+    [onScreen, otherSeries],
+  );
   const activeId = useViewerStore((s) => s.activeAnnotationId);
-  const focusAnnotation = useViewerStore((s) => s.focusAnnotation);
+  const { focusAnnotation } = useViewer();
+  const belowSeriesSelect = useSeriesSelectVisible();
+  // Another click would start a second switch on top of the one under way.
+  const switching = useViewerStore((s) => s.switchingSeriesKey !== null);
   const setActiveAnnotation = useViewerStore((s) => s.setActiveAnnotation);
   const removeAnnotation = useViewerStore((s) => s.removeAnnotation);
 
@@ -202,6 +216,7 @@ export function AnnotationHud() {
         className={styles.pillWrap}
         key={entranceKey}
         data-entrance={entranceActive || undefined}
+        data-below-series={belowSeriesSelect || undefined}
       >
         <button
           className={styles.pill}
@@ -240,12 +255,18 @@ export function AnnotationHud() {
 
   const confidencePct =
     shown.confidence != null ? Math.min(100, Math.max(0, shown.confidence)) : null;
+  const seriesName = seriesLabel(seriesList, shown.seriesKey);
 
   return (
     <>
-      {slots.annotationHint && <p className={styles.hintText}>{slots.annotationHint}</p>}
+      {slots.annotationHint && (
+        <p className={styles.hintText} data-below-series={belowSeriesSelect || undefined}>
+          {slots.annotationHint}
+        </p>
+      )}
       <div
         className={styles.card}
+        data-below-series={belowSeriesSelect || undefined}
         style={{ '--sev-color': color } as CSSProperties}
         aria-label="Finding summary"
         aria-live="polite"
@@ -312,6 +333,14 @@ export function AnnotationHud() {
                 {shown.sizeMm} mm
               </span>
             )}
+            {seriesName && (
+              <span className={styles.tag} title="Series">
+                <span className={styles.tagKey}>
+                  <Layers size={10} aria-hidden="true" />
+                </span>
+                {seriesName}
+              </span>
+            )}
           </div>
 
           {/* Divider + footer: Dismiss (left) + pagination (right) */}
@@ -323,6 +352,8 @@ export function AnnotationHud() {
                 className={styles.dismissBtn}
                 type="button"
                 aria-label="Dismiss finding"
+                // A finding on another series is removed from that series.
+                disabled={!onScreen.some((a) => a.id === shown.id)}
                 onClick={() => setConfirmDismiss(true)}
               >
                 <Trash2 size={11} />
@@ -336,6 +367,7 @@ export function AnnotationHud() {
                   className={styles.navBtn}
                   type="button"
                   aria-label="Previous finding"
+                  disabled={switching}
                   onClick={() => step(-1)}
                 >
                   <ChevronLeft size={15} />
@@ -347,6 +379,7 @@ export function AnnotationHud() {
                   className={styles.navBtn}
                   type="button"
                   aria-label="Next finding"
+                  disabled={switching}
                   onClick={() => step(1)}
                 >
                   <ChevronRight size={15} />

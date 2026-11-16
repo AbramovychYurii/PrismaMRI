@@ -23,6 +23,8 @@ export interface ViewerLabels {
     unavailableHint: string;
     contextLostTitle: string;
     contextLostHint: string;
+    /** Over the stage while another series of the study loads; the series' name follows it. */
+    switchingSeries: string;
   };
   /** Titles of the control groups — dock cells, and the mobile Controls tab. */
   sections: {
@@ -73,6 +75,7 @@ export const defaultLabels: ViewerLabels = {
     contextLostTitle: '3D view interrupted',
     contextLostHint:
       'The graphics driver was reset. The view comes back by itself once it recovers.',
+    switchingSeries: 'Loading series',
   },
   sections: {
     display: 'Display',

@@ -9,12 +9,16 @@ import {
 } from '@prisma-mri/viewer-core';
 import { fetchBlobWithProgress } from '@prisma-mri/viewer-core/unstable';
 import { flushSync } from 'react-dom';
-import type { ViewerStore } from './store';
+import { type ViewerSeriesContext, type ViewerStore, seriesContextOf } from './store';
 
 /** Runs one load: the volume worker by default. */
 export type VolumeLoadRunner = typeof loadVolumeInWorker;
 
-export type VolumeLoadedListener = (result: LoadResult) => void;
+/**
+ * `series` is the study the volume belongs to when it has several series, else
+ * null — what a host that caches the volume keeps to restore the selector.
+ */
+export type VolumeLoadedListener = (result: LoadResult, series: ViewerSeriesContext | null) => void;
 
 export interface ViewerLoaderOptions {
   /** Replaces the volume worker — for tests, or a host that parses elsewhere. */
@@ -36,8 +40,12 @@ export interface ViewerLoader {
   loadUrl: (url: string, filename: string, hints?: ImportHints) => Promise<void>;
   /** Dismisses the series choice if one is open, otherwise aborts the load. */
   cancel: () => void;
-  /** Re-assembles another series of the current source in place. */
-  switchSeries: (key: string) => void;
+  /**
+   * Re-assembles another series of the current source in place. Resolves when
+   * it is on screen — or at once if there is nothing to switch. A failed load
+   * resolves too, with `error` set; check `activeSeriesKey` to know.
+   */
+  switchSeries: (key: string) => Promise<void>;
   /** Answers the series choice: a series key, or null to cancel the load. */
   resolveSeries: (key: string | null) => void;
   /**
@@ -70,6 +78,8 @@ export function createViewerLoader(
     throw new Error(`maxTextureEdge must be a positive integer, not ${maxTextureEdge}.`);
   }
   let abort: AbortController | null = null;
+  /** Counts series switches, so the one that ends last is the one that clears the flag. */
+  let switchSeq = 0;
   let resolveChoice: ((key: string | null) => void) | null = null;
   const listeners = new Set<VolumeLoadedListener>();
 
@@ -156,15 +166,23 @@ export function createViewerLoader(
       // `loading.active` deliberately stays true: the host clears it once its
       // viewer screen has mounted, so the old screen never flashes back.
       flushSync(() => {
-        store.getState().setVolume(volume, prepared3D, histogram);
-        for (const listener of listeners) listener(result);
+        const { setVolume, setSeriesContext, clearSeriesContext } = store.getState();
+        setVolume(volume, prepared3D, histogram);
+        // In the same commit as the volume, so no render shows the new volume
+        // beside the findings of the old series.
+        if (seriesList && seriesList.length > 1) {
+          setSeriesContext({
+            source,
+            list: seriesList,
+            activeKey: seriesKey ?? null,
+            volumeIds: {},
+          });
+        } else {
+          clearSeriesContext();
+        }
+        const series = seriesContextOf(store.getState());
+        for (const listener of listeners) listener(result, series);
       });
-
-      if (seriesList && seriesList.length > 1) {
-        store.getState().setSeriesContext(source, seriesList, seriesKey ?? null);
-      } else {
-        store.getState().clearSeriesContext();
-      }
     } catch (err) {
       failLoad(err, 'Failed to load volume.');
     } finally {
@@ -207,8 +225,13 @@ export function createViewerLoader(
 
     switchSeries(key) {
       const { seriesSource, seriesList, activeSeriesKey } = store.getState();
-      if (!seriesSource || !seriesList || key === activeSeriesKey) return;
-      void loadSource(seriesSource, key, seriesList);
+      if (!seriesSource || !seriesList || key === activeSeriesKey) return Promise.resolve();
+      store.getState().setSwitchingSeries(key);
+      const mine = ++switchSeq;
+      return loadSource(seriesSource, key, seriesList).finally(() => {
+        // A newer switch aborts this one and clears the flag itself when it ends.
+        if (switchSeq === mine) store.getState().setSwitchingSeries(null);
+      });
     },
 
     resolveSeries(key) {

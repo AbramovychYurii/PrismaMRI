@@ -17,8 +17,10 @@ The protocol is intentionally tiny: one JSON message per line, request/response 
   - [Navigation](#navigation)
   - [Display](#display)
   - [Capture](#capture)
+  - [Series](#series)
   - [Annotations](#annotations)
   - [Measurement](#measurement)
+  - [Voxel analysis](#voxel-analysis)
 - [Errors](#errors)
 - [Minimal client examples](#minimal-client-examples)
 
@@ -26,7 +28,7 @@ The protocol is intentionally tiny: one JSON message per line, request/response 
 
 - **Transport:** plain WebSocket (no TLS) on `127.0.0.1`.
 - **Role:** the *companion process* runs the WebSocket **server**; the *browser app* is the **client** that connects out to it. (This is reversed from what most people expect — it's done this way so the browser PWA, which cannot bind a port, is always the initiator.)
-- **Ports tried, in order:** `7389, 7390, 7391, 7392, 7393`. Pick the first free one.
+- **Ports tried, in order:** `7389, 7390, 7391, 7392, 7393`. Pick the first free one. If binding fails with `EADDRINUSE`, move on to the next port instead of exiting: Claude Desktop starts one copy of the server per surface (chat, Cowork and Code sessions), so a second copy finding `7389` taken is normal.
 - **PNA preflight:** Chromium-based browsers send a [Private Network Access](https://developer.chrome.com/blog/private-network-access-preflight) preflight before upgrading to WebSocket from a public origin (e.g. the GitHub-Pages-hosted PWA). Your server **must** respond to plain HTTP requests on the same port with:
   ```
   HTTP/1.1 200 OK
@@ -36,7 +38,7 @@ The protocol is intentionally tiny: one JSON message per line, request/response 
   Access-Control-Allow-Methods: GET, OPTIONS
   ```
   Otherwise Chrome silently blocks the upgrade. See [`mcp-server/src/index.ts`](../mcp-server/src/index.ts) for a reference implementation.
-- **Browser discovery:** the PWA scans all five ports in parallel with a 300 ms probe timeout, caches the winning port in `localStorage` (`prismamri-last-local-port`), and tries the cached port first on subsequent loads.
+- **Browser discovery:** the PWA probes all five ports in parallel with a 300 ms timeout and **keeps a socket to every server that answers** — several servers can run at once and all of them drive the same viewer. Each command is answered on the socket it arrived on. While at least one server is connected, the PWA looks again every 15 s for one that started later, and after any socket closes. With nothing connected it does not poll.
 - **One client per app:** only one browser tab holds the socket at a time (enforced via [Web Locks](https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API) — `prismamri-mcp-bridge`). If the leader tab closes, the next tab takes over automatically. Your server may also see brief connection storms during tab handoff — see [Connection lifecycle](#connection-lifecycle) for the recommended cooldown.
 
 ## Message framing
@@ -132,7 +134,8 @@ Read the full viewer state. Cheap; safe to poll.
   sliceIndices: { coronal: number, sagittal: number, axial: number } | null,  // 1-based
   sliceTotals:  { coronal: number, sagittal: number, axial: number } | null,
   wl: { window: number, level: number },
-  preset: "mip" | "tissue" | "bone"
+  preset: "mip" | "tissue" | "bone",
+  series: { count: number, active: string | null } | null  // null unless the study has several series
 }
 ```
 
@@ -151,6 +154,9 @@ Centre the cursor at `dims / 2` and return volume metadata plus a centre-slice c
     modality?: string,
     scanner?:  string,
     protocol?: string,
+    bodyPart?: string,           // as declared by the file (DICOM Body Part Examined)
+    species?: string,            // as declared by the file (DICOM Patient's Species Description)
+    studyDescription?: string,
     scalarMin: number,
     scalarMax: number,
     formatId:  "dicom" | "nifti" | "mha" | "nrrd"
@@ -298,14 +304,26 @@ When `slab_mm > 0`, the image is rendered directly from the voxel buffer at nati
 
 #### `capture_3d`
 
-Screenshot the 3-D viewport exactly as displayed. Set the render preset first via `set_preset` if needed.
+Screenshot the 3-D viewport. Set the render preset first via `set_preset` if needed.
 
-**Params:** none.
+**Params:**
+```ts
+{ view?: 'current' | 'coronal' | 'sagittal' | 'axial' | 'all' }  // default 'current'
+```
+- `current` — the camera exactly as the user left it.
+- `coronal` / `sagittal` / `axial` — the standard view of that plane (frontal, lateral, top-down), the same one the slice panels' "View from this side" turns the camera to.
+- `all` — those three in one answer.
+
+The user's camera is turned and put back within the one call, so their view does not move. Nothing animates, so it also works while the tab is in the background.
 
 **Returns:**
 ```ts
-{ imageData: string }  // base64 JPEG
+{ imageData: string, view?: string }  // base64 JPEG; `view` echoes a single plane view
+// view: 'all' →
+{ coronal: string, sagittal: string, axial: string }
 ```
+
+Do not read left/right from these renders; take the side from the labelled 2-D planes.
 
 #### `capture_all`
 
@@ -335,6 +353,59 @@ Capture N evenly-spaced slices across one plane — a "contact sheet" for survey
 { images: string[], indices: number[], total: number }  // images parallel to indices (1-based)
 ```
 
+### Series
+
+A DICOM folder often holds several series (T1, T2, FLAIR, a localizer, the same scan in another plane). The viewer opens one at a time and keeps the files of the others, so it can switch in place. Everything else — captures, measurements, analysis, annotations — applies to the series that is open. After a page reload the other series are still there when the browser cache had room for the study's files; otherwise the restored volume has a single series.
+
+#### `list_series`
+
+**Params:** none.
+
+**Returns:**
+```ts
+{
+  count: number,                     // 0 for a single-series volume
+  active: string | null,             // key of the open series
+  series: Array<{
+    index: number,                   // 1-based position
+    key: string,                     // SeriesInstanceUID, else a geometry fingerprint
+    label: string,                   // series description
+    orientation: "Axial" | "Sagittal" | "Coronal" | "Oblique" | null,
+    modality: string | null,
+    slices: number,
+    matrix: [number, number],        // columns, rows
+    active: boolean,
+    findings: number                 // known findings on that series (see note below)
+  }>,
+  note: string
+}
+```
+`findings` is exact for the open series and for series that were open earlier in the session; a series never opened has none known.
+
+#### `switch_series`
+
+Opens another series in place. Resolves when it is on screen — re-assembling a large series from the loaded files takes seconds, so allow a long timeout (the reference server waits 90 s). The crosshair, window/level, render preset and slab go back to the new series' defaults. Findings stay with the series they were placed on.
+
+**Params:**
+```ts
+{ series: number | string }   // 1-based position from list_series, its label (case-insensitive), or its key
+```
+
+**Returns:**
+```ts
+{
+  active: string,                       // key
+  label: string,
+  orientation: "Axial" | "Sagittal" | "Coronal" | "Oblique" | null,
+  dims: [number, number, number],
+  spacing: [number, number, number],
+  modality?: string,
+  findings: number,                     // findings on this series
+  note: string
+}
+```
+Errors: the volume has a single series; no such series (the message lists the choices); the series could not be assembled (the viewer's error text).
+
 ### Annotations
 
 Findings persist per volume in the browser's `localStorage` and reattach automatically when the same volume is reopened. The full set is also drawn on the 3-D model and in the findings HUD.
@@ -357,7 +428,7 @@ Place a finding. Coordinates are given as fractions of the captured image (see [
 }
 ```
 
-The voxel is computed from `(fx, fy)` + the cursor's value on the plane's constant axis, then snapped to nearby anatomy of high contrast. The returned id is needed to delete this specific finding later.
+The voxel is computed from `(fx, fy)` + the cursor's value on the plane's constant axis, then snapped to nearby anatomy of high contrast. The finding belongs to the series that is open — in a multi-series study, `switch_series` first to place one on another. The returned id is needed to delete this specific finding later.
 
 **Returns:**
 ```ts
@@ -369,7 +440,8 @@ The voxel is computed from `(fx, fy)` + the cursor's value on the plane's consta
 ```ts
 // params
 { id: string }
-// returns: null (error "Annotation <id> not found" if unknown)
+// returns: null (error "Annotation <id> not found" if unknown; for a finding on a series that is not
+// open, an error naming that series — switch_series to it first)
 ```
 
 #### `list_annotations`
@@ -383,15 +455,18 @@ The voxel is computed from `(fx, fy)` + the cursor's value on the plane's consta
     voxel: { x: number, y: number, z: number },
     label: string,
     summary: string | null,
-    severity: "critical" | "serious" | "moderate" | "comment"
+    severity: "critical" | "serious" | "moderate" | "comment",
+    series: string | null,   // label of the series it is on; null for a single-series volume
+    onScreen: boolean        // on the series that is open now
   }>,
   count: number
 }
 ```
+In a multi-series study the list covers every series shown this session, open one first. `voxel` is in the coordinates of the finding's own series.
 
 #### `clear_annotations`
 
-Wipe every finding for the current volume. **Returns:** `null`.
+Wipe every finding on the series that is open. **Returns:** `null`.
 
 ### Measurement
 
@@ -428,6 +503,160 @@ Exactly one measurement exists at a time; `set_measurement` replaces any prior o
 #### `clear_measurement`
 
 **Returns:** `null`.
+
+### Voxel analysis
+
+These commands read the voxel buffer in the browser and answer with a few lines of numbers — no image unless stated. They are meant for deciding **where to look** and for **measuring**; the capture commands show what is there. All positions are **zero-based voxel** coordinates (`{x, y, z}`) in the patient-aligned frame described under [Coordinate systems](#coordinate-systems); sizes are millimetres.
+
+Every result that depends on a threshold or a coarser working grid says so (`threshold`, `resolutionVoxels`, `smoothed`) — quote them when reporting a negative.
+
+> **What these are not.** They are heuristics validated on synthetic phantoms (see [`docs/RESEARCH.md`](RESEARCH.md)). They find *candidates*; none of them diagnoses, and every candidate must be confirmed by looking. `resolutionVoxels` > 1 means the volume was too large to analyse at full resolution and small structures may be missed.
+
+#### `survey_subject`
+
+Params: none. Returns the grid and field of view; what the file `declared` (modality, bodyPart, species, studyDescription, protocol, scanner — each optional); `intensity` (min, max, percentiles, the two Otsu thresholds `subjectThreshold` and `denseThreshold`, `looksLikeHounsfield`); the `subject` (volume mL, extent, principal axes and spread, `elongation`, `flatness`, separate `pieces`); `dense` (fraction of the subject, number of dense pieces); `symmetry` (best axis, overlap, per-axis overlap); and plain-language `notes`.
+
+#### `roi_stats`
+
+```ts
+// params — a sphere (default: at the cursor, 5 mm) or a box
+{ center?: Voxel, radius_mm?: number }  |  { min: Voxel, max: Voxel }
+// returns
+{ shape, voxels, volumeMm3, mean, sd, min, max,
+  percentiles: [p5, p25, p50, p75, p95],
+  histogram: { from, to, counts: number[12] }, note? }
+```
+
+#### `line_profile`
+
+```ts
+{ from: Voxel, to: Voxel, samples?: number }      // samples default 64, max 256
+// returns
+{ lengthMm, stepMm, values: number[], min: {value, atMm}, max: {value, atMm}, steepestEdgeAtMm }
+```
+
+#### `slice_curve`
+
+```ts
+{ axis: "x"|"y"|"z", metric: "area_above"|"mean"|"max", threshold?: number, max_points?: number }
+// returns
+{ axis, metric, threshold?, values: number[], slicesPerValue, peaks: { slice, value }[3] }
+```
+
+`area_above` is the area in mm² of voxels above `threshold` (default: the tissue threshold) in each slice.
+
+#### `find_objects`
+
+Connected objects above an intensity threshold, numbered by size. Later `axis_profile` and `check_arrangement` calls refer to these ids and use the **last** result.
+
+```ts
+{ level?: "dense"|"subject", threshold?: number, threshold_max?: number,
+  min_volume_mm3?: number,           // default 5
+  split_touching?: boolean,          // split parts joined by a narrow neck
+  max_objects?: number,              // default 25, max 60
+  region?: { min: Voxel, max: Voxel } }
+// returns
+{ threshold, thresholdMax?, resolutionVoxels, split, found, shown,
+  objects: { id, volumeMm3, centroidVoxel, bboxVoxel, extentMm, lengthMm,
+             elongation, flatness, longAxis }[] }
+```
+
+`elongation` is 1 for a ball and large for a rod; `flatness` is large for a sheet. `split_touching` finds *necks*: parts joined by a wide bridge stay joined.
+
+#### `axis_profile`
+
+```ts
+{ object_id: number, segments?: number }          // segments default 24
+// returns
+{ id, lengthMm, straightness, maxBend: { angleDeg, atMm, centroidVoxel } | null,
+  diameterMm: number[], narrowest: { diameterMm, atMm }, widest: { diameterMm, atMm }, path: Voxel-like[] }
+```
+
+Follows the object along its long axis. `maxBend` compares the centre line a little before and after each point; a normal curved bone also bends, so compare with the other side.
+
+#### `check_arrangement`
+
+For a row of objects that should be regular (teeth, vertebrae, ribs). Needs ≥ 5 objects from a previous `find_objects`.
+
+```ts
+{ plane?: "axial"|"coronal"|"sagittal",           // plane the row lies in (axial for a dental arch)
+  object_ids?: number[],                           // default: objects of typical size
+  min_offset_mm?: number,                          // default 3
+  min_tilt_excess_deg?: number }                   // default 20
+// returns
+{ plane, count, curve: {a,b,c}, medianTiltDeg, medianSpacingMm,
+  warning?: string,                                // set when so many objects deviate that the selection is not one regular row
+  items: { id, centroidVoxel, offCurveMm, offLevelMm, tiltDeg, gapToNextMm, flags: string[] }[] }
+```
+
+Fits a curve robustly through the centroids and reports each object's distance from it and from the row's usual level, how much it leans against its neighbours (least angle to either neighbour; `null` for round objects), the gap to the next object relative to the gaps around it, and plain-language flags. Density is not used.
+
+#### `check_symmetry`
+
+```ts
+{ axis?: "x"|"y"|"z",                              // default: the best-fitting axis
+  region?: { min: Voxel, max: Voxel } }            // limit to a box around the subject (couch, second subject)
+// returns
+{ axes: { x|y|z: { planeVoxel, dice } }, best, planeVoxel, dice,
+  sides: { low, high },                            // e.g. "right" / "left" for x
+  volumeMm3: { low, high }, asymmetryIndex,
+  profile: { axis, slabs: { fromVoxel, toVoxel, asymmetry | null }[12] },
+  unmatched: { side, volumeMm3, centroidVoxel, extentMm, bboxVoxel }[],
+  resolutionVoxels }
+```
+
+Finds the plane that best mirrors the subject (`dice` = overlap, 1 = perfect) and lists the parts that have **no counterpart** on the other side. Only meaningful for bilateral anatomy; a low `dice` on every axis means the subject is not mirror-symmetric. The side names assume the volume was patient-aligned on import.
+
+#### `find_gaps`
+
+Thin, flat gaps inside dense material — crack and fracture **candidates**.
+
+```ts
+{ threshold?: number, max_gap_mm?: number,         // default 2, range 0.3–8
+  min_area_mm2?: number,                           // default 15
+  max_voxels?: number,                             // default 40 000 000; above this the volume is analysed on a coarser grid
+  region?: { min: Voxel, max: Voxel } }
+// returns
+{ threshold, maxGapMm, resolutionVoxels, smoothed, rawPieces,
+  candidates: { id, centroidVoxel, thicknessMm, areaMm2, planarity, enclosure, normal, lengthMm }[] }
+```
+
+`planarity` is near 0 for a flat sheet and near 1 for a tube or a ball; `enclosure` is the share of the gap with dense material on both faces. Joint spaces, sutures, the periodontal space and thin canals also qualify. Gaps narrower than a voxel are not seen. `smoothed: true` means the noise was loud enough to blur the volume first, which hides the thinnest gaps. Meaningful on CT/CBCT, not on MRI.
+
+#### `navigate_to_voxel`
+
+```ts
+{ voxel: Voxel }  →  { cursor: Voxel }              // clamped to the volume
+```
+
+#### `capture_region`
+
+A close-up cropped from the **full-resolution** slice, not a magnified thumbnail.
+
+```ts
+{ plane, center?: Voxel,                           // default: the cursor
+  fov_mm?: number,                                 // 5–400, default 40
+  size?: number,                                   // long edge in px, 128–1280, default 640
+  slab_mm?: number }
+// returns
+{ imageData: string, plane, sliceNumber, centerVoxel, fovMm: [w, h],
+  mmPerPixel, nativeMmPerVoxel: [h, v], windowLevel }
+```
+
+Does not move the crosshair. The image uses the viewer's current window and level.
+
+#### `capture_montage`
+
+Several slices of one plane on one captioned sheet.
+
+```ts
+{ plane, count?: number,                           // 2–20, default 12
+  from_slice?: number, to_slice?: number,          // 1-based range, default the whole plane
+  slab_mm?: number,                                // default 3
+  size?: number }                                  // sheet long edge, 400–1280, default 1200
+// returns
+{ imageData: string, plane, slices: number[], total, columns, slabMm, windowLevel }
+```
 
 ## Errors
 

@@ -8,6 +8,7 @@ export { type ViewerEventApi, type ViewerEvents, createViewerEvents } from './ev
 export {
   type ViewerApi,
   type ViewerLoadingState,
+  type ViewerSeriesContext,
   type ViewerSnapshot,
   type ViewerSnapshotListener,
   type ViewerStatus,

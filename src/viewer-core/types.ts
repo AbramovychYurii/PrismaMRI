@@ -15,6 +15,11 @@ export interface ParsedVolumeMeta {
   protocol?: string;
   scanner?: string;
   modality?: string;
+  /** Body part the file declares (DICOM Body Part Examined), if any. */
+  bodyPart?: string;
+  /** Species the file declares (DICOM Patient's Species Description), if any. */
+  species?: string;
+  studyDescription?: string;
   spacing: Vec3;
   origin: Vec3;
   /** Voxel dimensions in source order [width, height, depth]. */
@@ -144,6 +149,11 @@ export interface Annotation {
   id: string;
   /** Stable identifier of the volume this finding belongs to (see deriveVolumeId). */
   volumeId: string;
+  /**
+   * Key of the series this finding is on, when the volume came from a source
+   * with several series. Lets the viewer find the series again to show it.
+   */
+  seriesKey?: string;
   /** Plane the agent was viewing when it placed the marker. */
   plane: SlicePlane;
   /** Horizontal fraction 0–1 from the left edge of the slice canvas. */

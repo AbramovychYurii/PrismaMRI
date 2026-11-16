@@ -27,6 +27,16 @@ export function createViewer(options: ViewerOptions = {}): ViewerInstance {
     ...loader,
     ...createViewerEvents(api, loader),
     surfaces: createViewerSurfaces(),
+    // A finding on another series of the open study is shown by switching to
+    // that series first; the store alone only knows the series on screen.
+    focusAnnotation(id) {
+      const other = store.getState().otherSeriesAnnotations.find((a) => a.id === id);
+      if (!other?.seriesKey) {
+        api.focusAnnotation(id);
+        return;
+      }
+      void loader.switchSeries(other.seriesKey).then(() => api.focusAnnotation(id));
+    },
     dispose() {
       // Everything the host attached or started: the load in flight, the
       // `on` / `subscribe` / `onVolumeLoaded` listeners. The state stays, and

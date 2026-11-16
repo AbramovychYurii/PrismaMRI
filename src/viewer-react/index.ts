@@ -17,6 +17,7 @@ export {
   type ViewerLoadingState,
   type ViewerOptions,
   type ViewerProviderProps,
+  type ViewerSeriesContext,
   type ViewerSlots,
   type ViewerSnapshot,
   type ViewerSnapshotListener,

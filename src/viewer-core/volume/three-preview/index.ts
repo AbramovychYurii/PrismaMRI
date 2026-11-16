@@ -14,6 +14,7 @@ import { cursorToTextureVoxel } from '../plane';
 import { AnnotationMarkers } from './annotation-markers';
 import { buildCamera, buildControls, frameCamera } from './camera';
 import { MeasurementLine } from './measurement-line';
+import { PLANE_VIEWS } from './plane-views';
 import {
   type PlaneColors,
   type VolumeObject,
@@ -384,13 +385,9 @@ export class ThreePreview {
   }
 
   /**
-   * Smoothly animate the camera to the standard anatomical view for `plane`.
-   * The camera distance (zoom) is preserved; only orientation changes.
-   *
-   * View conventions (matching 2-D slice panel layout):
-   *   coronal  — looking along -Y, Z up   (frontal / anterior view)
-   *   sagittal — looking along +X, Z up   (right lateral view)
-   *   axial    — looking along +Z, -Y up  (superior / top-down view)
+   * Smoothly animate the camera to the standard anatomical view for `plane`
+   * (see {@link PLANE_VIEWS}). The camera distance (zoom) is preserved; only
+   * orientation changes.
    */
   snapToPlane(plane: SlicePlane): void {
     if (!this.controls) return;
@@ -399,17 +396,12 @@ export class ThreePreview {
     const radius = this.camera.position.distanceTo(center);
 
     // Target camera direction (unit vector FROM center TO camera) and up vector.
-    const dirMap: Record<SlicePlane, [THREE.Vector3, THREE.Vector3]> = {
-      coronal: [new THREE.Vector3(0, -1, 0), new THREE.Vector3(0, 0, 1)],
-      sagittal: [new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, 1)],
-      axial: [new THREE.Vector3(0, 0, 1), new THREE.Vector3(0, -1, 0)],
-    };
-    const [dir, up] = dirMap[plane];
+    const { dir, up } = PLANE_VIEWS[plane];
 
     this._snapFromPos.copy(this.camera.position);
     this._snapFromUp.copy(this.camera.up);
-    this._snapToPos.copy(center).addScaledVector(dir, radius);
-    this._snapToUp.copy(up);
+    this._snapToPos.copy(center).addScaledVector(new THREE.Vector3(...dir), radius);
+    this._snapToUp.set(...up);
     this._snapCenter.copy(center);
     this._snapRadius = radius;
     this._snapStartTs = 0; // will be set on first animation frame
@@ -623,6 +615,34 @@ export class ThreePreview {
     if (!captureCtx) throw new Error('captureJpeg: failed to acquire 2D context');
     captureCtx.putImageData(new ImageData(flipped, capW, capH), 0, 0);
     return off.toDataURL('image/jpeg', quality).replace(/^data:[^;]+;base64,/, '');
+  }
+
+  /**
+   * Like {@link captureJpeg}, but seen from the standard view of `plane` (see
+   * {@link PLANE_VIEWS}). The camera is moved and put back in the same
+   * synchronous call, so the user's view stays. Not {@link snapToPlane}: that
+   * animates on animation frames, which a background tab never runs.
+   */
+  captureJpegFromPlane(plane: SlicePlane, maxEdge = 512, quality = 0.92): string {
+    if (!this.controls) throw new Error('captureJpegFromPlane: 3-D view not ready');
+    const target = this.controls.target;
+    const savedPos = this.camera.position.clone();
+    const savedUp = this.camera.up.clone();
+    const { dir, up } = PLANE_VIEWS[plane];
+
+    this.camera.position
+      .copy(target)
+      .addScaledVector(new THREE.Vector3(...dir), savedPos.distanceTo(target));
+    this.camera.up.set(...up);
+    this.camera.lookAt(target);
+    try {
+      return this.captureJpeg(maxEdge, quality);
+    } finally {
+      this.camera.position.copy(savedPos);
+      this.camera.up.copy(savedUp);
+      this.camera.lookAt(target);
+      this.dirty = true;
+    }
   }
 
   /**

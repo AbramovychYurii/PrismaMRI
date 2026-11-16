@@ -1,4 +1,4 @@
-import type { AnnotationSeverity, SlicePlane } from '@prisma-mri/viewer-core';
+import type { AnnotationSeverity, SlicePlane, Vec3 } from '@prisma-mri/viewer-core';
 import { isSlicePlane } from '@prisma-mri/viewer-react/unstable';
 import { SEVERITIES } from './constants';
 
@@ -37,14 +37,19 @@ export function requirePlane(args: Args, key = 'plane'): SlicePlane {
   return value;
 }
 
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value);
+
 export function requireNumber(args: Args, key: string): number {
   const value = args[key];
-  if (typeof value !== 'number' || !Number.isFinite(value)) reject(key, 'a finite number', value);
+  if (!isFiniteNumber(value)) reject(key, 'a finite number', value);
   return value;
 }
 
 /** Absent means "use the default"; present but unusable is still an error. */
-export function optionalNumber(args: Args, key: string, fallback: number): number {
+export function optionalNumber(args: Args, key: string): number | undefined;
+export function optionalNumber(args: Args, key: string, fallback: number): number;
+export function optionalNumber(args: Args, key: string, fallback?: number): number | undefined {
   if (args[key] === undefined || args[key] === null) return fallback;
   return requireNumber(args, key);
 }
@@ -76,6 +81,15 @@ export function requireOneOf<T extends string>(args: Args, key: string, allowed:
   return value as T;
 }
 
+export function optionalOneOf<T extends string>(
+  args: Args,
+  key: string,
+  allowed: readonly T[],
+): T | undefined {
+  if (args[key] === undefined || args[key] === null) return undefined;
+  return requireOneOf(args, key, allowed);
+}
+
 /**
  * Severity keeps its old forgiving behaviour: an unrecognised value falls back
  * to "serious" rather than dropping the finding. Losing a finding the agent
@@ -86,4 +100,34 @@ export function optionalSeverity(args: Args, key = 'severity'): AnnotationSeveri
   return typeof value === 'string' && (SEVERITIES as readonly string[]).includes(value)
     ? (value as AnnotationSeverity)
     : 'serious';
+}
+
+/** A `{x, y, z}` voxel; each coordinate must be a finite number. */
+export function requireVoxel(args: Args, key: string): Vec3 {
+  const value = args[key];
+  const { x, y, z } = (typeof value === 'object' && value !== null ? value : {}) as Args;
+  if (!isFiniteNumber(x) || !isFiniteNumber(y) || !isFiniteNumber(z)) {
+    reject(key, 'an object {x, y, z} of voxel coordinates', value);
+  }
+  return [x, y, z];
+}
+
+export function optionalVoxel(args: Args, key: string): Vec3 | undefined {
+  return args[key] === undefined || args[key] === null ? undefined : requireVoxel(args, key);
+}
+
+export function optionalBoolean(args: Args, key: string, fallback: boolean): boolean {
+  const value = args[key];
+  if (value === undefined || value === null) return fallback;
+  if (typeof value !== 'boolean') reject(key, 'true or false', value);
+  return value;
+}
+
+/** An optional `{min:{x,y,z}, max:{x,y,z}}` voxel box. */
+export function optionalRegion(args: Args, key: string): { min: Vec3; max: Vec3 } | undefined {
+  const value = args[key];
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'object') reject(key, 'an object {min:{x,y,z}, max:{x,y,z}}', value);
+  const box = value as Args;
+  return { min: requireVoxel(box, 'min'), max: requireVoxel(box, 'max') };
 }

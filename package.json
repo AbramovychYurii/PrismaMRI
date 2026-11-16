@@ -20,7 +20,9 @@
     "test:e2e:update": "playwright test --update-snapshots",
     "ref:capture": "vite build && playwright test -c e2e/reference/playwright.config.ts render --update-snapshots=all",
     "ref:check": "vite build && playwright test -c e2e/reference/playwright.config.ts render",
-    "ref:perf": "vite build && playwright test -c e2e/reference/playwright.config.ts perf"
+    "ref:perf": "vite build && playwright test -c e2e/reference/playwright.config.ts perf",
+    "research": "RESEARCH=1 vitest run research/benchmark.test.ts",
+    "research:write": "RESEARCH=1 RESEARCH_WRITE=1 vitest run research/benchmark.test.ts"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.3.0",

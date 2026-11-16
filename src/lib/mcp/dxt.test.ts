@@ -23,7 +23,9 @@ describe('buildDxtArchive', () => {
 
     const manifest = JSON.parse(strFromU8(entries['manifest.json']));
     expect(manifest.server.entry_point).toBe('server/index.js');
-    expect(manifest.tools).toHaveLength(20);
+    expect(manifest.tools).toHaveLength(34);
     expect(manifest.tools[0]).toEqual({ name: 'get_viewer_state' });
+    expect(manifest.tools).toContainEqual({ name: 'find_gaps' });
+    expect(manifest.tools).toContainEqual({ name: 'switch_series' });
   });
 });

@@ -25,7 +25,8 @@ Set the slab once with \`set_slab_mm\` before each capture group; it persists un
 ## Step 1 · Volume and spatial context
 1. Call \`get_viewer_state\`. If \`volumeLoaded\` is false, stop and ask the user to open a file first.
    Record: modality (CT / MRI / CBCT), dims [W×H×D], voxel spacing in mm. Every size estimate depends on spacing.
-2. Call \`set_render_preset "bone"\`, then \`capture_3d\` — this gives the full 3-D spatial skeleton before any 2-D navigation. Use it to understand the global anatomy, identify dominant structures, and orient your slice survey.
+   If the state reports \`series\`, the study has several series: call \`list_series\` and read the ones that answer the question, one at a time with \`switch_series\` — finish and annotate each before moving to the next, because findings stay with the series they were placed on. State in the report which series you read and which you did not.
+2. Call \`set_render_preset "bone"\`, then \`capture_3d\` with \`view: "all"\` — three renders aligned to the coronal, sagittal and axial planes (frontal, lateral, top-down) in one call, before any 2-D navigation. Use them to understand the global anatomy, count and compare structures, notice anything missing, extra or out of line from three sides, and orient your slice survey. Take left/right from the labelled 2-D planes, not from these renders.
 
 ## Step 2 · Volume overview and windowing
 Call \`get_volume_overview\` — this returns metadata and centre-slice captures of all three planes in one call. These centre slices are your anatomical reference point; no additional navigation needed at this stage.
@@ -40,7 +41,7 @@ The viewer auto-calibrates W/L on load. Only override if images are visibly clip
 **Never call \`set_window_level\` with arbitrary values** — always use named presets or the file default.
 
 ## Step 3 · Systematic MIP survey — all three planes
-Work plane by plane: **coronal → sagittal → axial**.
+Work plane by plane: **coronal → sagittal → axial**. In a study with several series, repeat Steps 3–5 on each series you chose in Step 1 (\`switch_series\` to the next one when the current is done).
 
 For each plane:
 1. \`set_slab_mm 5\`
@@ -85,15 +86,15 @@ State reasoning explicitly: *"Most likely X because [one feature]; Y is possible
 ## Step 5 · 3-D spatial verification
 After all annotations are placed:
 1. \`set_render_preset "bone"\` (skeletal/dental CT) or \`"mip"\` (angiography/airway).
-2. \`capture_3d\` — confirm every marker lands at the correct anatomical site.
+2. \`capture_3d\` with \`view: "all"\` — confirm every marker lands at the correct anatomical site, from all three sides.
 3. If a marker looks misplaced: remove it, re-examine with \`capture_all_planes\` + slab_mm 3, re-annotate.
 
 ## Step 6 · Structured report
 Present the final report in this exact structure:
 
-**Technique** — modality, dims, voxel spacing mm, W/L preset applied, slab thickness used.
+**Technique** — modality, dims, voxel spacing mm, W/L preset applied, slab thickness used. For a multi-series study: the series read (label, orientation) and the ones not read.
 
-**Findings** — one paragraph per anatomical region, most-severe first. Each abnormal finding must include: anatomical location (name + approximate voxel coords), size if measurable, morphology, top differential.
+**Findings** — one paragraph per anatomical region, most-severe first. Each abnormal finding must include: anatomical location (name + approximate voxel coords), the series it is on (multi-series study), size if measurable, morphology, top differential.
 
 **Impression** — 3–5 sentences. Lead with the most clinically significant conclusion. Include confidence levels for critical/serious findings.
 

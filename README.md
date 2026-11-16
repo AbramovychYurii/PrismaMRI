@@ -45,10 +45,10 @@ So I built a **simpler way to review results for personal use**: three orthogona
 
 ### AI assistance (optional)
 
-- **Claude Desktop Extension** — ship-as-`.dxt` MCP server lets Claude operate the viewer end-to-end: navigate, capture, window/level, render presets, slab MIP, annotations, measurements.
+- **Claude Desktop Extension** — ship-as-`.dxt` MCP server lets Claude operate the viewer end-to-end: navigate, capture, window/level, render presets, slab MIP, annotations, measurements — and list and switch the series of a multi-series study.
 - **Embedded radiology skill** — every `.dxt` carries an evidence-based prompt ([`mcp-server/skill/SKILL.md`](mcp-server/skill/SKILL.md)) with RSNA-style structured reports and a MIP-first, three-plane confirmation protocol — delivered to Claude automatically via the MCP `initialize` handshake.
 - **AI annotations on the volume** — the agent places severity-coloured pins on the 2D panels _and_ the 3D model (critical / serious / moderate / note), with a label, summary, confidence score and optional size.
-- **Findings HUD** — floating card per finding with severity chip, location, confidence bar, summary, voxel coordinates and prev/next navigation. Click a pin to focus its finding.
+- **Findings HUD** — floating card per finding with severity chip, location, confidence bar, summary, voxel coordinates and prev/next navigation. Click a pin to focus its finding. In a study with several series the panel steps through the findings of all of them and switches to the right series for you; it sits below the series selector.
 - **PDF report generation** — export findings to a printable PDF with:
   - scope toggle (this finding only vs all findings + consolidated impression),
   - optional scan thumbnails captured from the exact slice of each finding,
@@ -62,9 +62,9 @@ So I built a **simpler way to review results for personal use**: three orthogona
 - **PWA installable** — runs offline once installed; Claude Desktop then connects to the installed PWA directly via local WebSocket (no relay).
 - **Mobile layout** — dedicated bottom tab bar, touch-swipe slice navigation, single-plane focus mode.
 - **Folder import / drag-and-drop** — drop a DICOM folder, a `.nii.gz`, a `.mha/.mhd`, a `.nrrd`, or a ZIP archive containing any of those.
-- **IndexedDB cache** — the last loaded volume is restored on reload so you don’t re-import on every refresh.
+- **IndexedDB cache** — the last loaded volume is restored on reload so you don’t re-import on every refresh. For a study with several series the files are kept too (when they fit the free quota), so the series selector and the findings on the other series survive the reload.
 - **Per-volume annotation persistence** — AI findings are stored per volume in `localStorage` and reattach automatically when the same volume is reopened.
-- **Keyboard shortcuts** — `?` opens a full shortcuts cheat-sheet; `⌘O` / `Ctrl+O` opens a folder; `Esc` closes dialogs and cancels a load in progress (it never leaves a loaded volume — use **Back to import**).
+- **Keyboard shortcuts** — `?` opens a full shortcuts cheat-sheet; `⌘O` / `Ctrl+O` opens a folder; `[` / `]` open the previous / next series of a multi-series study; `Esc` closes dialogs and cancels a load in progress (it never leaves a loaded volume — use **Back to import**).
 
 ## Supported formats
 
@@ -131,6 +131,8 @@ npm run ref:perf    # load timings, memory and import-screen load → e2e/refere
 
 PrismaMRI ships a Claude Desktop Extension (`prismamri.dxt`) that lets Claude navigate the viewer, capture slices, place annotations, run measurements, and produce a structured description of the study.
 
+Beyond pictures, the agent can **query the voxels themselves**: region statistics, intensity profiles, per-slice curves, an inventory of separate objects with their volumes and axes, the straightness of a bone, whether a row of teeth or vertebrae keeps its order, what has no counterpart on the other side of the body, and thin gaps in bone that may be cracks. Answers are a few lines of numbers, so large volumes never have to be sent through the connector. It starts every study by working out *what* it is looking at (human or animal, which region) rather than assuming. These tools find candidates for a person to check — they are validated on synthetic phantoms only; see [`docs/RESEARCH.md`](docs/RESEARCH.md) for what that does and does not show.
+
 For materially better analysis quality, every `prismamri.dxt` ships with an embedded evidence-based skill prompt — **[`mcp-server/skill/SKILL.md`](mcp-server/skill/SKILL.md)**. It encodes systematic CT/MRI search patterns, an RSNA-style structured report template, and a tool-orchestration recipe derived from peer-reviewed studies on multimodal-LLM performance in radiology (2024–2025).
 
 The skill is bundled inside the `.dxt` archive and delivered to Claude automatically via the MCP `initialize` handshake (`instructions` field) — there is nothing to install or configure. As soon as you connect the extension in Claude Desktop, the methodology is active. Compared to an unguided prompt, this noticeably improves descriptive accuracy and reduces hallucinated findings.
@@ -141,7 +143,7 @@ Once findings appear in the viewer, click **REPORT** on any finding card to expo
 
 ### Building your own integration
 
-The browser app talks to the bundled MCP server over a small JSON-over-WebSocket protocol on `127.0.0.1`. It is not specific to MCP — any local process can drive the viewer (a CLI, a Python notebook bridge, an alternative MCP server pointed at a different LLM, an integration test harness). The full specification, including all 20 commands and a minimal Node.js client, lives in [`docs/PROTOCOL.md`](docs/PROTOCOL.md).
+The browser app talks to the bundled MCP server over a small JSON-over-WebSocket protocol on `127.0.0.1`. It is not specific to MCP — any local process can drive the viewer (a CLI, a Python notebook bridge, an alternative MCP server pointed at a different LLM, an integration test harness). The full specification, including all 34 commands and a minimal Node.js client, lives in [`docs/PROTOCOL.md`](docs/PROTOCOL.md).
 
 ## Privacy
 

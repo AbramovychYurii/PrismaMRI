@@ -12,4 +12,17 @@ export {
   letterboxRect,
   pointerToImageFrac,
 } from './volume/letterbox';
+export { round } from './analysis/grid';
+export { seriesLabel } from './import/series';
 export { clamp } from './volume/math';
+export { alongAxis } from './volume/plane';
+// Synthetic volumes with known defects — for tests and for the benchmark in research/.
+export {
+  type AnimalOptions,
+  type CrackOptions,
+  type JawOptions,
+  PhantomBuilder,
+  animalPhantom,
+  crackPhantom,
+  jawPhantom,
+} from './analysis/phantoms';
