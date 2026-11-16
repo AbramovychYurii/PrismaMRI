@@ -1,9 +1,11 @@
+import { APP_NAME } from '@/brand';
 import { BrandBlock } from '@/components/header/BrandBlock';
 import { Header } from '@/components/header/Header';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { usePwaInstall } from '@/hooks/usePwaInstall';
 import {
   Viewer,
+  type ViewerLabelsInput,
   type ViewerSlots,
   accentAlpha,
   useViewer,
@@ -118,6 +120,11 @@ function MobileHeader() {
   );
 }
 
+/** The app's name on what the viewer hands out: `prismamri-axial-42.png`, the share sheet's title. */
+const VIEWER_LABELS: ViewerLabelsInput = {
+  export: { filePrefix: APP_NAME.toLowerCase(), shareTitle: APP_NAME },
+};
+
 interface AppGridProps {
   slots: ViewerSlots;
   onExit: () => void;
@@ -138,6 +145,7 @@ export function AppGrid({ slots, onExit }: AppGridProps) {
       viewer={viewer}
       layout={isMobile ? 'mobile' : 'desktop'}
       keyboardTarget={window}
+      labels={VIEWER_LABELS}
       slots={slots}
       onExit={onExit}
     />

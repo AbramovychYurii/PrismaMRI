@@ -2,7 +2,7 @@
  * @prisma-mri/viewer-react/unstable — what the viewer's own UI is built from.
  *
  * No semver here: the store (field and action names change whenever the viewer
- * needs it), and the small pieces the PrismaMRI app reuses — Tooltip, focus
+ * needs it), and the small pieces a host app reuses — Tooltip, focus
  * trap, hover hook, download helper, layout and severity constants. A host that
  * wants to stay put uses the viewer's methods and `useViewerSnapshot` from the
  * main entry instead.

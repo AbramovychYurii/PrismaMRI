@@ -200,7 +200,7 @@ describe('dicomAdapter — what it cannot read', () => {
         noop,
       ),
     ).rejects.toThrow(
-      'This DICOM series is stored as JPEG 2000 Lossless (1.2.840.10008.1.2.4.90), and PrismaMRI reads uncompressed DICOM only.',
+      'This DICOM series is stored as JPEG 2000 Lossless (1.2.840.10008.1.2.4.90), and only uncompressed DICOM can be read.',
     );
     await expect(
       dicomAdapter.parse(

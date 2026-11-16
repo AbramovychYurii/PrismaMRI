@@ -12,7 +12,7 @@
  *    Auto-expands when a marker is focused (click on viewer / nav).
  *    The X button hides the expanded card AND clears the active finding.
  *
- * The host adds its own footer actions (PrismaMRI: the PDF report) and the
+ * The host adds its own footer actions (for example a PDF report) and the
  * hint line under the card through `slots.annotationActions` / `annotationHint`.
  *
  * All styling lives in `AnnotationHud.module.css`.
