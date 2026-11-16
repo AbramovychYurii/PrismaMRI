@@ -162,7 +162,7 @@ export function createViewerLoader(
       const { result } = out;
       const { volume, prepared3D, histogram } = result;
       // Synchronous, listeners included, so a host that swaps screens on load
-      // (PrismaMRI's import → viewer route) does it in the same commit.
+      // (an import → viewer route) does it in the same commit.
       // `loading.active` deliberately stays true: the host clears it once its
       // viewer screen has mounted, so the old screen never flashes back.
       flushSync(() => {

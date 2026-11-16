@@ -61,5 +61,10 @@ describe('resolveLabels', () => {
     expect(labels.planes.coronal).toEqual(defaultLabels.planes.coronal);
     expect(labels.stage.noVolume).toBe('Немає тому');
     expect(labels.stage.unavailableTitle).toBe(defaultLabels.stage.unavailableTitle);
+    expect(labels.export).toEqual({ filePrefix: 'viewer', shareTitle: 'Viewer' });
+    expect(resolveLabels({ export: { filePrefix: 'scan' } }).export).toEqual({
+      filePrefix: 'scan',
+      shareTitle: 'Viewer',
+    });
   });
 });

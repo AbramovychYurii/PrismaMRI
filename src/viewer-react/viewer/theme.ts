@@ -53,7 +53,7 @@ export interface ViewerThemeInput {
   canvasBackground?: string;
 }
 
-/** PrismaMRI's own look — warm dark surfaces, amber / violet / azure planes. */
+/** The default look — warm dark surfaces, amber / violet / azure planes. */
 export const defaultTheme: ViewerTheme = {
   colors: {
     bg: '#0c0b09',

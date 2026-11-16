@@ -51,7 +51,7 @@ export function Stage() {
       <StageAlert />
       <ToolbarPill previewRef={previewRef} has3D={status !== 'unavailable'} />
       <AnnotationHud />
-      {/* The host's overlay (PrismaMRI: the AI agent button) hides in focus
+      {/* The host's overlay (for example an AI agent button) hides in focus
           mode — it's part of the chrome the user asked to mute. Unmounting
           also collapses any expanded panel state cleanly on re-entry. */}
       {!focus && slots.stageOverlay}

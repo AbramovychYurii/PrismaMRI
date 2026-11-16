@@ -128,13 +128,13 @@ export function unreadableReason(t: DicomTags): string | null {
     const name = SYNTAX_NAMES[t.transferSyntax] ?? 'a compressed encoding';
     const uid = t.transferSyntax ? ` (${t.transferSyntax})` : '';
     const advice = 'Export it uncompressed (Explicit VR Little Endian) and open it again.';
-    return `This DICOM series is stored as ${name}${uid}, and PrismaMRI reads uncompressed DICOM only. ${advice}`;
+    return `This DICOM series is stored as ${name}${uid}, and only uncompressed DICOM can be read. ${advice}`;
   }
   if (t.samplesPerPixel !== 1) {
-    return `This DICOM series is in colour (${t.samplesPerPixel} samples per pixel); PrismaMRI reads greyscale only.`;
+    return `This DICOM series is in colour (${t.samplesPerPixel} samples per pixel); only greyscale DICOM can be read.`;
   }
   if (t.bitsAllocated !== 8 && t.bitsAllocated !== 16 && t.bitsAllocated !== 32) {
-    return `This DICOM series stores ${t.bitsAllocated}-bit pixels, which PrismaMRI does not read.`;
+    return `This DICOM series stores ${t.bitsAllocated}-bit pixels, which cannot be read.`;
   }
   return null;
 }

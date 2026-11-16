@@ -48,11 +48,16 @@ export const TrayButton = memo(function TrayButton({
   );
 });
 
-function downloadSlice(canvas: HTMLCanvasElement | null, plane: SlicePlane, idx: number): void {
+function downloadSlice(
+  canvas: HTMLCanvasElement | null,
+  prefix: string,
+  plane: SlicePlane,
+  idx: number,
+): void {
   if (!canvas) return;
   canvas.toBlob((blob) => {
     if (!blob) return;
-    downloadBlob(blob, `prismamri-${plane}-${idx}.png`);
+    downloadBlob(blob, `${prefix}-${plane}-${idx}.png`);
   }, 'image/png');
 }
 
@@ -67,11 +72,12 @@ export function ExportSliceButton({
   idx: number;
   large?: boolean;
 }) {
+  const { filePrefix } = useViewerLabels().export;
   return (
     <TrayButton
       large={large}
       label="Export slice as PNG"
-      onClick={() => downloadSlice(canvasRef.current, plane, idx)}
+      onClick={() => downloadSlice(canvasRef.current, filePrefix, plane, idx)}
     >
       <Download size={large ? 13 : 11} />
     </TrayButton>

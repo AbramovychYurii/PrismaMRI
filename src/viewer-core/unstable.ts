@@ -1,7 +1,7 @@
 /**
  * @prisma-mri/viewer-core/unstable — helpers the viewer packages share.
  *
- * No semver here: they exist because `viewer-react` and the PrismaMRI app need
+ * No semver here: they exist because `viewer-react` and the host app need
  * them, not because they are part of the library's promise. They may be renamed,
  * moved or removed in any release.
  */

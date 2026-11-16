@@ -40,6 +40,13 @@ export interface ViewerLabels {
     disclaimerLead: string;
     disclaimer: string;
   };
+  /** What the viewer calls the files it hands out (PNG slices, 3-D image and video). */
+  export: {
+    /** File names start with it: `viewer-axial-42.png`. */
+    filePrefix: string;
+    /** Title of the OS share sheet; the item follows it: "Viewer — 3D view". */
+    shareTitle: string;
+  };
 }
 
 /** What a host passes: any part of the labels, down to a single string. */
@@ -51,6 +58,7 @@ export interface ViewerLabelsInput {
   stage?: Partial<ViewerLabels['stage']>;
   sections?: Partial<ViewerLabels['sections']>;
   session?: Partial<ViewerLabels['session']>;
+  export?: Partial<ViewerLabels['export']>;
 }
 
 export const defaultLabels: ViewerLabels = {
@@ -89,6 +97,10 @@ export const defaultLabels: ViewerLabels = {
     disclaimerLead: 'Reference only.',
     disclaimer: 'Not for diagnosis, treatment planning, measurements, or implant workflows.',
   },
+  export: {
+    filePrefix: 'viewer',
+    shareTitle: 'Viewer',
+  },
 };
 
 export function resolveLabels(input: ViewerLabelsInput = {}): ViewerLabels {
@@ -106,5 +118,6 @@ export function resolveLabels(input: ViewerLabelsInput = {}): ViewerLabels {
     stage: { ...d.stage, ...input.stage },
     sections: { ...d.sections, ...input.sections },
     session: { ...d.session, ...input.session },
+    export: { ...d.export, ...input.export },
   };
 }

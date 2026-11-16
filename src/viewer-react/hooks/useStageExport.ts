@@ -1,7 +1,7 @@
 import type { ThreePreview } from '@prisma-mri/viewer-core';
 import { useCallback, useState } from 'react';
 import { downloadBlob } from '../util/download';
-import { useViewerStore } from '../viewer';
+import { useViewerLabels, useViewerStore } from '../viewer';
 
 /** Hand the file to the user: save it, or offer it to the OS share sheet. */
 export type Delivery = 'download' | 'share';
@@ -40,6 +40,7 @@ function deliver(blob: Blob, filename: string, title: string, how: Delivery): Pr
 export function useStageExport(previewRef: React.MutableRefObject<ThreePreview | null>) {
   const [recordPct, setRecordPct] = useState<number | null>(null);
   const setError = useViewerStore((s) => s.setError);
+  const { filePrefix, shareTitle } = useViewerLabels().export;
 
   // Shown by StageAlert; the console alone left a failed export looking like
   // a click that did nothing. Engine text stays in the console — the user gets
@@ -56,10 +57,10 @@ export function useStageExport(previewRef: React.MutableRefObject<ThreePreview |
     (how: Delivery) => {
       previewRef.current
         ?.exportPNG()
-        .then((blob) => deliver(blob, 'prismamri-3d.png', 'PrismaMRI — 3D view', how))
+        .then((blob) => deliver(blob, `${filePrefix}-3d.png`, `${shareTitle} — 3D view`, how))
         .catch((err) => reportFailure('3D view', err));
     },
-    [previewRef, reportFailure],
+    [previewRef, reportFailure, filePrefix, shareTitle],
   );
 
   const exportVideo = useCallback(
@@ -71,14 +72,14 @@ export function useStageExport(previewRef: React.MutableRefObject<ThreePreview |
         const { blob, ext } = await preview.exportRotationVideo({
           onProgress: (t) => setRecordPct(t),
         });
-        await deliver(blob, `prismamri-3d-spin.${ext}`, 'PrismaMRI — 3D spin', how);
+        await deliver(blob, `${filePrefix}-3d-spin.${ext}`, `${shareTitle} — 3D spin`, how);
       } catch (err) {
         reportFailure('3D spin', err);
       } finally {
         setRecordPct(null);
       }
     },
-    [previewRef, recordPct, reportFailure],
+    [previewRef, recordPct, reportFailure, filePrefix, shareTitle],
   );
 
   return { recordPct, exportImage, exportVideo };
