@@ -38,7 +38,8 @@ function visibleDots(
     .filter((dot): dot is { fx: number; fy: number } => dot !== null);
 }
 
-interface MenuState {
+/** The measure menu's anchor; exported so the hooks that return it can be declared. */
+export interface MenuState {
   screenX: number;
   screenY: number;
   voxel: MeasurementPoint;
