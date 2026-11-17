@@ -22,9 +22,9 @@ import {
   type Annotation,
   type SlicePlane,
   type VolumeCursor,
+  seriesLabel,
   sliceNumber,
 } from '@prisma-mri/viewer-core';
-import { seriesLabel } from '@prisma-mri/viewer-core/unstable';
 import { ChevronLeft, ChevronRight, Layers, Sparkles, Trash2, X } from 'lucide-react';
 import {
   type ButtonHTMLAttributes,

@@ -4,7 +4,7 @@
  * series list or on the next finding looks like nothing happened.
  */
 
-import { seriesLabel } from '@prisma-mri/viewer-core/unstable';
+import { seriesLabel } from '@prisma-mri/viewer-core';
 import { useViewerLabels, useViewerStore } from '../../viewer';
 import styles from './StageSeriesLoading.module.css';
 

@@ -1,5 +1,5 @@
+import { isSlicePlane } from '@prisma-mri/viewer-core';
 import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useState } from 'react';
-import { isSlicePlane } from '../constants';
 import { useViewerStoreEffects } from '../hooks/useViewerStoreEffects';
 import {
   type ViewerInstance,

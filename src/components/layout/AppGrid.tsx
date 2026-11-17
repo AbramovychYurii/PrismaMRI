@@ -4,6 +4,7 @@ import { Header } from '@/components/header/Header';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { usePwaInstall } from '@/hooks/usePwaInstall';
 import {
+  Tooltip,
   Viewer,
   type ViewerLabelsInput,
   type ViewerSlots,
@@ -11,7 +12,6 @@ import {
   useViewer,
   useViewerSnapshot,
 } from '@prisma-mri/viewer-react';
-import { Tooltip } from '@prisma-mri/viewer-react/unstable';
 import { MonitorDown } from 'lucide-react';
 import styled from 'styled-components';
 

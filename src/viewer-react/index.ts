@@ -1,7 +1,10 @@
 /** @prisma-mri/viewer-react — the viewer as React components, its store and configuration. */
 export { Viewer, type ViewerProps } from './components/Viewer';
 export { AnnotationActionButton } from './components/annotations/AnnotationHud';
+export { DOCK_H } from './components/dock/Dock';
 export { StatusStrip } from './components/status/StatusStrip';
+export { Tooltip } from './components/ui/Tooltip';
+export { useFocusTrap } from './hooks/useFocusTrap';
 export {
   type AnnotationActionContext,
   type AnnotationStorage,
@@ -29,30 +32,21 @@ export {
   ViewerProvider,
   createViewer,
   isAbort,
-  usePortalContainer,
   useViewer,
-  useViewerEnvironment,
   useViewerEvent,
-  useViewerFeatures,
-  useViewerHost,
-  useViewerLabels,
-  useViewerLayout,
   useViewerSnapshot,
   useViewerSurfaces,
-  useViewerTheme,
 } from './viewer';
 export {
   ALL_RENDER_PRESETS,
   type ViewerFeatures,
   defaultFeatures,
-  resolveFeatures,
 } from './viewer/features';
 export {
   type PlaneLabel,
   type ViewerLabels,
   type ViewerLabelsInput,
   defaultLabels,
-  resolveLabels,
 } from './viewer/labels';
 export {
   type ViewerColors,
@@ -61,9 +55,5 @@ export {
   type ViewerThemeInput,
   accentAlpha,
   defaultTheme,
-  resolveTheme,
-  themeCssVars,
-  withAlpha,
 } from './viewer/theme';
-export { MOBILE_MAX_WIDTH, type ViewerLayoutMode, useContainerLayout } from './viewer/layout';
 export type { MobileTab, ToolbarState } from './types';

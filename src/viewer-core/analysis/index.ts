@@ -22,7 +22,7 @@ export {
   splitTouching,
 } from './components';
 export { type GapCandidate, type GapOptions, type GapReport, findGaps } from './gaps';
-export { type Mask3, type Region, type ThresholdOptions, thresholdMask } from './grid';
+export { type Mask3, type Region, type ThresholdOptions, round, thresholdMask } from './grid';
 export {
   type CurveMetric,
   type LineProfile,
@@ -42,3 +42,13 @@ export {
   checkSymmetry,
 } from './symmetry';
 export { autoClasses } from './thresholds';
+// Synthetic volumes with known defects — fixtures for tests and for the benchmark in research/.
+export {
+  type AnimalOptions,
+  type CrackOptions,
+  type JawOptions,
+  PhantomBuilder,
+  animalPhantom,
+  crackPhantom,
+  jawPhantom,
+} from './phantoms';

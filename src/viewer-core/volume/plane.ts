@@ -23,6 +23,13 @@ export const PLANE_GEOMETRY: Record<SlicePlane, PlaneGeometry> = {
 
 const AXIS_INDEX: Record<Axis, 0 | 1 | 2> = { x: 0, y: 1, z: 2 };
 
+const SLICE_PLANES: ReadonlyArray<string> = ['coronal', 'sagittal', 'axial'];
+
+/** Type guard — narrows a string (a tab name, a tool argument) to a `SlicePlane`. */
+export function isSlicePlane(value: string): value is SlicePlane {
+  return SLICE_PLANES.includes(value);
+}
+
 export function alongAxis(triple: AxisTriple, axis: Axis): number {
   return triple[AXIS_INDEX[axis]];
 }

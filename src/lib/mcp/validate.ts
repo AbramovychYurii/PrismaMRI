@@ -1,5 +1,9 @@
-import type { AnnotationSeverity, SlicePlane, Vec3 } from '@prisma-mri/viewer-core';
-import { isSlicePlane } from '@prisma-mri/viewer-react/unstable';
+import {
+  type AnnotationSeverity,
+  type SlicePlane,
+  type Vec3,
+  isSlicePlane,
+} from '@prisma-mri/viewer-core';
 import { SEVERITIES } from './constants';
 
 /**

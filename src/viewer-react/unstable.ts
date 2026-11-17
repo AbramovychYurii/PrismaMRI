@@ -1,11 +1,10 @@
 /**
- * @prisma-mri/viewer-react/unstable — what the viewer's own UI is built from.
+ * @prisma-mri/viewer-react/unstable — the viewer's plumbing.
  *
- * No semver here: the store (field and action names change whenever the viewer
- * needs it), and the small pieces a host app reuses — Tooltip, focus
- * trap, hover hook, download helper, layout and severity constants. A host that
- * wants to stay put uses the viewer's methods and `useViewerSnapshot` from the
- * main entry instead.
+ * No semver here. The store (field and action names change whenever the viewer needs it);
+ * the context hooks and the resolvers the viewer's own components are built on; the layout
+ * helper. A host that wants to stay put uses the viewer's methods and `useViewerSnapshot`,
+ * and passes `theme`, `features` and `labels` to `<Viewer>`, from the main entry.
  */
 export {
   type ViewerActions,
@@ -14,12 +13,18 @@ export {
   type ViewerStoreState,
   createViewerStore,
 } from './viewer/store';
-export { DOCK_H } from './components/dock/Dock';
-export { AuroraSparkles } from './components/ui/AuroraSparkles';
-export { Tooltip } from './components/ui/Tooltip';
-export { isSlicePlane, SEVERITY_HEX } from './constants';
-export { useFocusTrap } from './hooks/useFocusTrap';
-export { useHover } from './hooks/useHover';
-export { downloadBlob } from './util/download';
 export { getViewerStore } from './viewer/createViewer';
 export { useViewerStore, useViewerStoreApi } from './viewer/context';
+export {
+  usePortalContainer,
+  useViewerEnvironment,
+  useViewerFeatures,
+  useViewerHost,
+  useViewerLabels,
+  useViewerLayout,
+  useViewerTheme,
+} from './viewer';
+export { resolveFeatures } from './viewer/features';
+export { resolveLabels } from './viewer/labels';
+export { resolveTheme, themeCssVars, withAlpha } from './viewer/theme';
+export { MOBILE_MAX_WIDTH, type ViewerLayoutMode, useContainerLayout } from './viewer/layout';

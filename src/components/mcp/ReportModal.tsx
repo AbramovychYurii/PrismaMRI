@@ -9,6 +9,8 @@
  * glue and the preview JSX.
  */
 
+import { AuroraSparkles } from '@/components/ui/AuroraSparkles';
+import { downloadBlob } from '@/lib/download';
 import { waitForPaint } from '@/lib/mcp/canvas-utils';
 import { type Capture, annotateCanvas, captureRaw } from '@/lib/report/capture';
 import {
@@ -19,16 +21,12 @@ import {
 } from '@prisma-mri/viewer-core';
 import {
   defaultLabels,
+  defaultTheme,
+  useFocusTrap,
   useViewer,
   useViewerSnapshot,
   useViewerSurfaces,
 } from '@prisma-mri/viewer-react';
-import {
-  AuroraSparkles,
-  SEVERITY_HEX,
-  downloadBlob,
-  useFocusTrap,
-} from '@prisma-mri/viewer-react/unstable';
 import { Download, FileText, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -149,7 +147,7 @@ export function ReportModal({ finding, findingIndex, allFindings, onClose }: Pro
         thumbs.set(
           f.id,
           showMarkers
-            ? annotateCanvas(canvas, f.fx, f.fy, SEVERITY_HEX[f.severity])
+            ? annotateCanvas(canvas, f.fx, f.fy, defaultTheme.severity[f.severity])
             : captureRaw(canvas),
         );
       }
@@ -173,7 +171,7 @@ export function ReportModal({ finding, findingIndex, allFindings, onClose }: Pro
             thumbnails.set(
               f.id,
               showMarkers
-                ? annotateCanvas(canvas, f.fx, f.fy, SEVERITY_HEX[f.severity])
+                ? annotateCanvas(canvas, f.fx, f.fy, defaultTheme.severity[f.severity])
                 : captureRaw(canvas),
             );
           }
@@ -398,7 +396,7 @@ export function ReportModal({ finding, findingIndex, allFindings, onClose }: Pro
                 const perPage = showImages ? 2 : 4;
                 return scopeFindings.map((f, i) => {
                   const globalIdx = allFindings.findIndex((x) => x.id === f.id);
-                  const color = SEVERITY_HEX[f.severity];
+                  const color = defaultTheme.severity[f.severity];
                   const thumb = previewThumbs.get(f.id);
                   const pageBreak = i > 0 && i % perPage === 0;
                   return (

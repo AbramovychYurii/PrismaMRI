@@ -22,13 +22,6 @@ export const AXIS_ACCENT: Record<Axis, Accent> = {
   z: 'azure',
 };
 
-const SLICE_PLANES: ReadonlyArray<SlicePlane> = ['coronal', 'sagittal', 'axial'];
-
-/** Type guard — narrows an unknown string to SlicePlane. */
-export function isSlicePlane(value: string): value is SlicePlane {
-  return (SLICE_PLANES as ReadonlyArray<string>).includes(value);
-}
-
 /** Slice plane → accent name (matches the panel headers). */
 export const PLANE_ACCENT_KEY: Record<SlicePlane, Accent> = {
   coronal: 'amber',

@@ -59,3 +59,8 @@ export function snapToAnatomy(
   }
   return voxel;
 }
+
+/** `value` limited to `[min, max]`. */
+export function clamp(value: number, min: number, max: number): number {
+  return value < min ? min : value > max ? max : value;
+}
