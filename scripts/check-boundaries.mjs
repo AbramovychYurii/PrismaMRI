@@ -30,7 +30,7 @@ const PACKAGES = {
   },
 };
 /** Allowed in test files of either package, on top of its own dependencies. */
-const TEST_DEPS = ['vitest'];
+const TEST_DEPS = ['vitest', '@testing-library/react', '@testing-library/dom'];
 
 /** Static, side-effect, re-export and dynamic imports, and worker URLs. */
 const IMPORT = [
