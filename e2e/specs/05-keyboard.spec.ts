@@ -5,7 +5,7 @@
  * ? → shortcuts modal, Escape → close modal / return to import,
  * ↑/↓ → slice navigation, Ctrl+O → open-folder prompt.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../helpers/test';
 import { loadVolume } from '../helpers/load-volume.js';
 
 test.describe('Keyboard shortcuts', () => {

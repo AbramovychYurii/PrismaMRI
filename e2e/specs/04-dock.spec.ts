@@ -4,7 +4,7 @@
  * Exercises the floating dock: toggle open/close, W/L sliders, render-mode
  * presets, and the session / navigation cells.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../helpers/test';
 import { loadVolume } from '../helpers/load-volume.js';
 
 test.describe('Dock panel', () => {

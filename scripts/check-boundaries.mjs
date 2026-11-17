@@ -9,6 +9,9 @@
  *   the app            reaches the viewer only through the package names, never
  *                      a path inside src/viewer-core or src/viewer-react, and never
  *                      through an `/unstable` entry (those have no semver).
+ *   e2e specs          take `test` and `expect` from e2e/helpers/test, never from
+ *                      `@playwright/test`: its fixture keeps a local MCP server
+ *                      (and the connection dialog it brings) out of the run.
  *
  * Run by `npm run lint`. Exits 1 and lists every import that crosses a line.
  */
@@ -111,6 +114,16 @@ for (const abs of walk(SRC)) {
     if (!pkg.deps.includes(name) && !(isTest && TEST_DEPS.includes(name))) {
       problems.push(`${file}: "${spec}" is not a dependency of ${pkg.dir}`);
     }
+  }
+}
+
+for (const abs of walk(path.join(ROOT, 'e2e'))) {
+  const file = rel(abs);
+  if (!file.endsWith('.spec.ts')) continue;
+  const text = readFileSync(abs, 'utf8');
+  const specs = new Set(IMPORT.flatMap((re) => [...text.matchAll(re)].map((m) => m[1])));
+  if (specs.has('@playwright/test')) {
+    problems.push(`${file}: imports @playwright/test — import from e2e/helpers/test instead`);
   }
 }
 

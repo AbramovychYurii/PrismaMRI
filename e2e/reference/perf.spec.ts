@@ -18,7 +18,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
-import { type Browser, type Page, test } from '@playwright/test';
+import { type Browser, type Page, blockAgentSockets, test } from '../helpers/test';
 import { backToImport, examplePath, openFile } from './helpers';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -300,6 +300,7 @@ test('import screen cold load', async ({ browser }) => {
   const runs: { lcpMs: number; scriptKb: number }[] = [];
   for (let i = 0; i < 5; i++) {
     const context = await browser.newContext({ serviceWorkers: 'block' });
+    await blockAgentSockets(context);
     const page = await context.newPage();
     const cdp = await context.newCDPSession(page);
     await cdp.send('Emulation.setCPUThrottlingRate', { rate: 4 });

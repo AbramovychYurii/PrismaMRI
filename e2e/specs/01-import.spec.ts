@@ -4,7 +4,7 @@
  * Verifies the landing page structure before any volume is loaded:
  * brand identity, file-format chips, upload button, example cards.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../helpers/test';
 
 test.describe('Import screen', () => {
   test.beforeEach(async ({ page }) => {
