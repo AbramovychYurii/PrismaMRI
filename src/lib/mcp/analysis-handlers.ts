@@ -1,32 +1,34 @@
 import {
-  type ComponentObject,
-  type Labelling,
   type LoadedVolume,
   PLANE_GEOMETRY,
   type Vec3,
   type VolumeCursor,
+  clampToDims,
+  extractSliceGrayImage,
+  planeAspect,
+  slabHalfSlices,
+  sliceCount,
+  sliceIndex,
+} from '@prisma-mri/viewer-core';
+import {
+  type ComponentObject,
+  type Labelling,
   autoClasses,
   axisProfile,
   checkArrangement,
   checkSymmetry,
-  clampToDims,
   describeObject,
-  extractSliceGrayImage,
   findGaps,
   labelComponents,
   lineProfile,
-  planeAspect,
   roiStats,
   roundLineProfile,
   roundRoi,
-  slabHalfSlices,
-  sliceCount,
   sliceCurve,
-  sliceIndex,
   splitTouching,
   surveySubject,
   thresholdMask,
-} from '@prisma-mri/viewer-core';
+} from '@prisma-mri/viewer-core/analysis';
 import { alongAxis, clamp, round } from '@prisma-mri/viewer-core/unstable';
 import { cropSliceForMcp, montageForMcp } from './canvas-utils';
 import { MAX_SLAB_MM, MCP_ANALYSIS_MAX_EDGE } from './constants';

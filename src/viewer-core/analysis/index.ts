@@ -1,3 +1,10 @@
+/**
+ * @prisma-mri/viewer-core/analysis — pure functions over a loaded volume: threshold masks,
+ * connected components, gaps, symmetry, arrangement, profiles and ROI statistics.
+ *
+ * A separate entry so the main one stays about loading and slicing. The API is young and
+ * may change in any 0.x release; it moves into the main entry once it settles.
+ */
 export {
   type ArrangementItem,
   type ArrangementOptions,

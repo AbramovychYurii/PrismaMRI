@@ -1,5 +1,4 @@
 /** @prisma-mri/viewer-core — volume import, slices and the 3-D preview, without React. */
-export * from './analysis';
 export { describeLoadError } from './import/load-error';
 export { loadVolumeFromSource } from './import/load-volume';
 export {
