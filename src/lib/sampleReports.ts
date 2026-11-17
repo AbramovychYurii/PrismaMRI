@@ -27,7 +27,7 @@ export interface SampleReport {
  * Allow-list of demo volume IDs the example report button works for.
  * Keys must match `deriveVolumeId(volume)` exactly.
  */
-export const SAMPLE_REPORTS: Record<string, SampleReport> = {
+const SAMPLE_REPORTS: Record<string, SampleReport> = {
   'nrrd:401x401x201:0.2500x0.2500x0.2500:16:-1992:3699:maxillofacial_cbct.nrrd': {
     annotations: [
       {

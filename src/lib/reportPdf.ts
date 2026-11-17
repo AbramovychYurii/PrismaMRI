@@ -4,17 +4,16 @@
  * Pure function: receives all data up-front (including pre-captured
  * thumbnail data URLs) and returns a PDF Blob.  No React hooks inside.
  */
-import { defaultLabels } from '@prisma-mri/viewer-react';
+import { defaultTheme } from '@prisma-mri/viewer-react';
 
 import {
   type Annotation,
   type AnnotationSeverity,
   type ParsedVolumeMeta,
-  type SlicePlane,
   intensityUnit,
-  sliceNumber,
 } from '@prisma-mri/viewer-core';
 import jsPDF from 'jspdf';
+import { planeName, sliceNum } from './report/finding';
 
 const PDF_LABEL: Record<AnnotationSeverity, string> = {
   critical: 'CRITICAL',
@@ -23,23 +22,15 @@ const PDF_LABEL: Record<AnnotationSeverity, string> = {
   comment: 'COMMENT',
 };
 
-// Exact values from SEVERITY_HEX in constants.ts
-const SEVERITY_RGB: Record<AnnotationSeverity, [number, number, number]> = {
-  critical: [255, 59, 48], // #ff3b30
-  serious: [255, 149, 0], // #ff9500
-  moderate: [255, 214, 10], // #ffd60a
-  comment: [52, 199, 89], // #34c759
-};
-
 function hexToRgb(hex: string): [number, number, number] {
   const v = Number.parseInt(hex.replace('#', ''), 16);
   return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
 }
-void hexToRgb; // used optionally; keep to avoid lint errors
 
-const planeName = (plane: SlicePlane) => defaultLabels.planes[plane].name;
-
-const sliceNum = (a: Annotation) => sliceNumber(a.voxel, a.plane);
+/** The theme's severity colours, as the RGB triples jsPDF takes. */
+const SEVERITY_RGB = Object.fromEntries(
+  Object.entries(defaultTheme.severity).map(([severity, hex]) => [severity, hexToRgb(hex)]),
+) as Record<AnnotationSeverity, [number, number, number]>;
 
 export interface ReportParams {
   findings: Annotation[];

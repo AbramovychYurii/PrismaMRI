@@ -1,5 +1,4 @@
 import type { AnnotationSeverity, Axis, SlicePlane } from '@prisma-mri/viewer-core';
-import { defaultTheme } from './viewer/theme';
 
 export const WL_DEBOUNCE_MS = 96;
 
@@ -23,7 +22,7 @@ export const AXIS_ACCENT: Record<Axis, Accent> = {
 };
 
 /** Slice plane → accent name (matches the panel headers). */
-export const PLANE_ACCENT_KEY: Record<SlicePlane, Accent> = {
+const PLANE_ACCENT_KEY: Record<SlicePlane, Accent> = {
   coronal: 'amber',
   sagittal: 'violet',
   axial: 'azure',
@@ -60,9 +59,6 @@ export const PLANE_AXIS_CODE: Record<SlicePlane, string> = {
   sagittal: 'YZ',
   axial: 'XY',
 };
-
-/** The default severity colours — for the app's PDF report; the viewer reads its theme. */
-export const SEVERITY_HEX: Record<AnnotationSeverity, string> = defaultTheme.severity;
 
 /** Most-severe-first ordering used when sorting findings in the navigator. */
 export const SEVERITY_RANK: Record<AnnotationSeverity, number> = {

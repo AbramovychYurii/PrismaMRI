@@ -474,14 +474,3 @@ export async function loadVolume(): Promise<{
     };
   });
 }
-
-export async function clearVolume(): Promise<void> {
-  const db = await openDb();
-  const tabKey = getTabKey();
-  storedFilesToken = null;
-  try {
-    await deleteRecords(db, [tabKey, seriesMetaId(tabKey), seriesFilesId(tabKey)]);
-  } finally {
-    db.close();
-  }
-}

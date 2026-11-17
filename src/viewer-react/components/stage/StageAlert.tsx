@@ -1,7 +1,7 @@
 /**
  * StageAlert — the viewer's error message. Failures that happen while a volume
- * is open (switching series, exporting the 3-D view) set the store's `error`,
- * which until now only the import screen showed, so they went unseen here.
+ * is open (switching series, exporting the 3-D view) set the store's `error`;
+ * this shows it over the stage, where the import screen's copy would be unseen.
  *
  * Sits top-centre over the stage, between the series switcher and the toolbar
  * pill, on the same layer as that chrome. Text is the import screen's error

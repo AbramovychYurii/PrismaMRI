@@ -179,7 +179,7 @@ function takeMipBuffer(size: number): Float32Array {
  * `centerIndex`. The per-pixel maximum is taken in raw scalar space before W/L
  * is applied, so the result reflects true peak intensity.
  */
-export function extractSlabMipImage(
+function extractSlabMipImage(
   volume: LoadedVolume,
   plane: SlicePlane,
   centerIndex: number,

@@ -4,15 +4,14 @@ export {
   createViewer,
   getViewerStore,
 } from './createViewer';
-export { type ViewerEventApi, type ViewerEvents, createViewerEvents } from './events';
-export {
-  type ViewerApi,
-  type ViewerLoadingState,
-  type ViewerSeriesContext,
-  type ViewerSnapshot,
-  type ViewerSnapshotListener,
-  type ViewerStatus,
-  createViewerApi,
+export type { ViewerEventApi, ViewerEvents } from './events';
+export type {
+  ViewerApi,
+  ViewerLoadingState,
+  ViewerSeriesContext,
+  ViewerSnapshot,
+  ViewerSnapshotListener,
+  ViewerStatus,
 } from './api';
 export {
   type AnnotationActionContext,
@@ -37,14 +36,11 @@ export {
   useViewerStoreApi,
   useViewerSurfaces,
 } from './context';
-export {
-  type AnnotationStorage,
-  type ViewerActions,
-  type ViewerState,
-  type ViewerStore,
-  type ViewerStoreOptions,
-  type ViewerStoreState,
-  createViewerStore,
+export type {
+  AnnotationStorage,
+  ViewerStore,
+  ViewerStoreOptions,
+  ViewerStoreState,
 } from './store';
 export {
   type ViewerLoader,
@@ -54,29 +50,7 @@ export {
   isAbort,
 } from './loader';
 export type { ViewerSurfaces } from './surfaces';
-export {
-  ALL_RENDER_PRESETS,
-  type ViewerFeatures,
-  defaultFeatures,
-  resolveFeatures,
-} from './features';
-export {
-  type PlaneLabel,
-  type ViewerLabels,
-  type ViewerLabelsInput,
-  defaultLabels,
-  fillLabel,
-  resolveLabels,
-} from './labels';
-export {
-  type ViewerColors,
-  type ViewerFonts,
-  type ViewerTheme,
-  type ViewerThemeInput,
-  defaultTheme,
-  resolveTheme,
-  themeCssVars,
-  withAlpha,
-  accentAlpha,
-} from './theme';
-export { MOBILE_MAX_WIDTH, type ViewerLayoutMode, useContainerLayout } from './layout';
+export { type ViewerFeatures, defaultFeatures } from './features';
+export { type ViewerLabels, defaultLabels, fillLabel } from './labels';
+export { type ViewerTheme, accentAlpha } from './theme';
+export { useContainerLayout } from './layout';

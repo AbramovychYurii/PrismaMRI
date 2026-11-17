@@ -25,7 +25,7 @@ export interface Mask3 {
 }
 
 /** Default cap on the voxels one analysis works on. */
-export const DEFAULT_MAX_VOXELS = 24_000_000;
+const DEFAULT_MAX_VOXELS = 24_000_000;
 
 export const round = (value: number, digits = 1): number => {
   const f = 10 ** digits;
@@ -59,7 +59,7 @@ export function regionDims(region: Region): Vec3 {
 }
 
 /** Smallest integer stride that brings a region under `maxVoxels`. */
-export function strideFor(dims: ArrayLike<number>, maxVoxels = DEFAULT_MAX_VOXELS): number {
+function strideFor(dims: ArrayLike<number>, maxVoxels = DEFAULT_MAX_VOXELS): number {
   let stride = 1;
   while (
     Math.ceil(dims[0] / stride) * Math.ceil(dims[1] / stride) * Math.ceil(dims[2] / stride) >
