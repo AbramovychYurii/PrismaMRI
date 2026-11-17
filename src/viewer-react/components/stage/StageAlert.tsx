@@ -9,12 +9,13 @@
  */
 
 import { X } from 'lucide-react';
-import { useViewerStore } from '../../viewer';
+import { useViewerLabels, useViewerStore } from '../../viewer';
 import styles from './StageAlert.module.css';
 
 export function StageAlert() {
   const error = useViewerStore((s) => s.error);
   const setError = useViewerStore((s) => s.setError);
+  const { alert } = useViewerLabels();
   if (!error) return null;
 
   return (
@@ -25,7 +26,7 @@ export function StageAlert() {
       <button
         className={styles.dismissBtn}
         type="button"
-        aria-label="Close"
+        aria-label={alert.close}
         onClick={() => setError(null)}
       >
         <X size={16} />

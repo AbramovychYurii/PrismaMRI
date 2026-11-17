@@ -1,5 +1,5 @@
 import { intensityUnit } from '@prisma-mri/viewer-core';
-import { useViewerStore } from '../../viewer';
+import { useViewerLabels, useViewerStore } from '../../viewer';
 import styles from './StudyCell.module.css';
 
 function formatBytes(n: number) {
@@ -23,6 +23,7 @@ function Row({ k, v, dim }: { k: string; v: string; dim?: string }) {
 
 export function StudyCell() {
   const volume = useViewerStore((s) => s.volume);
+  const { dock } = useViewerLabels();
   const unit = intensityUnit(volume?.meta.modality);
   const meta = volume?.meta;
 
@@ -32,23 +33,23 @@ export function StudyCell() {
 
   return (
     <div className={styles.studyGrid}>
-      <Row k="ID" v={meta?.studyId ?? '—'} />
-      <Row k="Acquired" v={meta?.acquired ?? '—'} />
-      <Row k="Protocol" v={meta?.protocol ?? '—'} />
+      <Row k={dock.studyId} v={meta?.studyId ?? '—'} />
+      <Row k={dock.acquired} v={meta?.acquired ?? '—'} />
+      <Row k={dock.protocol} v={meta?.protocol ?? '—'} />
       <Row
-        k="Voxels"
+        k={dock.voxels}
         v={voxelCount ? voxelCount.toLocaleString('en-US').replace(/,/g, ' ') : '—'}
         dim={voxelCount ? `· ${formatBytes(bytes)}` : undefined}
       />
       <Row
-        k="Range"
+        k={dock.range}
         v={
           volume
             ? `${Math.round(volume.scalarMin)} → ${Math.round(volume.scalarMax)}${unit ? ` ${unit}` : ''}`
             : '—'
         }
       />
-      <Row k="Source" v={volume ? 'Local · in-memory' : '—'} />
+      <Row k={dock.source} v={volume ? dock.sourceValue : '—'} />
     </div>
   );
 }

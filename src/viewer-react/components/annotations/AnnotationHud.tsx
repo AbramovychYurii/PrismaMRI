@@ -40,6 +40,8 @@ import {
 import { SEVERITY_RANK } from '../../constants';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
 import {
+  type ViewerLabels,
+  fillLabel,
   useViewer,
   useViewerFeatures,
   useViewerHost,
@@ -52,8 +54,11 @@ import { AuroraSparkles } from '../ui/AuroraSparkles';
 import { ConfirmModal } from '../ui/ConfirmModal';
 import styles from './AnnotationHud.module.css';
 
-function sliceInfo(planeName: string, plane: SlicePlane, v: VolumeCursor): string {
-  return `${planeName} · slice ${sliceNumber(v, plane)}`;
+function sliceInfo(labels: ViewerLabels, plane: SlicePlane, v: VolumeCursor): string {
+  return fillLabel(labels.findings.location, {
+    plane: labels.planes[plane].name,
+    number: sliceNumber(v, plane),
+  });
 }
 
 function orderAll(list: Annotation[]): Annotation[] {
@@ -225,7 +230,7 @@ export function AnnotationHud() {
             if (!activeId) focusAnnotation(ordered[0].id);
             setOpen(true);
           }}
-          aria-label={`Show ${annotations.length} AI findings`}
+          aria-label={fillLabel(labels.findings.show, { count: annotations.length })}
         >
           <span
             className={styles.specular}
@@ -238,7 +243,7 @@ export function AnnotationHud() {
           <span className={styles.pillCount} data-entrance={entranceActive || undefined}>
             {displayedCount}
           </span>
-          <span className={styles.pillLabel}>FINDINGS</span>
+          <span className={styles.pillLabel}>{labels.findings.pill}</span>
         </button>
       </div>
     );
@@ -268,7 +273,7 @@ export function AnnotationHud() {
         className={styles.card}
         data-below-series={belowSeriesSelect || undefined}
         style={{ '--sev-color': color } as CSSProperties}
-        aria-label="Finding summary"
+        aria-label={labels.findings.summary}
         aria-live="polite"
       >
         {/* Left vertical accent bar */}
@@ -281,14 +286,12 @@ export function AnnotationHud() {
               <span className={styles.chipDot} />
               {labels.severity[shown.severity]}
             </span>
-            <span className={styles.location}>
-              {sliceInfo(labels.planes[shown.plane].name, shown.plane, shown.voxel)}
-            </span>
+            <span className={styles.location}>{sliceInfo(labels, shown.plane, shown.voxel)}</span>
             <button
               className={styles.headerBtn}
               type="button"
-              aria-label="Close"
-              title="Close"
+              aria-label={labels.findings.close}
+              title={labels.findings.close}
               onClick={() => {
                 setActiveAnnotation(null);
                 setOpen(false);
@@ -305,7 +308,7 @@ export function AnnotationHud() {
           {confidencePct != null && (
             <div className={styles.confidenceRow}>
               <AuroraSparkles size={11} strokeWidth={1.5} />
-              <span className={styles.confidenceLabel}>Confidence:</span>
+              <span className={styles.confidenceLabel}>{labels.findings.confidence}</span>
               <span className={styles.confidenceValue}>{confidencePct}%</span>
             </div>
           )}
@@ -334,7 +337,7 @@ export function AnnotationHud() {
               </span>
             )}
             {seriesName && (
-              <span className={styles.tag} title="Series">
+              <span className={styles.tag} title={labels.findings.series}>
                 <span className={styles.tagKey}>
                   <Layers size={10} aria-hidden="true" />
                 </span>
@@ -351,13 +354,13 @@ export function AnnotationHud() {
               <button
                 className={styles.dismissBtn}
                 type="button"
-                aria-label="Dismiss finding"
+                aria-label={labels.findings.dismissAria}
                 // A finding on another series is removed from that series.
                 disabled={!onScreen.some((a) => a.id === shown.id)}
                 onClick={() => setConfirmDismiss(true)}
               >
                 <Trash2 size={11} />
-                Dismiss
+                {labels.findings.dismiss}
               </button>
             </div>
 
@@ -366,7 +369,7 @@ export function AnnotationHud() {
                 <button
                   className={styles.navBtn}
                   type="button"
-                  aria-label="Previous finding"
+                  aria-label={labels.findings.previous}
                   disabled={switching}
                   onClick={() => step(-1)}
                 >
@@ -378,7 +381,7 @@ export function AnnotationHud() {
                 <button
                   className={styles.navBtn}
                   type="button"
-                  aria-label="Next finding"
+                  aria-label={labels.findings.next}
                   disabled={switching}
                   onClick={() => step(1)}
                 >
@@ -391,10 +394,10 @@ export function AnnotationHud() {
 
         {confirmDismiss && (
           <ConfirmModal
-            title="Remove finding?"
-            message={`"${shown.label}" will be permanently removed from the viewer.`}
-            confirmLabel="Dismiss"
-            cancelLabel="Keep"
+            title={labels.findings.removeTitle}
+            message={fillLabel(labels.findings.removeMessage, { label: shown.label })}
+            confirmLabel={labels.findings.dismiss}
+            cancelLabel={labels.findings.keep}
             danger
             onCancel={() => setConfirmDismiss(false)}
             onConfirm={() => {

@@ -48,7 +48,9 @@ function PanelsToggle({
 }) {
   const [hover, setHover] = useState(false);
   const reduced = usePrefersReducedMotion();
-  const tip = useTooltip(open ? 'Hide control panels' : 'Show control panels', true);
+  const labels = useViewerLabels();
+  const text = open ? labels.dock.hide : labels.dock.show;
+  const tip = useTooltip(text, true);
 
   const handleMouseEnter = (e: React.MouseEvent<HTMLButtonElement>) => {
     setHover(true);
@@ -64,7 +66,7 @@ function PanelsToggle({
       <button
         className={styles.toggle}
         type="button"
-        aria-label={open ? 'Hide control panels' : 'Show control panels'}
+        aria-label={text}
         aria-expanded={open}
         onClick={onToggle}
         onMouseEnter={handleMouseEnter}

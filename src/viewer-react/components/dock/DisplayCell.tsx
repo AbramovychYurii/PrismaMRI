@@ -1,10 +1,10 @@
 import { intensityUnit } from '@prisma-mri/viewer-core';
-import { useViewerStore } from '../../viewer';
+import { useViewerLabels, useViewerStore } from '../../viewer';
 import styles from './DisplayCell.module.css';
 import { HistogramBar } from './HistogramBar';
 
 interface SliderRowProps {
-  name: 'Window' | 'Level';
+  name: string;
   value: number;
   /** 'HU' for CT; empty where the scalar has no unit to name (MR). */
   unit: string;
@@ -58,6 +58,7 @@ export function DisplayCell() {
   const setWLDraft = useViewerStore((s) => s.setWLDraft);
   const volume = useViewerStore((s) => s.volume);
   const histogram = useViewerStore((s) => s.histogram);
+  const { dock } = useViewerLabels();
 
   const scalarMin = volume ? Math.floor(volume.scalarMin) : -1000;
   const scalarMax = volume ? Math.ceil(volume.scalarMax) : 3000;
@@ -77,23 +78,23 @@ export function DisplayCell() {
     <div className={styles.displayCellWrap}>
       {histogram && <HistogramBar histogram={histogram} wl={wlDraft} />}
       <SliderRow
-        name="Window"
+        name={dock.window}
         value={wlDraft.window}
         unit={unit}
         min={1}
         max={fullSpan}
         accent="var(--pmri-amber)"
-        hint="Contrast span — narrower window sharpens bone & raises 3D contrast."
+        hint={dock.windowHint}
         onChange={handleWindowChange}
       />
       <SliderRow
-        name="Level"
+        name={dock.level}
         value={wlDraft.level}
         unit={unit}
         min={scalarMin}
         max={scalarMax}
         accent="var(--pmri-teal)"
-        hint="Brightness center — higher emphasizes dense tissue in 2D & 3D."
+        hint={dock.levelHint}
         onChange={handleLevelChange}
       />
     </div>

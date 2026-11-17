@@ -1,7 +1,7 @@
 import type { ThreePreview } from '@prisma-mri/viewer-core';
 import { useCallback, useState } from 'react';
 import { downloadBlob } from '../util/download';
-import { useViewerLabels, useViewerStore } from '../viewer';
+import { fillLabel, useViewerLabels, useViewerStore } from '../viewer';
 
 /** Hand the file to the user: save it, or offer it to the OS share sheet. */
 export type Delivery = 'download' | 'share';
@@ -40,7 +40,9 @@ function deliver(blob: Blob, filename: string, title: string, how: Delivery): Pr
 export function useStageExport(previewRef: React.MutableRefObject<ThreePreview | null>) {
   const [recordPct, setRecordPct] = useState<number | null>(null);
   const setError = useViewerStore((s) => s.setError);
-  const { filePrefix, shareTitle } = useViewerLabels().export;
+  const labels = useViewerLabels();
+  const { filePrefix, shareTitle } = labels.export;
+  const { viewName, spinName, exportFailed } = labels.stageMenu;
 
   // Shown by StageAlert; the console alone left a failed export looking like
   // a click that did nothing. Engine text stays in the console — the user gets
@@ -48,19 +50,19 @@ export function useStageExport(previewRef: React.MutableRefObject<ThreePreview |
   const reportFailure = useCallback(
     (what: string, err: unknown) => {
       console.error(err);
-      setError(`Failed to export the ${what}. Try again, or reload the page if it keeps failing.`);
+      setError(fillLabel(exportFailed, { what }));
     },
-    [setError],
+    [setError, exportFailed],
   );
 
   const exportImage = useCallback(
     (how: Delivery) => {
       previewRef.current
         ?.exportPNG()
-        .then((blob) => deliver(blob, `${filePrefix}-3d.png`, `${shareTitle} — 3D view`, how))
-        .catch((err) => reportFailure('3D view', err));
+        .then((blob) => deliver(blob, `${filePrefix}-3d.png`, `${shareTitle} — ${viewName}`, how))
+        .catch((err) => reportFailure(viewName, err));
     },
-    [previewRef, reportFailure, filePrefix, shareTitle],
+    [previewRef, reportFailure, filePrefix, shareTitle, viewName],
   );
 
   const exportVideo = useCallback(
@@ -72,14 +74,14 @@ export function useStageExport(previewRef: React.MutableRefObject<ThreePreview |
         const { blob, ext } = await preview.exportRotationVideo({
           onProgress: (t) => setRecordPct(t),
         });
-        await deliver(blob, `${filePrefix}-3d-spin.${ext}`, `${shareTitle} — 3D spin`, how);
+        await deliver(blob, `${filePrefix}-3d-spin.${ext}`, `${shareTitle} — ${spinName}`, how);
       } catch (err) {
-        reportFailure('3D spin', err);
+        reportFailure(spinName, err);
       } finally {
         setRecordPct(null);
       }
     },
-    [previewRef, recordPct, reportFailure, filePrefix, shareTitle],
+    [previewRef, recordPct, reportFailure, filePrefix, shareTitle, spinName],
   );
 
   return { recordPct, exportImage, exportVideo };

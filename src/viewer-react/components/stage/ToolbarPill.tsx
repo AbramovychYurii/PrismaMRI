@@ -2,7 +2,13 @@ import type { PlanesMode, ThreePreview } from '@prisma-mri/viewer-core';
 import { Maximize2, PanelRight } from 'lucide-react';
 import { useHover } from '../../hooks/useHover';
 import type { ToolbarState } from '../../types';
-import { useViewerFeatures, useViewerLayout, useViewerStore } from '../../viewer';
+import {
+  type ViewerLabels,
+  useViewerFeatures,
+  useViewerLabels,
+  useViewerLayout,
+  useViewerStore,
+} from '../../viewer';
 import { Tooltip } from '../ui/Tooltip';
 import { StageMenu } from './StageMenu';
 import styles from './ToolbarPill.module.css';
@@ -11,8 +17,8 @@ interface ToolbarButton {
   id: Exclude<keyof ToolbarState, 'planes'>;
   icon: React.ReactNode;
   label?: string;
-  tipOff: string;
-  tipOn: string;
+  /** The tip before the button is switched on, and after — as the labels word them. */
+  tips: (t: ViewerLabels['toolbar']) => { off: string; on: string };
   /** Hide this button on mobile — it's meaningless without the sidebar. */
   mobileHidden?: boolean;
 }
@@ -89,29 +95,28 @@ const BUTTONS: ToolbarButton[] = [
   {
     id: 'focus',
     icon: <Maximize2 size={20} />,
-    tipOff: 'Focus mode',
-    tipOn: 'Exit focus mode',
+    tips: (t) => ({ off: t.focusOff, on: t.focusOn }),
     mobileHidden: true,
   },
   {
     id: 'rail',
     icon: <PanelRight size={20} />,
-    tipOff: 'Show side panel',
-    tipOn: 'Hide side panel',
+    tips: (t) => ({ off: t.railOff, on: t.railOn }),
     mobileHidden: true,
   },
 ];
 
-const PLANES_TIP: Record<PlanesMode, string> = {
-  off: 'Show slice planes',
-  active: 'Show all 3 planes',
-  all: 'Hide slice planes',
-};
+const planesTip = (t: ViewerLabels['toolbar']): Record<PlanesMode, string> => ({
+  off: t.planesOff,
+  active: t.planesActive,
+  all: t.planesAll,
+});
 
 function PlanesButton() {
   const mode = useViewerStore((s) => s.toolbar.planes);
   const cyclePlanesMode = useViewerStore((s) => s.cyclePlanesMode);
   const { hover, onMouseEnter, onMouseLeave } = useHover();
+  const tip = planesTip(useViewerLabels().toolbar)[mode];
 
   const on = mode !== 'off';
   const icon: Record<PlanesMode, React.ReactNode> = {
@@ -121,11 +126,11 @@ function PlanesButton() {
   };
 
   return (
-    <Tooltip label={PLANES_TIP[mode]}>
+    <Tooltip label={tip}>
       <button
         className={styles.toolBtn}
         type="button"
-        aria-label={PLANES_TIP[mode]}
+        aria-label={tip}
         onClick={cyclePlanesMode}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
@@ -142,13 +147,15 @@ function ClipButton() {
   const on = useViewerStore((s) => s.toolbar.clip);
   const toggle = useViewerStore((s) => s.toggleToolbar);
   const { hover, onMouseEnter, onMouseLeave } = useHover();
+  const { toolbar } = useViewerLabels();
+  const tip = on ? toolbar.clipOn : toolbar.clipOff;
 
   return (
-    <Tooltip label={on ? 'Disable clip mode' : 'Clip volume at active slice'}>
+    <Tooltip label={tip}>
       <button
         className={styles.toolBtn}
         type="button"
-        aria-label={on ? 'Disable clip mode' : 'Clip volume at active slice'}
+        aria-label={tip}
         onClick={() => toggle('clip')}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
@@ -165,13 +172,15 @@ function ToolButton({ btn }: { btn: ToolbarButton }) {
   const on = useViewerStore((s) => s.toolbar[btn.id]);
   const toggle = useViewerStore((s) => s.toggleToolbar);
   const { hover, onMouseEnter, onMouseLeave } = useHover();
+  const tips = btn.tips(useViewerLabels().toolbar);
+  const tip = on ? tips.on : tips.off;
 
   return (
-    <Tooltip label={on ? btn.tipOn : btn.tipOff}>
+    <Tooltip label={tip}>
       <button
         className={styles.toolBtn}
         type="button"
-        aria-label={on ? btn.tipOn : btn.tipOff}
+        aria-label={tip}
         onClick={() => toggle(btn.id)}
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}

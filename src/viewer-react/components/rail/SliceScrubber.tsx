@@ -11,7 +11,7 @@ import {
 } from 'react';
 import { PLANE_ACCENT } from '../../constants';
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion';
-import { useViewerLabels } from '../../viewer';
+import { fillLabel, useViewerLabels } from '../../viewer';
 import styles from './SliceScrubber.module.css';
 
 const HOLD_DELAY_MS = 350;
@@ -114,7 +114,7 @@ export function SliceScrubber({
   large,
 }: SliceScrubberProps) {
   const accent = PLANE_ACCENT[axis];
-  const planeLabels = useViewerLabels().planes;
+  const { planes: planeLabels, rail } = useViewerLabels();
   const trackRef = useRef<HTMLDivElement>(null);
   const [trackH, setTrackH] = useState(0);
   const draggingRef = useRef(false);
@@ -226,14 +226,14 @@ export function SliceScrubber({
       onPointerDown={handleContainerPointerDown}
       onClick={handleContainerClick}
     >
-      <ChevronButton dir="up" label="Next slice" large={large} onStep={step} />
+      <ChevronButton dir="up" label={rail.nextSlice} large={large} onStep={step} />
 
       {/* TRACK */}
       <div
         ref={trackRef}
         role="slider"
         tabIndex={0}
-        aria-label={`${planeLabels[axis].name} slice`}
+        aria-label={fillLabel(rail.scrubber, { plane: planeLabels[axis].name })}
         aria-orientation="vertical"
         aria-valuemin={1}
         aria-valuemax={total}
@@ -264,7 +264,7 @@ export function SliceScrubber({
         </div>
       </div>
 
-      <ChevronButton dir="down" label="Previous slice" large={large} onStep={step} />
+      <ChevronButton dir="down" label={rail.previousSlice} large={large} onStep={step} />
     </div>
   );
 }

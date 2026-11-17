@@ -2,7 +2,7 @@ import { Eye, MapPin, Ruler, Trash2 } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useMenuKeyboard } from '../../hooks/useMenuKeyboard';
-import { usePortalContainer } from '../../viewer';
+import { usePortalContainer, useViewerLabels } from '../../viewer';
 import styles from './MeasureMenu.module.css';
 
 interface Props {
@@ -30,6 +30,7 @@ export function MeasureMenu({
   onClose,
 }: Props) {
   const portalContainer = usePortalContainer();
+  const { rail } = useViewerLabels();
   const ref = useRef<HTMLDivElement>(null);
 
   // Clamp to viewport so menu never overflows edge — items: measure-from (+
@@ -63,7 +64,7 @@ export function MeasureMenu({
       className={styles.menu}
       ref={ref}
       role="menu"
-      aria-label="Slice actions"
+      aria-label={rail.sliceActions}
       style={{ left: safeX, top: safeY }}
       onClick={(e) => e.stopPropagation()}
     >
@@ -77,7 +78,7 @@ export function MeasureMenu({
             onClick={wrap(onMeasureFrom)}
           >
             <MapPin size={12} />
-            Measure from here
+            {rail.measureFrom}
           </button>
           {hasMeasurementFrom && (
             <button
@@ -88,7 +89,7 @@ export function MeasureMenu({
               onClick={wrap(onMeasureTo)}
             >
               <Ruler size={12} />
-              Measure to here
+              {rail.measureTo}
             </button>
           )}
           <div className={styles.divider} aria-hidden />
@@ -102,7 +103,7 @@ export function MeasureMenu({
         onClick={wrap(onSnapToView)}
       >
         <Eye size={12} />
-        View from this side
+        {rail.viewFromSide}
       </button>
       {hasMeasurementFrom && (
         <>
@@ -115,7 +116,7 @@ export function MeasureMenu({
             onClick={wrap(onClear)}
           >
             <Trash2 size={12} />
-            Clear measurement
+            {rail.clearMeasurement}
           </button>
         </>
       )}

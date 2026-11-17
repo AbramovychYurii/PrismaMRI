@@ -44,7 +44,8 @@ function ExpandedSlicePanel({ plane }: { plane: SlicePlane }) {
   const moveCrosshair = useCrosshairClick(core, plane);
   const dragHandlers = useShiftDragMeasurement(core, plane);
   const panelKeys = useSlicePanelKeys(core, plane);
-  const hint = useViewerLabels().planes[plane].hint;
+  const { planes, rail } = useViewerLabels();
+  const hint = planes[plane].hint;
 
   const onClose = useCallback(() => setExpandedPlane(null), [setExpandedPlane]);
 
@@ -101,13 +102,13 @@ function ExpandedSlicePanel({ plane }: { plane: SlicePlane }) {
 
       <div className={styles.buttonTray}>
         <ExportSliceButton canvasRef={core.frame.canvasRef} plane={plane} idx={idx} large />
-        <TrayButton large label="Collapse panel" onClick={onClose}>
+        <TrayButton large label={rail.collapse} onClick={onClose}>
           <Minimize2 size={13} />
         </TrayButton>
         {total > 0 && (
           <TrayButton
             large
-            label="Toggle slice scrubber"
+            label={rail.toggleScrubber}
             active={scrubVisible}
             onClick={() => setScrubVisible(plane, !scrubVisible)}
           >
@@ -130,7 +131,7 @@ function ExpandedSlicePanel({ plane }: { plane: SlicePlane }) {
       <div className={styles.panelFooter} data-scrub={scrubVisible || undefined}>
         <span>
           {hint} · {PLANE_AXIS_CODE[plane]}
-          {measure.enabled && ' · SHIFT+DRAG · MEASURE'}
+          {measure.enabled && ` ${rail.measureHint}`}
         </span>
         {total > 0 && <SliceCount idx={idx} total={total} />}
       </div>
@@ -208,12 +209,12 @@ function RailSlicePanel({ plane }: { plane: SlicePlane }) {
       ) : (
         <>
           <div className={styles.buttonTray}>
-            <TrayButton label="Expand panel" onClick={() => setExpandedPlane(plane)}>
+            <TrayButton label={labels.rail.expand} onClick={() => setExpandedPlane(plane)}>
               <Maximize2 size={11} />
             </TrayButton>
             {total > 0 && (
               <TrayButton
-                label="Toggle slice scrubber"
+                label={labels.rail.toggleScrubber}
                 active={scrubVisible}
                 onClick={() => setScrubVisible(plane, !scrubVisible)}
               >
