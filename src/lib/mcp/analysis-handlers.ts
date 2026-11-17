@@ -3,6 +3,7 @@ import {
   PLANE_GEOMETRY,
   type Vec3,
   type VolumeCursor,
+  alongAxis,
   clampToDims,
   extractSliceGrayImage,
   planeAspect,
@@ -22,6 +23,7 @@ import {
   labelComponents,
   lineProfile,
   roiStats,
+  round,
   roundLineProfile,
   roundRoi,
   sliceCurve,
@@ -29,7 +31,6 @@ import {
   surveySubject,
   thresholdMask,
 } from '@prisma-mri/viewer-core/analysis';
-import { alongAxis, clamp, round } from '@prisma-mri/viewer-core/unstable';
 import { cropSliceForMcp, montageForMcp } from './canvas-utils';
 import { MAX_SLAB_MM, MCP_ANALYSIS_MAX_EDGE } from './constants';
 import { type Handler, evenlySpaced, requireLoaded } from './handler-base';
@@ -44,6 +45,7 @@ import {
   requirePlane,
   requireVoxel,
 } from './validate';
+import { clamp } from './voxel-utils';
 
 /**
  * Commands that look at the voxels themselves. They answer in a few lines of

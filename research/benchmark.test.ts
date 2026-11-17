@@ -9,14 +9,19 @@
  * this measures the algorithms, not the clinical usefulness — see docs/RESEARCH.md.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
+import {
+  animalPhantom,
+  axisProfile,
+  checkArrangement,
+  checkSymmetry,
+  crackPhantom,
+  findGaps,
+  jawPhantom,
+  labelComponents,
+  splitTouching,
+  thresholdMask,
+} from '@prisma-mri/viewer-core/analysis';
 import { describe, expect, it } from 'vitest';
-import { checkArrangement } from '../src/viewer-core/analysis/arrangement';
-import { axisProfile } from '../src/viewer-core/analysis/axis';
-import { labelComponents, splitTouching } from '../src/viewer-core/analysis/components';
-import { findGaps } from '../src/viewer-core/analysis/gaps';
-import { thresholdMask } from '../src/viewer-core/analysis/grid';
-import { animalPhantom, crackPhantom, jawPhantom } from '../src/viewer-core/analysis/phantoms';
-import { checkSymmetry } from '../src/viewer-core/analysis/symmetry';
 
 const RUN = process.env.RESEARCH === '1';
 const WRITE = process.env.RESEARCH_WRITE === '1';

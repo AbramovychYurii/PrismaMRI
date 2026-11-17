@@ -15,11 +15,11 @@ import {
   type VolumeHistogram,
   clampToDims,
   deriveVolumeId,
+  isSlicePlane,
   volumeCenter,
 } from '@prisma-mri/viewer-core';
 import { type StoreApi, createStore } from 'zustand';
 import { type StateStorage, createJSONStorage, persist } from 'zustand/middleware';
-import { isSlicePlane } from '../constants';
 import type { MobileTab, ToolbarState } from '../types';
 
 export interface ViewerState {

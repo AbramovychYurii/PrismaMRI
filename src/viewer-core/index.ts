@@ -7,13 +7,16 @@ export {
   fromFileList,
   type FsEntry,
 } from './import/scan-folder';
+export { seriesLabel } from './import/series';
 export type { ImportHints, ImportSource, SeriesChoice } from './import/types';
 export { type LoadResult, loadVolumeInWorker, type LoadWorkerResult } from './import/volume-client';
 export type * from './types';
 export { MAX_3D_TEXTURE_EDGE, prepareVolumeFor3D } from './volume/preview-3d';
 export {
+  alongAxis,
   clampToDims,
   fracToVoxel,
+  isSlicePlane,
   PLANE_GEOMETRY,
   planeAspect,
   type ScreenDirection,

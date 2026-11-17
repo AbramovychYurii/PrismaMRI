@@ -6,6 +6,7 @@ import {
   clampToDims,
   extractSliceGrayImage,
   fracToVoxel,
+  seriesLabel,
   slabHalfSlices,
   sliceAxis,
   sliceCount,
@@ -13,7 +14,6 @@ import {
   sliceNumber,
   volumeCenter,
 } from '@prisma-mri/viewer-core';
-import { clamp, seriesLabel } from '@prisma-mri/viewer-core/unstable';
 
 import { ANALYSIS_HANDLERS } from './analysis-handlers';
 import { captureCanvas, renderSliceForMcp, waitForPaint } from './canvas-utils';
@@ -31,7 +31,7 @@ import {
   requirePlane,
   requireString,
 } from './validate';
-import { snapToAnatomy } from './voxel-utils';
+import { clamp, snapToAnatomy } from './voxel-utils';
 
 function sliceNumbers(cursor: VolumeCursor) {
   return {

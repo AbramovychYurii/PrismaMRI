@@ -7,7 +7,7 @@
  */
 
 import type { SeriesChoice } from '@prisma-mri/viewer-core';
-import { useFocusTrap } from '@prisma-mri/viewer-react/unstable';
+import { useFocusTrap } from '@prisma-mri/viewer-react';
 import { Layers, X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
