@@ -65,6 +65,7 @@ export {
   type ViewerLabels,
   type ViewerLabelsInput,
   defaultLabels,
+  fillLabel,
   resolveLabels,
 } from './labels';
 export {

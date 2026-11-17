@@ -1,6 +1,6 @@
 import { type ScreenDirection, type SlicePlane, stepInPlane } from '@prisma-mri/viewer-core';
 import { useCallback, useRef } from 'react';
-import { useViewerLabels } from '../viewer';
+import { fillLabel, useViewerLabels } from '../viewer';
 import type { SlicePanelCore } from './useSlicePanelCore';
 
 const ARROWS: Record<string, ScreenDirection> = {
@@ -37,7 +37,8 @@ export function useSlicePanelKeys(core: SlicePanelCore, plane: SlicePlane) {
   const { dims, cursor } = core.frame;
   const { openMenuAtCursor, onContextMenu: openMenuAtPointer } = core.measure;
   const openedByKeyAt = useRef(Number.NEGATIVE_INFINITY);
-  const planeName = useViewerLabels().planes[plane].name;
+  const { planes, rail } = useViewerLabels();
+  const planeName = planes[plane].name;
 
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLElement>) => {
@@ -87,7 +88,7 @@ export function useSlicePanelKeys(core: SlicePanelCore, plane: SlicePlane) {
   return {
     tabIndex: 0,
     role: 'group',
-    'aria-label': `${planeName} slice — up and down arrows step through slices, Shift and arrow keys move the crosshair, Shift+F10 opens the measure menu`,
+    'aria-label': fillLabel(rail.panelKeys, { plane: planeName }),
     'aria-keyshortcuts': SHORTCUTS,
     onKeyDown,
     onFocus,

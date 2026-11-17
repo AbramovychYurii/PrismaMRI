@@ -6,7 +6,13 @@
 
 import { type Annotation, type SlicePlane, sliceIndex } from '@prisma-mri/viewer-core';
 import { type CSSProperties, memo, useMemo } from 'react';
-import { useViewerFeatures, useViewerStore, useViewerTheme } from '../../viewer';
+import {
+  fillLabel,
+  useViewerFeatures,
+  useViewerLabels,
+  useViewerStore,
+  useViewerTheme,
+} from '../../viewer';
 import styles from './AnnotationOverlay.module.css';
 
 const PinItem = memo(function PinItem({
@@ -21,6 +27,7 @@ const PinItem = memo(function PinItem({
   onSelect: (id: string) => void;
 }) {
   const color = useViewerTheme().severity[annotation.severity];
+  const labels = useViewerLabels();
   const labelSide = annotation.fx > 0.55 ? 'left' : 'right';
   const labelVSide = annotation.fy < 0.15 ? 'top' : annotation.fy > 0.85 ? 'bottom' : 'center';
   return (
@@ -37,7 +44,10 @@ const PinItem = memo(function PinItem({
         } as CSSProperties
       }
       title={annotation.label}
-      aria-label={`${annotation.severity}: ${annotation.label}`}
+      aria-label={fillLabel(labels.findings.marker, {
+        severity: labels.severity[annotation.severity],
+        label: annotation.label,
+      })}
       onClick={(e) => {
         e.stopPropagation();
         onSelect(annotation.id);

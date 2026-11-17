@@ -1,5 +1,5 @@
 import { intensityUnit } from '@prisma-mri/viewer-core';
-import { useViewerStore } from '../../viewer';
+import { useViewerLabels, useViewerStore } from '../../viewer';
 import styles from './StatusStrip.module.css';
 
 function RunCell({
@@ -32,6 +32,7 @@ function RunCell({
 export function StatusStrip() {
   const volume = useViewerStore((s) => s.volume);
   const measurement = useViewerStore((s) => s.measurement);
+  const { status } = useViewerLabels();
   const meta = volume?.meta;
   const dims = meta?.dims;
   const spacing = meta?.spacing;
@@ -44,25 +45,25 @@ export function StatusStrip() {
     measureValue = measurement.distanceMm.toFixed(1);
     measureDim = 'mm';
   } else {
-    measureValue = 'Set endpoint';
+    measureValue = status.setEndpoint;
   }
 
   return (
     // `pmri-root`: placed in the host's own markup, so it brings the viewer's base styles.
     <div className={`pmri-root ${styles.stripGrid}`}>
-      <RunCell k="Scanner" v={meta?.scanner ?? '—'} />
+      <RunCell k={status.scanner} v={meta?.scanner ?? '—'} />
       <RunCell
-        k="Volume"
+        k={status.volume}
         v={dims ? `${dims[0]} × ${dims[1]} × ${dims[2]}` : '—'}
         dim={dims ? 'vox' : undefined}
       />
       <RunCell
-        k="Spacing"
+        k={status.spacing}
         v={spacing ? spacing.map((s) => s.toFixed(2)).join(' × ') : '—'}
         dim={spacing ? 'mm' : undefined}
       />
       <RunCell
-        k="Modality"
+        k={status.modality}
         v={meta?.modality ?? '—'}
         dim={
           meta?.bitsAllocated
@@ -73,7 +74,7 @@ export function StatusStrip() {
         }
       />
       <div className={styles.runCell} data-last>
-        <div className={styles.runKey}>Measure</div>
+        <div className={styles.runKey}>{status.measure}</div>
         {measurement?.distanceMm !== null && measurement !== null ? (
           <div className={`${styles.runVal} ${styles.measureVal}`}>
             {measureValue}

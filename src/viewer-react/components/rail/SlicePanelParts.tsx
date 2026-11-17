@@ -72,11 +72,12 @@ export function ExportSliceButton({
   idx: number;
   large?: boolean;
 }) {
-  const { filePrefix } = useViewerLabels().export;
+  const labels = useViewerLabels();
+  const { filePrefix } = labels.export;
   return (
     <TrayButton
       large={large}
-      label="Export slice as PNG"
+      label={labels.rail.exportSlice}
       onClick={() => downloadSlice(canvasRef.current, filePrefix, plane, idx)}
     >
       <Download size={large ? 13 : 11} />

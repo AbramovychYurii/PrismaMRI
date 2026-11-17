@@ -7,11 +7,17 @@
 
 import type { SeriesChoice } from '@prisma-mri/viewer-core';
 import { ChevronDown, Layers } from 'lucide-react';
-import { useViewer, useViewerFeatures, useViewerStore } from '../../viewer';
+import {
+  fillLabel,
+  useViewer,
+  useViewerFeatures,
+  useViewerLabels,
+  useViewerStore,
+} from '../../viewer';
 import styles from './StageSeriesSelect.module.css';
 
-function optionLabel(s: SeriesChoice): string {
-  const bits = [s.label, s.orientation, `${s.count} sl`].filter(Boolean);
+function optionLabel(s: SeriesChoice, slices: string): string {
+  const bits = [s.label, s.orientation, fillLabel(slices, { count: s.count })].filter(Boolean);
   return bits.join(' · ');
 }
 
@@ -35,6 +41,7 @@ export function StageSeriesSelect() {
   const activeSeriesKey = useViewerStore((s) => s.activeSeriesKey);
   const switching = useViewerStore((s) => s.switchingSeriesKey);
   const { switchSeries } = useViewer();
+  const { series } = useViewerLabels();
 
   if (!seriesList) return null;
 
@@ -46,8 +53,8 @@ export function StageSeriesSelect() {
       <div className={styles.selectInner}>
         <select
           className={styles.select}
-          aria-label="Switch series"
-          title="Switch series — [ and ] step through them"
+          aria-label={series.switchLabel}
+          title={series.switchHint}
           // The pending choice while a series loads. Not `disabled` then: that
           // would drop the keyboard focus, and a second choice replaces the load.
           value={switching ?? activeSeriesKey ?? ''}
@@ -56,7 +63,7 @@ export function StageSeriesSelect() {
         >
           {seriesList.map((s) => (
             <option key={s.key} value={s.key}>
-              {optionLabel(s)}
+              {optionLabel(s, series.slices)}
             </option>
           ))}
         </select>

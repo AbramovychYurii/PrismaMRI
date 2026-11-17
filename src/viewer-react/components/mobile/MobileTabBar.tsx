@@ -36,7 +36,6 @@ function PlaneGlyph({
 
 interface Tab {
   id: MobileTab;
-  label: string;
   /** Spoken name — the visible label is an abbreviation. */
   name: (labels: ViewerLabels) => string;
   accent: string;
@@ -47,35 +46,30 @@ const TABS: Tab[] = [
   {
     id: '3d',
     name: (l) => l.view3d,
-    label: '3D',
     accent: 'var(--pmri-amber)',
     icon: (a) => <Box size={20} strokeWidth={a ? 1.8 : 1.4} />,
   },
   {
     id: 'coronal',
     name: (l) => l.planes.coronal.name,
-    label: 'COR',
     accent: 'var(--pmri-amber)',
     icon: (a, acc) => <PlaneGlyph letter="C" active={a} accent={acc} />,
   },
   {
     id: 'sagittal',
     name: (l) => l.planes.sagittal.name,
-    label: 'SAG',
     accent: 'var(--pmri-violet)',
     icon: (a, acc) => <PlaneGlyph letter="S" active={a} accent={acc} />,
   },
   {
     id: 'axial',
     name: (l) => l.planes.axial.name,
-    label: 'AXI',
     accent: 'var(--pmri-azure)',
     icon: (a, acc) => <PlaneGlyph letter="A" active={a} accent={acc} />,
   },
   {
     id: 'controls',
     name: (l) => l.controlsTab,
-    label: 'CTRL',
     accent: 'var(--pmri-amber)',
     icon: (a) => <Settings size={19} strokeWidth={a ? 1.8 : 1.4} />,
   },
@@ -127,7 +121,7 @@ export function MobileTabBar() {
       style={{ '--tab-count': tabs.length } as CSSProperties}
       ref={barRef}
       role="tablist"
-      aria-label="Views"
+      aria-label={labels.mobile.tabBar}
       onKeyDown={onKeyDown}
     >
       {tabs.map((tab) => {
@@ -147,7 +141,7 @@ export function MobileTabBar() {
             onClick={handleClick}
           >
             {tab.icon(active, tab.accent)}
-            <span className={styles.tabLabel}>{tab.label}</span>
+            <span className={styles.tabLabel}>{labels.mobile.tabs[tab.id]}</span>
           </button>
         );
       })}

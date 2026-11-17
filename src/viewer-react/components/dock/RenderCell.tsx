@@ -1,22 +1,11 @@
-import type { RenderPreset } from '@prisma-mri/viewer-core';
 import { Info } from 'lucide-react';
 import { useHover } from '../../hooks/useHover';
-import { useViewerFeatures, useViewerStore } from '../../viewer';
+import { fillLabel, useViewerFeatures, useViewerLabels, useViewerStore } from '../../viewer';
 import { Tooltip } from '../ui/Tooltip';
 import styles from './RenderCell.module.css';
 
-const SLAB_PRESETS: Array<[string, number]> = [
-  ['Off', 0],
-  ['3 mm', 3],
-  ['5 mm', 5],
-  ['10 mm', 10],
-];
-
-const PRESETS: { id: RenderPreset; name: string; desc: string }[] = [
-  { id: 'mip', name: 'MIP', desc: 'Max intensity — full range grayscale' },
-  { id: 'tissue', name: 'Tissue', desc: 'Fat · muscle · fluid · marrow' },
-  { id: 'bone', name: 'Bone', desc: 'Highlights dense bright structures' },
-];
+/** Slab thicknesses on offer, in mm; 0 is off. */
+const SLAB_PRESETS = [0, 3, 5, 10];
 
 function PresetButton({
   name,
@@ -55,8 +44,11 @@ export function RenderCell() {
   const slabMm = useViewerStore((s) => s.slabMm);
   const setSlabMm = useViewerStore((s) => s.setSlabMm);
   const features = useViewerFeatures();
+  const { dock } = useViewerLabels();
   // In the host's order, not ours.
-  const offered = features.renderPresets.flatMap((id) => PRESETS.filter((p) => p.id === id));
+  const offered = features.renderPresets.flatMap((id) =>
+    id in dock.presets ? [{ id, ...dock.presets[id as keyof typeof dock.presets] }] : [],
+  );
 
   return (
     <div className={styles.wrap}>
@@ -75,11 +67,8 @@ export function RenderCell() {
       {features.slab && (
         <div className={styles.slabSection}>
           <div className={styles.slabHead}>
-            <span className={styles.slabHeadTitle}>Slab MIP</span>
-            <Tooltip
-              label="Maximum Intensity Projection — composites several adjacent slices into one image. Reveals vessels, fractures and lesions that span multiple slices. 3–5 mm is ideal for most CT studies."
-              above
-            >
+            <span className={styles.slabHeadTitle}>{dock.slabTitle}</span>
+            <Tooltip label={dock.slabInfo} above>
               <Info
                 size={13}
                 style={{ color: 'var(--pmri-ink-3)', cursor: 'default', flexShrink: 0 }}
@@ -88,16 +77,16 @@ export function RenderCell() {
             <span className={styles.slabHeadLine} />
           </div>
           <div className={styles.slabRow}>
-            {SLAB_PRESETS.map(([label, mm]) => (
+            {SLAB_PRESETS.map((mm) => (
               <button
                 className={styles.slabBtn}
-                key={label}
+                key={mm}
                 type="button"
                 data-active={slabMm === mm || undefined}
                 onClick={() => setSlabMm(mm)}
                 aria-pressed={slabMm === mm}
               >
-                {label}
+                {mm === 0 ? dock.slabOff : fillLabel(dock.slabMm, { mm })}
               </button>
             ))}
           </div>

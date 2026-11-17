@@ -20,6 +20,7 @@ import { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { isTopLayer } from '../../hooks/layers';
 import { useFocusTrap } from '../../hooks/useFocusTrap';
+import { useViewerLabels } from '../../viewer';
 import styles from './ConfirmModal.module.css';
 
 export interface ConfirmModalProps {
@@ -36,12 +37,15 @@ export interface ConfirmModalProps {
 export function ConfirmModal({
   title,
   message,
-  confirmLabel = 'Confirm',
-  cancelLabel = 'Cancel',
+  confirmLabel,
+  cancelLabel,
   danger = false,
   onConfirm,
   onCancel,
 }: ConfirmModalProps) {
+  const { confirm } = useViewerLabels();
+  const confirmText = confirmLabel ?? confirm.confirm;
+  const cancelText = cancelLabel ?? confirm.cancel;
   // Esc → cancel, but only for the topmost dialog on the page: with two
   // viewers open, Esc closes the newest one, not both.
   const dialogRef = useRef<HTMLDivElement | null>(null);
@@ -88,7 +92,12 @@ export function ConfirmModal({
           <h2 className={styles.title} id={titleId}>
             {title}
           </h2>
-          <button className={styles.closeBtn} type="button" aria-label="Cancel" onClick={onCancel}>
+          <button
+            className={styles.closeBtn}
+            type="button"
+            aria-label={confirm.cancel}
+            onClick={onCancel}
+          >
             <X size={16} />
           </button>
         </div>
@@ -97,7 +106,7 @@ export function ConfirmModal({
 
         <div className={styles.actions}>
           <button className={styles.cancelBtn} ref={cancelBtnRef} type="button" onClick={onCancel}>
-            {cancelLabel}
+            {cancelText}
           </button>
           <button
             className={styles.confirmBtn}
@@ -105,7 +114,7 @@ export function ConfirmModal({
             data-danger={danger || undefined}
             onClick={onConfirm}
           >
-            {confirmLabel}
+            {confirmText}
           </button>
         </div>
       </div>

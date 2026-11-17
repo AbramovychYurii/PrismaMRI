@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { defaultFeatures, resolveFeatures } from './features';
-import { defaultLabels, resolveLabels } from './labels';
+import { defaultLabels, fillLabel, resolveLabels } from './labels';
 import { defaultTheme, resolveTheme, themeCssVars, withAlpha } from './theme';
 import tokensCss from './tokens.css?raw';
 
@@ -66,5 +66,84 @@ describe('resolveLabels', () => {
       filePrefix: 'scan',
       shareTitle: 'Viewer',
     });
+  });
+});
+
+describe('resolveLabels — the groups of the controls', () => {
+  it('replaces one string and keeps its neighbours', () => {
+    const labels = resolveLabels({
+      toolbar: { focusOn: 'Вийти з фокусу' },
+      findings: { dismiss: 'Видалити' },
+    });
+    expect(labels.toolbar.focusOn).toBe('Вийти з фокусу');
+    expect(labels.toolbar.focusOff).toBe(defaultLabels.toolbar.focusOff);
+    expect(labels.findings.dismiss).toBe('Видалити');
+    expect(labels.findings.keep).toBe(defaultLabels.findings.keep);
+  });
+
+  it('merges render presets one by one, down to a single field', () => {
+    const { presets } = resolveLabels({ dock: { presets: { bone: { name: 'Кістка' } } } }).dock;
+    expect(presets.bone).toEqual({ ...defaultLabels.dock.presets.bone, name: 'Кістка' });
+    expect(presets.mip).toEqual(defaultLabels.dock.presets.mip);
+  });
+
+  it('merges the mobile tabs, and the tab bar separately', () => {
+    const { mobile } = resolveLabels({ mobile: { tabs: { controls: 'КЕР' } } });
+    expect(mobile.tabs.controls).toBe('КЕР');
+    expect(mobile.tabs.axial).toBe(defaultLabels.mobile.tabs.axial);
+    expect(mobile.tabBar).toBe(defaultLabels.mobile.tabBar);
+  });
+
+  it('replaces the navigation tips as a whole', () => {
+    const tips = [[{ key: 'Тягни', text: 'щоб гортати' }]];
+    expect(resolveLabels({ dock: { tips } }).dock.tips).toBe(tips);
+  });
+
+  it('does not change the defaults it was given', () => {
+    const before = JSON.stringify(defaultLabels);
+    resolveLabels({ dock: { presets: { mip: { name: 'x' } } }, mobile: { tabs: { axial: 'y' } } });
+    expect(JSON.stringify(defaultLabels)).toBe(before);
+  });
+});
+
+describe('fillLabel', () => {
+  it('fills every mark, whatever the order', () => {
+    expect(fillLabel('{plane} · slice {number}', { number: 7, plane: 'Axial' })).toBe(
+      'Axial · slice 7',
+    );
+    expect(fillLabel('{mm} mm, {mm}', { mm: 5 })).toBe('5 mm, 5');
+  });
+
+  it('leaves a mark with no value, so a typo in a label shows', () => {
+    expect(fillLabel('Show {count} findings', { cnt: 3 })).toBe('Show {count} findings');
+  });
+
+  it('keeps text without marks as it is', () => {
+    expect(fillLabel('Close', { count: 1 })).toBe('Close');
+  });
+
+  it('fills the marks every default label that has one names', () => {
+    const MARKS: Record<string, string[]> = {
+      'stageMenu.recording': ['percent'],
+      'stageMenu.exportSpin': ['ext'],
+      'stageMenu.shareSpin': ['ext'],
+      'stageMenu.exportFailed': ['what'],
+      'series.slices': ['count'],
+      'findings.show': ['count'],
+      'findings.removeMessage': ['label'],
+      'findings.location': ['plane', 'number'],
+      'findings.marker': ['severity', 'label'],
+      'dock.slabMm': ['mm'],
+      'rail.scrubber': ['plane'],
+      'rail.panelKeys': ['plane'],
+    };
+    for (const [path, names] of Object.entries(MARKS)) {
+      const text = path
+        .split('.')
+        .reduce<unknown>((o, k) => (o as Record<string, unknown>)[k], defaultLabels);
+      expect(typeof text, path).toBe('string');
+      const values = Object.fromEntries(names.map((n) => [n, 'x']));
+      expect(fillLabel(text as string, values), path).not.toMatch(/\{\w+\}/);
+    }
   });
 });

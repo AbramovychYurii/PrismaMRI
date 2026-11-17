@@ -4,6 +4,7 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { useHover } from '../../hooks/useHover';
 import { useMenuKeyboard } from '../../hooks/useMenuKeyboard';
 import { useStageExport } from '../../hooks/useStageExport';
+import { fillLabel, useViewerLabels } from '../../viewer';
 import styles from './StageMenu.module.css';
 
 function IconMoreHorizontal() {
@@ -113,6 +114,7 @@ export function StageMenu({ previewRef }: Props) {
   const [open, setOpen] = useState(false);
   const { recordPct, exportImage, exportVideo } = useStageExport(previewRef);
   const { hover, onMouseEnter, onMouseLeave } = useHover();
+  const { stageMenu } = useViewerLabels();
   const wrapRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setOpen(false), []);
@@ -158,7 +160,9 @@ export function StageMenu({ previewRef }: Props) {
         className={styles.triggerBtn}
         type="button"
         aria-label={
-          recording ? `Recording 3D spin — ${Math.round((recordPct ?? 0) * 100)}%` : 'Stage options'
+          recording
+            ? fillLabel(stageMenu.recording, { percent: Math.round((recordPct ?? 0) * 100) })
+            : stageMenu.title
         }
         aria-haspopup="menu"
         aria-expanded={open}
@@ -173,16 +177,12 @@ export function StageMenu({ previewRef }: Props) {
       </button>
 
       {open && (
-        <div className={styles.dropdown} ref={menuRef} role="menu" aria-label="Stage options">
-          <MenuItem
-            icon={<IconDownload />}
-            label="Export 3D view (.png)"
-            onClick={handleExport3D}
-          />
+        <div className={styles.dropdown} ref={menuRef} role="menu" aria-label={stageMenu.title}>
+          <MenuItem icon={<IconDownload />} label={stageMenu.exportView} onClick={handleExport3D} />
           {CAN_RECORD_VIDEO && (
             <MenuItem
               icon={<IconVideo />}
-              label={`Export 3D spin (.${VIDEO_EXT})`}
+              label={fillLabel(stageMenu.exportSpin, { ext: VIDEO_EXT })}
               onClick={handleExportVideo}
             />
           )}
@@ -191,13 +191,13 @@ export function StageMenu({ previewRef }: Props) {
               <div className={styles.divider} aria-hidden />
               <MenuItem
                 icon={<Share2 size={14} />}
-                label="Share 3D view (.png)"
+                label={stageMenu.shareView}
                 onClick={handleShare3D}
               />
               {CAN_RECORD_VIDEO && (
                 <MenuItem
                   icon={<Share2 size={14} />}
-                  label={`Share 3D spin (.${VIDEO_EXT})`}
+                  label={fillLabel(stageMenu.shareSpin, { ext: VIDEO_EXT })}
                   onClick={handleShareVideo}
                 />
               )}
