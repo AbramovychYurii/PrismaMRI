@@ -7,7 +7,8 @@
  *   src/viewer-react/  imports itself, `@prisma-mri/viewer-core` and its own
  *                      dependencies — no app code.
  *   the app            reaches the viewer only through the package names, never
- *                      a path inside src/viewer-core or src/viewer-react.
+ *                      a path inside src/viewer-core or src/viewer-react, and never
+ *                      through an `/unstable` entry (those have no semver).
  *
  * Run by `npm run lint`. Exits 1 and lists every import that crosses a line.
  */
@@ -71,45 +72,24 @@ function target(spec, file) {
 
 const problems = [];
 
-/** Store internals: in `viewer-react/unstable` for the viewer's own components, never for a host. */
-const STORE_NAMES = new Set([
-  'createViewerStore',
-  'getViewerStore',
-  'useViewerStore',
-  'useViewerStoreApi',
-  'ViewerStore',
-  'ViewerStoreState',
-  'ViewerState',
-  'ViewerActions',
-]);
-const UNSTABLE_IMPORT =
-  /import\s+(?:type\s+)?\{([^}]*)\}\s*from\s*['"]@prisma-mri\/viewer-react\/unstable['"]/g;
+/** What the app may not import: the `/unstable` entries have no semver. */
+const UNSTABLE_ENTRY = /^@prisma-mri\/viewer-(core|react)\/unstable$/;
 
 for (const abs of walk(SRC)) {
   const file = rel(abs);
   const home = packageOf(file);
   const isTest = /\.test\.tsx?$/.test(file);
   const text = readFileSync(abs, 'utf8');
-  if (home === 'app') {
-    for (const m of text.matchAll(UNSTABLE_IMPORT)) {
-      for (const raw of m[1].split(',')) {
-        const name = raw
-          .trim()
-          .replace(/^type\s+/, '')
-          .split(/\s+as\s+/)[0];
-        if (STORE_NAMES.has(name)) {
-          problems.push(
-            `${file}: "${name}" — the app goes through the viewer's methods and useViewerSnapshot, not its store`,
-          );
-        }
-      }
-    }
-  }
   const specs = new Set(IMPORT.flatMap((re) => [...text.matchAll(re)].map((m) => m[1])));
 
   for (const spec of specs) {
     const to = target(spec, file);
     if (home === 'app') {
+      if (UNSTABLE_ENTRY.test(spec)) {
+        problems.push(
+          `${file}: "${spec}" has no semver — use the main entry (the store only through the viewer's methods and useViewerSnapshot)`,
+        );
+      }
       if (to && packageOf(to) !== 'app') {
         problems.push(
           `${file}: "${spec}" reaches into ${PACKAGES[packageOf(to)].dir} — import from @prisma-mri/viewer-${packageOf(to)} instead`,
