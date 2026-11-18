@@ -8,23 +8,21 @@ vi.mock('./canvas-utils', async (importOriginal) => ({
   waitForPaint: async () => {},
 }));
 
-/** A 3-D preview that records which camera each shot was taken from. */
+/** A 3-D view that records which camera each shot was taken from. */
 function fakePreview() {
   return {
     shots: [] as string[],
-    captureJpeg() {
-      this.shots.push('current');
-      return 'jpeg-current';
-    },
-    captureJpegFromPlane(plane: string) {
-      this.shots.push(plane);
-      return `jpeg-${plane}`;
+    capture3D({ plane }: { plane?: string } = {}) {
+      const camera = plane ?? 'current';
+      this.shots.push(camera);
+      return `jpeg-${camera}`;
     },
   };
 }
 
 function run(msg: Record<string, unknown>, preview: ReturnType<typeof fakePreview> | null) {
-  const viewer = { surfaces: { preview: () => preview } } as never;
+  const capture3D = preview ? preview.capture3D.bind(preview) : () => null;
+  const viewer = { surfaces: { capture3D } } as never;
   return runHandler(MCP_HANDLERS.capture_3d, viewer, 'capture_3d', msg);
 }
 

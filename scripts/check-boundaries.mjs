@@ -8,7 +8,8 @@
  *                      dependencies — no app code.
  *   the app            reaches the viewer only through the package names, never
  *                      a path inside src/viewer-core or src/viewer-react, and never
- *                      through an `/unstable` entry (those have no semver).
+ *                      through an `/unstable` entry (those have no semver);
+ *                      `viewer-core/testing` only from its test files.
  *   e2e specs          take `test` and `expect` from e2e/helpers/test, never from
  *                      `@playwright/test`: its fixture keeps a local MCP server
  *                      (and the connection dialog it brings) out of the run.
@@ -77,6 +78,8 @@ const problems = [];
 
 /** What the app may not import: the `/unstable` entries have no semver. */
 const UNSTABLE_ENTRY = /^@prisma-mri\/viewer-(core|react)\/unstable$/;
+/** What the app may import only in its tests: fixtures do not belong in its bundle. */
+const TESTING_ENTRY = /^@prisma-mri\/viewer-core\/testing$/;
 
 for (const abs of walk(SRC)) {
   const file = rel(abs);
@@ -92,6 +95,9 @@ for (const abs of walk(SRC)) {
         problems.push(
           `${file}: "${spec}" has no semver — use the main entry (the store only through the viewer's methods and useViewerSnapshot)`,
         );
+      }
+      if (TESTING_ENTRY.test(spec) && !isTest) {
+        problems.push(`${file}: "${spec}" holds test fixtures — import it from test files only`);
       }
       if (to && packageOf(to) !== 'app') {
         problems.push(

@@ -28,6 +28,14 @@ export interface ViewerLoaderOptions {
    * weak GPUs; the slice panels always use the full-resolution volume.
    */
   maxTextureEdge?: number;
+  /**
+   * Keeps `loading.active` on after a volume lands, until the host calls
+   * `finishLoading()`. For a host that swaps screens on load (an import screen
+   * → the viewer) and must not show the old screen un-dimmed while the new one
+   * mounts. Off by default: a load ends on its own, in the commit that shows
+   * the volume.
+   */
+  holdLoading?: boolean;
 }
 
 export interface ViewerLoader {
@@ -63,6 +71,14 @@ export interface ViewerLoader {
 
 const IDLE_LOADING = { active: false, percent: 0, stage: 'idle' as const, message: '' };
 
+/** Where a load that landed leaves `loading` — on its own, or through `finishLoading()`. */
+export const DONE_LOADING = {
+  active: false,
+  percent: 100,
+  stage: 'done' as const,
+  message: 'Ready',
+};
+
 export const isAbort = (err: unknown) => err instanceof DOMException && err.name === 'AbortError';
 
 /**
@@ -72,7 +88,7 @@ export const isAbort = (err: unknown) => err instanceof DOMException && err.name
  */
 export function createViewerLoader(
   store: ViewerStore,
-  { runLoad = loadVolumeInWorker, maxTextureEdge }: ViewerLoaderOptions = {},
+  { runLoad = loadVolumeInWorker, maxTextureEdge, holdLoading = false }: ViewerLoaderOptions = {},
 ): ViewerLoader {
   if (maxTextureEdge !== undefined && !(Number.isInteger(maxTextureEdge) && maxTextureEdge > 0)) {
     throw new Error(`maxTextureEdge must be a positive integer, not ${maxTextureEdge}.`);
@@ -162,12 +178,13 @@ export function createViewerLoader(
       const { result } = out;
       const { volume, prepared3D, histogram } = result;
       // Synchronous, listeners included, so a host that swaps screens on load
-      // (an import → viewer route) does it in the same commit.
-      // `loading.active` deliberately stays true: the host clears it once its
-      // viewer screen has mounted, so the old screen never flashes back.
+      // (an import → viewer route) does it in the same commit. With
+      // `holdLoading`, `loading.active` stays true until the host's
+      // `finishLoading()`, so its old screen never flashes back un-dimmed.
       flushSync(() => {
         const { setVolume, setSeriesContext, clearSeriesContext } = store.getState();
         setVolume(volume, prepared3D, histogram);
+        if (!holdLoading) setLoading(DONE_LOADING);
         // In the same commit as the volume, so no render shows the new volume
         // beside the findings of the old series.
         if (seriesList && seriesList.length > 1) {

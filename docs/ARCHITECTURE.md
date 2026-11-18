@@ -42,7 +42,7 @@ Two packages that could be published on their own, plus the app. Dependencies po
 | **`viewer-react`** | `src/viewer-react` | `<Viewer>` and everything to drive it from outside. `createViewer()` returns one object: state and commands, the loader (`load`, `switchSeries`, `onVolumeLoaded`), events and `surfaces`. A Zustand store per viewer, so several viewers on a page are independent. CSS Modules, `--pmri-*` tokens, features, labels, slots. |
 | **`viewer-core`** | `src/viewer-core` | No React. `import/` (DICOM, NIfTI, NRRD, MHA adapters, folder scan, series), `worker/` (`volume.worker`), `volume/` (LPS orientation, slices and slab MIP, 3-D texture, `ThreePreview`), `analysis/` (pure functions). Depends only on `fflate` and `three`. |
 
-The `/unstable` entry points carry no semver: small helpers in `viewer-core`, and the store, `Tooltip`, focus trap and constants in `viewer-react`.
+The `/unstable` entry points carry no semver: small helpers in `viewer-core`, and the store, `Tooltip`, focus trap and constants in `viewer-react`. `viewer-core/analysis` holds the voxel analysis; `viewer-core/testing` holds the synthetic volumes it is tested against, and the app imports it only from test files.
 
 ## 3. From file to screen
 

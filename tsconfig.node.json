@@ -9,7 +9,8 @@
     "noEmit": true,
     "types": ["node"],
     "paths": {
-      "@prisma-mri/viewer-core/analysis": ["./src/viewer-core/analysis/index.ts"]
+      "@prisma-mri/viewer-core/analysis": ["./src/viewer-core/analysis/index.ts"],
+      "@prisma-mri/viewer-core/testing": ["./src/viewer-core/testing.ts"]
     }
   },
   "include": ["vite.config.ts", "research"]

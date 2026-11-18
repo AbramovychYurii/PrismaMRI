@@ -217,24 +217,27 @@ const CAPTURE_3D_VIEWS = ['current', 'coronal', 'sagittal', 'axial', 'all'] as c
 
 const handleCapture3d: Handler = async ({ msg, ok, fail, viewer }) => {
   const view = optionalOneOf(msg, 'view', CAPTURE_3D_VIEWS) ?? 'current';
-  const preview = viewer.surfaces.preview();
-  if (!preview) {
-    fail('3-D view not ready');
-    return;
-  }
   await waitForPaint();
 
+  const shoot = (plane?: SlicePlane) =>
+    viewer.surfaces.capture3D({ plane, maxEdge: MCP_MAX_EDGE, quality: MCP_JPEG_QUALITY });
+  const notReady = () => fail('3-D view not ready');
+
   if (view === 'current') {
-    ok({ imageData: preview.captureJpeg(MCP_MAX_EDGE, MCP_JPEG_QUALITY) });
+    const imageData = shoot();
+    if (imageData === null) return notReady();
+    ok({ imageData });
     return;
   }
-  const from = (plane: SlicePlane) =>
-    preview.captureJpegFromPlane(plane, MCP_MAX_EDGE, MCP_JPEG_QUALITY);
   if (view === 'all') {
-    ok({ coronal: from('coronal'), sagittal: from('sagittal'), axial: from('axial') });
+    const coronal = shoot('coronal');
+    if (coronal === null) return notReady();
+    ok({ coronal, sagittal: shoot('sagittal'), axial: shoot('axial') });
     return;
   }
-  ok({ imageData: from(view), view });
+  const imageData = shoot(view);
+  if (imageData === null) return notReady();
+  ok({ imageData, view });
 };
 
 const handleCaptureAll: Handler = ({ ok, fail, viewer }) => {

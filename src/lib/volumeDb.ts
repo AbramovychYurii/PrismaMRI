@@ -65,9 +65,24 @@ function pruneOldRecords(db: IDBDatabase, keepId: string): Promise<void> {
   });
 }
 
-interface StoredRecord {
+/**
+ * Version of the records below. The volume record copies viewer-core's
+ * `LoadedVolume`, `PreparedVolumeFor3D` and `VolumeHistogram` field by field,
+ * and the series records hold its `SeriesChoice` — shapes that change with the
+ * package, not with this app. Bump it whenever what is stored changes, or what
+ * a stored field means: a record of another format is a cache miss, never a
+ * volume restored with a field missing.
+ *
+ * Checked on the volume record only: every load rewrites the series records
+ * with it, so they are never older than it.
+ */
+export const RECORD_FORMAT = 2;
+
+export interface StoredRecord {
   id: string;
   timestamp: number;
+  /** {@link RECORD_FORMAT} at the time of writing; absent before formats were kept (1). */
+  format?: number;
   formatId: string;
   voxelType: 'float32' | 'int16';
   voxels: ArrayBuffer;
@@ -86,8 +101,78 @@ interface StoredRecord {
   p3dThreshold: number;
   p3dSourceRange: [number, number];
   p3dSourceDims: Vec3;
-  /** Absent in records written before the grid moved to the worker. */
+  /** Absent when the volume had no empty-space grid. */
   p3dOccupancy?: ArrayBuffer;
+}
+
+/** What the volume record holds — the parts of a load `restoreVolume` takes back. */
+export interface CachedVolume {
+  volume: LoadedVolume;
+  prepared3D: PreparedVolumeFor3D;
+  histogram: VolumeHistogram;
+}
+
+/** The volume record for a load. Pure, so the shape can be tested without a browser. */
+export function toRecord(
+  id: string,
+  timestamp: number,
+  { volume, prepared3D, histogram }: CachedVolume,
+): StoredRecord {
+  return {
+    id,
+    timestamp,
+    format: RECORD_FORMAT,
+    formatId: volume.formatId,
+    voxelType: volume.voxels instanceof Float32Array ? 'float32' : 'int16',
+    voxels: recordBuffer(volume.voxels),
+    scalarMin: volume.scalarMin,
+    scalarMax: volume.scalarMax,
+    windowLevel: volume.windowLevel,
+    meta: volume.meta,
+    histBins: recordBuffer(histogram.bins),
+    histMin: histogram.min,
+    histMax: histogram.max,
+    histCount: histogram.count,
+    p3dData: recordBuffer(prepared3D.data),
+    p3dDims: prepared3D.dims,
+    p3dSpacing: prepared3D.spacing,
+    p3dClim: prepared3D.clim,
+    p3dThreshold: prepared3D.threshold,
+    p3dSourceRange: prepared3D.sourceRange,
+    p3dSourceDims: prepared3D.sourceDims,
+    p3dOccupancy: prepared3D.occupancy ? recordBuffer(prepared3D.occupancy) : undefined,
+  };
+}
+
+/** The load a volume record holds, or null when it was written in another format. */
+export function fromRecord(r: StoredRecord): CachedVolume | null {
+  if (r.format !== RECORD_FORMAT) return null;
+  return {
+    volume: {
+      voxels: r.voxelType === 'float32' ? new Float32Array(r.voxels) : new Int16Array(r.voxels),
+      meta: r.meta,
+      scalarMin: r.scalarMin,
+      scalarMax: r.scalarMax,
+      windowLevel: r.windowLevel,
+      formatId: r.formatId as LoadedVolume['formatId'],
+    },
+    prepared3D: {
+      data: new Uint8Array(r.p3dData),
+      dims: r.p3dDims,
+      spacing: r.p3dSpacing,
+      clim: r.p3dClim,
+      threshold: r.p3dThreshold,
+      sourceRange: r.p3dSourceRange,
+      sourceDims: r.p3dSourceDims,
+      occupancy: r.p3dOccupancy ? new Uint8Array(r.p3dOccupancy) : undefined,
+    },
+    histogram: {
+      bins: new Uint32Array(r.histBins),
+      min: r.histMin,
+      max: r.histMax,
+      count: r.histCount,
+    },
+  };
 }
 
 /**
@@ -286,31 +371,7 @@ export async function saveVolume(
     // Only now build the record: `put` clones it, which at full-body size is
     // ~650 MB, so paying for that before knowing there is room would be the
     // worst of both worlds — a memory spike *and* a write that fails anyway.
-    const record: StoredRecord = {
-      id: tabKey,
-      timestamp: Date.now(),
-      formatId: volume.formatId,
-      voxelType: volume.voxels instanceof Float32Array ? 'float32' : 'int16',
-      voxels: recordBuffer(volume.voxels),
-      scalarMin: volume.scalarMin,
-      scalarMax: volume.scalarMax,
-      windowLevel: volume.windowLevel,
-      meta: volume.meta,
-      histBins: recordBuffer(histogram.bins),
-      histMin: histogram.min,
-      histMax: histogram.max,
-      histCount: histogram.count,
-      p3dData: recordBuffer(prepared3D.data),
-      p3dDims: prepared3D.dims,
-      p3dSpacing: prepared3D.spacing,
-      p3dClim: prepared3D.clim,
-      p3dThreshold: prepared3D.threshold,
-      p3dSourceRange: prepared3D.sourceRange,
-      p3dSourceDims: prepared3D.sourceDims,
-      p3dOccupancy: prepared3D.occupancy ? recordBuffer(prepared3D.occupancy) : undefined,
-    };
-
-    await putRecord(db, record);
+    await putRecord(db, toRecord(tabKey, Date.now(), { volume, prepared3D, histogram }));
 
     return { stored: true, bytes };
   } catch (err) {
@@ -408,13 +469,13 @@ export async function saveSeries(series: ViewerSeriesContext | null): Promise<Se
   }
 }
 
-export async function loadVolume(): Promise<{
-  volume: LoadedVolume;
-  prepared3D: PreparedVolumeFor3D;
-  histogram: VolumeHistogram;
-  /** The study's series, when it had several and they were kept. */
-  series?: ViewerSeriesContext;
-} | null> {
+export async function loadVolume(): Promise<
+  | (CachedVolume & {
+      /** The study's series, when it had several and they were kept. */
+      series?: ViewerSeriesContext;
+    })
+  | null
+> {
   const db = await openDb();
   const tabKey = getTabKey();
   return new Promise((resolve, reject) => {
@@ -426,10 +487,9 @@ export async function loadVolume(): Promise<{
     tx.oncomplete = () => {
       db.close();
       const r = volumeRequest.result as StoredRecord | undefined;
-      if (!r) return resolve(null);
-
-      const voxels =
-        r.voxelType === 'float32' ? new Float32Array(r.voxels) : new Int16Array(r.voxels);
+      // A record of another format is a miss; the next save overwrites it.
+      const cached = r ? fromRecord(r) : null;
+      if (!cached) return resolve(null);
 
       // The files are already in the database: remember it, so the first series
       // switch after the reload does not write them again.
@@ -440,33 +500,7 @@ export async function loadVolume(): Promise<{
         storedFilesToken = files.token;
       }
 
-      resolve({
-        volume: {
-          voxels,
-          meta: r.meta,
-          scalarMin: r.scalarMin,
-          scalarMax: r.scalarMax,
-          windowLevel: r.windowLevel,
-          formatId: r.formatId as LoadedVolume['formatId'],
-        },
-        prepared3D: {
-          data: new Uint8Array(r.p3dData),
-          dims: r.p3dDims,
-          spacing: r.p3dSpacing,
-          clim: r.p3dClim,
-          threshold: r.p3dThreshold,
-          sourceRange: r.p3dSourceRange,
-          sourceDims: r.p3dSourceDims,
-          occupancy: r.p3dOccupancy ? new Uint8Array(r.p3dOccupancy) : undefined,
-        },
-        histogram: {
-          bins: new Uint32Array(r.histBins),
-          min: r.histMin,
-          max: r.histMax,
-          count: r.histCount,
-        },
-        series,
-      });
+      resolve({ ...cached, series });
     };
     tx.onerror = () => {
       db.close();

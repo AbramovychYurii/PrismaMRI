@@ -8,10 +8,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import {
   type ViewerTheme,
+  useSurfaceRegistry,
   useViewerFeatures,
   useViewerStore,
   useViewerStoreApi,
-  useViewerSurfaces,
   useViewerTheme,
 } from '../viewer';
 
@@ -69,7 +69,7 @@ export type PreviewStatus = 'ready' | 'unavailable' | 'context-lost';
  */
 function usePreviewInstance(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   const previewRef = useRef<ThreePreview | null>(null);
-  const surfaces = useViewerSurfaces();
+  const surfaces = useSurfaceRegistry();
   const [status, setStatus] = useState<PreviewStatus>('ready');
   const theme = useViewerTheme();
   const colors = useMemo(() => previewColors(theme), [theme]);

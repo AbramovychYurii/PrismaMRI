@@ -2,7 +2,12 @@ import { type ViewerApi, createViewerApi } from './api';
 import { type ViewerEventApi, createViewerEvents } from './events';
 import { type ViewerLoader, type ViewerLoaderOptions, createViewerLoader } from './loader';
 import { type ViewerStore, type ViewerStoreOptions, createViewerStore } from './store';
-import { type ViewerSurfaces, createViewerSurfaces } from './surfaces';
+import {
+  type ViewerSurfaceRegistry,
+  type ViewerSurfaces,
+  createSurfaceRegistry,
+  publicSurfaces,
+} from './surfaces';
 
 /**
  * One viewer: what a host reads and commands (`ViewerApi`), how volumes get in
@@ -16,17 +21,19 @@ export interface ViewerInstance extends ViewerApi, ViewerLoader, ViewerEventApi 
 export type ViewerOptions = ViewerStoreOptions & ViewerLoaderOptions;
 
 const stores = new WeakMap<ViewerInstance, ViewerStore>();
+const registries = new WeakMap<ViewerInstance, ViewerSurfaceRegistry>();
 
 export function createViewer(options: ViewerOptions = {}): ViewerInstance {
   const store = createViewerStore(options);
   const subscriptions = new Set<() => void>();
   const api = createViewerApi(store, subscriptions);
   const loader = createViewerLoader(store, options);
+  const registry = createSurfaceRegistry();
   const viewer: ViewerInstance = {
     ...api,
     ...loader,
     ...createViewerEvents(api, loader),
-    surfaces: createViewerSurfaces(),
+    surfaces: publicSurfaces(registry),
     // A finding on another series of the open study is shown by switching to
     // that series first; the store alone only knows the series on screen.
     focusAnnotation(id) {
@@ -46,7 +53,15 @@ export function createViewer(options: ViewerOptions = {}): ViewerInstance {
     },
   };
   stores.set(viewer, store);
+  registries.set(viewer, registry);
   return viewer;
+}
+
+/** Where a viewer's own components register their canvases and the 3-D preview. */
+export function getSurfaceRegistry(viewer: ViewerInstance): ViewerSurfaceRegistry {
+  const registry = registries.get(viewer);
+  if (!registry) throw new Error('Not a viewer made by createViewer.');
+  return registry;
 }
 
 /**

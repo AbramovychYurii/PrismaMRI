@@ -10,17 +10,15 @@
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import {
-  animalPhantom,
   axisProfile,
   checkArrangement,
   checkSymmetry,
-  crackPhantom,
   findGaps,
-  jawPhantom,
   labelComponents,
   splitTouching,
   thresholdMask,
 } from '@prisma-mri/viewer-core/analysis';
+import { animalPhantom, crackPhantom, jawPhantom } from '@prisma-mri/viewer-core/testing';
 import { describe, expect, it } from 'vitest';
 
 const RUN = process.env.RESEARCH === '1';

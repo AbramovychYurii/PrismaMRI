@@ -1,0 +1,7 @@
+interface AnimalOptions
+function animalPhantom
+interface CrackOptions
+function crackPhantom
+interface JawOptions
+function jawPhantom
+class PhantomBuilder

@@ -35,6 +35,7 @@ export {
   useViewerStore,
   useViewerStoreApi,
   useViewerSurfaces,
+  useSurfaceRegistry,
 } from './context';
 export type {
   AnnotationStorage,
@@ -49,7 +50,7 @@ export {
   type VolumeLoadedListener,
   isAbort,
 } from './loader';
-export type { ViewerSurfaces } from './surfaces';
+export type { Capture3DOptions, ViewerSurfaces } from './surfaces';
 export { type ViewerFeatures, defaultFeatures } from './features';
 export { type ViewerLabels, defaultLabels, fillLabel } from './labels';
 export { type ViewerTheme, accentAlpha } from './theme';

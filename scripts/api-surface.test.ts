@@ -26,6 +26,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ENTRIES = [
   { name: 'viewer-core', file: 'src/viewer-core/index.ts' },
   { name: 'viewer-core-analysis', file: 'src/viewer-core/analysis/index.ts' },
+  { name: 'viewer-core-testing', file: 'src/viewer-core/testing.ts' },
   { name: 'viewer-core-unstable', file: 'src/viewer-core/unstable.ts' },
   { name: 'viewer-react', file: 'src/viewer-react/index.ts' },
   { name: 'viewer-react-unstable', file: 'src/viewer-react/unstable.ts' },
