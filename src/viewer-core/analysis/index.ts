@@ -42,13 +42,4 @@ export {
   checkSymmetry,
 } from './symmetry';
 export { autoClasses } from './thresholds';
-// Synthetic volumes with known defects — fixtures for tests and for the benchmark in research/.
-export {
-  type AnimalOptions,
-  type CrackOptions,
-  type JawOptions,
-  PhantomBuilder,
-  animalPhantom,
-  crackPhantom,
-  jawPhantom,
-} from './phantoms';
+// Synthetic volumes to test these against: `@prisma-mri/viewer-core/testing`.

@@ -49,8 +49,8 @@ export function ViewerPage() {
   const navigate = useNavigate();
   const exitToImport = useCallback(() => navigate('/'), [navigate]);
 
-  // Clear the loading flag once the viewer takes over. loadFromSource
-  // deliberately leaves it true through the route swap so the example
+  // Clear the loading flag once the viewer takes over. appViewer's
+  // `holdLoading` leaves it true through the route swap so the example
   // cards stay dimmed until ImportOverlay is fully gone — otherwise the
   // cards visibly un-dim while the heavy AppGrid mount holds the previous
   // frame on screen.

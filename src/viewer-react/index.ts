@@ -8,6 +8,7 @@ export { useFocusTrap } from './hooks/useFocusTrap';
 export {
   type AnnotationActionContext,
   type AnnotationStorage,
+  type Capture3DOptions,
   type ViewerApi,
   type ViewerEnvironment,
   type ViewerEventApi,
@@ -48,6 +49,11 @@ export {
   type ViewerLabelsInput,
   defaultLabels,
 } from './viewer/labels';
+export {
+  type ViewerShortcut,
+  type ViewerShortcutGroup,
+  viewerShortcuts,
+} from './viewer/shortcuts';
 export {
   type ViewerColors,
   type ViewerFonts,

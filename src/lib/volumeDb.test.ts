@@ -1,12 +1,15 @@
 import {
   QUOTA_SHARE,
+  RECORD_FORMAT,
   type StoredSeriesFiles,
   type StoredSeriesMeta,
   filesBytes,
   fitsInQuota,
+  fromRecord,
   recordBuffer,
   recordBytes,
   seriesFromRecords,
+  toRecord,
 } from '@/lib/volumeDb';
 import type { LoadedVolume, PreparedVolumeFor3D, VolumeHistogram } from '@prisma-mri/viewer-core';
 import { describe, expect, it } from 'vitest';
@@ -167,5 +170,76 @@ describe('keeping the series of a study', () => {
 
   it('gives nothing back for a single series — there is nothing to switch to', () => {
     expect(seriesFromRecords(meta({ list: meta().list.slice(0, 1) }), files())).toBeUndefined();
+  });
+});
+
+describe('the volume record', () => {
+  /**
+   * Every field set, optional ones too. When viewer-core adds a field to one of
+   * these types, this stops compiling until the record keeps it — and then
+   * RECORD_FORMAT goes up with it.
+   */
+  function fullLoad(voxels: Float32Array | Int16Array = new Int16Array([-5, 0, 7, 1200])) {
+    const volume: Required<LoadedVolume> = {
+      voxels,
+      meta: {
+        dims: [2, 2, 1],
+        spacing: [0.5, 0.5, 1],
+        origin: [1, 2, 3],
+        bitsAllocated: 16,
+        studyId: 'study',
+        acquired: '2026-11-18',
+        protocol: 'T1',
+        scanner: 'scanner',
+        modality: 'CT',
+        bodyPart: 'HEAD',
+        species: 'Canis familiaris',
+        studyDescription: 'description',
+        rescaleSlope: 1,
+        rescaleIntercept: -1024,
+      },
+      scalarMin: -5,
+      scalarMax: 1200,
+      windowLevel: { window: 400, level: 40 },
+      formatId: 'dicom',
+    };
+    const prepared3D: Required<PreparedVolumeFor3D> = {
+      data: new Uint8Array([0, 64, 128, 255]),
+      dims: [2, 2, 1],
+      spacing: [0.5, 0.5, 1],
+      clim: [10, 240],
+      threshold: 0.3,
+      sourceRange: [-5, 1200],
+      sourceDims: [2, 2, 1],
+      occupancy: new Uint8Array([255, 0]),
+    };
+    const histogram: Required<VolumeHistogram> = {
+      bins: new Uint32Array([1, 2, 1]),
+      min: -5,
+      max: 1200,
+      count: 4,
+    };
+    return { volume, prepared3D, histogram };
+  }
+
+  it('gives back what was stored, field for field', () => {
+    const load = fullLoad();
+    expect(fromRecord(toRecord('tab-1', 1, load))).toEqual(load);
+  });
+
+  it('keeps float voxels as floats', () => {
+    const load = fullLoad(new Float32Array([0.25, 0.5, 0.75, 1]));
+    expect(fromRecord(toRecord('tab-1', 1, load))?.volume.voxels).toBeInstanceOf(Float32Array);
+  });
+
+  it('stores the format it was written in', () => {
+    expect(toRecord('tab-1', 1, fullLoad()).format).toBe(RECORD_FORMAT);
+  });
+
+  it('treats a record of another format as a miss', () => {
+    const record = toRecord('tab-1', 1, fullLoad());
+    expect(fromRecord({ ...record, format: RECORD_FORMAT - 1 })).toBeNull();
+    // Written before formats were kept.
+    expect(fromRecord({ ...record, format: undefined })).toBeNull();
   });
 });

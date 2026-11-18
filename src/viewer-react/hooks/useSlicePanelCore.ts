@@ -17,7 +17,7 @@ import {
 } from '@prisma-mri/viewer-core/unstable';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { ACCENT_VAR, AXIS_ACCENT, type Axis } from '../constants';
-import { accentAlpha, useViewerStore, useViewerSurfaces, useViewerTheme } from '../viewer';
+import { accentAlpha, useSurfaceRegistry, useViewerStore, useViewerTheme } from '../viewer';
 import { useMeasurementInteraction } from './useMeasurementInteraction';
 import { useCanvasPainter, useCanvasSize } from './useSliceCanvas';
 import { useSliceImage } from './useSliceImage';
@@ -59,7 +59,7 @@ export function useSlicePanelCore(plane: SlicePlane, halfSlabs = 0) {
   const cursor = useViewerStore((s) => s.cursor);
   const scrubVisible = useViewerStore((s) => s.scrubVisible[plane]);
   const setScrubVisible = useViewerStore((s) => s.setScrubVisible);
-  const surfaces = useViewerSurfaces();
+  const surfaces = useSurfaceRegistry();
   const theme = useViewerTheme();
 
   const drawFracs = useMemo<LetterboxRect | null>(

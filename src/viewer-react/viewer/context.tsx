@@ -10,12 +10,12 @@ import {
 } from 'react';
 import { useStore } from 'zustand';
 import type { ViewerSnapshot } from './api';
-import { type ViewerInstance, getViewerStore } from './createViewer';
+import { type ViewerInstance, getSurfaceRegistry, getViewerStore } from './createViewer';
 import type { ViewerEvents } from './events';
 import { type ViewerFeatures, defaultFeatures } from './features';
 import { type ViewerLabels, defaultLabels } from './labels';
 import type { ViewerStore, ViewerStoreState } from './store';
-import type { ViewerSurfaces } from './surfaces';
+import type { ViewerSurfaceRegistry, ViewerSurfaces } from './surfaces';
 import { type ViewerTheme, defaultTheme } from './theme';
 // Here, not in the barrel: every viewer — and every piece placed outside one —
 // runs through this module, so the tokens can never be tree-shaken away.
@@ -190,6 +190,11 @@ export function useViewerStoreApi(): ViewerStore {
 
 export function useViewerSurfaces(): ViewerSurfaces {
   return useViewerContext().viewer.surfaces;
+}
+
+/** The surrounding viewer's surface registry — for the components that own a surface. */
+export function useSurfaceRegistry(): ViewerSurfaceRegistry {
+  return getSurfaceRegistry(useViewerContext().viewer);
 }
 
 /**

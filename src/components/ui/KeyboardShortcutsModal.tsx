@@ -1,57 +1,16 @@
-import { useFocusTrap } from '@prisma-mri/viewer-react';
+import { type ViewerShortcutGroup, useFocusTrap, viewerShortcuts } from '@prisma-mri/viewer-react';
 import { X } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import styled from 'styled-components';
 
-interface ShortcutRow {
-  action: string;
-  keys: string[];
-  /** Alternative gesture shown after a "/" — e.g. touch equivalent. */
-  altKeys?: string[];
-}
-
-const SECTIONS: Array<{ label: string; rows: ShortcutRow[] }> = [
+/** The app's own shortcuts first, then the viewer's — from the viewer, so they match its version. */
+const SECTIONS: ViewerShortcutGroup[] = [
   {
-    label: 'File',
-    rows: [{ keys: ['⌘ / Ctrl', 'O'], action: 'Open folder' }],
+    title: 'File',
+    shortcuts: [{ keys: ['⌘ / Ctrl', 'O'], action: 'Open folder' }],
   },
-  {
-    label: 'Slices',
-    rows: [
-      { keys: ['Scroll'], action: 'Navigate slices' },
-      { keys: ['↑ / ↓'], action: 'Step slice (active plane)' },
-      { keys: ['PgUp / PgDn'], action: '±10 slices (scrubber focused)' },
-      { keys: ['Home / End'], action: 'First / last slice' },
-    ],
-  },
-  {
-    label: '2D Panels',
-    rows: [
-      { keys: ['Click'], action: 'Activate plane / move crosshair' },
-      { keys: ['1 / 2 / 3'], action: 'Focus coronal / sagittal / axial' },
-      { keys: ['Shift', 'Drag'], action: 'Measure distance (fullscreen)' },
-      { keys: ['Right-click'], altKeys: ['Long press'], action: 'Open measure menu' },
-      { keys: ['Tab'], action: 'Focus a panel (and its plane)' },
-      { keys: ['Shift', '← → ↑ ↓'], action: 'Move crosshair (panel focused)' },
-      { keys: ['Shift', 'F10'], altKeys: ['Menu'], action: 'Open measure menu (panel focused)' },
-    ],
-  },
-  {
-    label: 'Series',
-    rows: [
-      { keys: ['[ / ]'], action: 'Previous / next series' },
-      { keys: ['Tab'], action: 'Focus the series selector' },
-      { keys: ['↑ / ↓'], action: 'Choose a series (selector focused)' },
-    ],
-  },
-  {
-    label: '3D View',
-    rows: [
-      { keys: ['Drag'], action: 'Orbit' },
-      { keys: ['Scroll'], action: 'Zoom' },
-    ],
-  },
+  ...viewerShortcuts(),
 ];
 
 const Backdrop = styled.div`
@@ -205,9 +164,9 @@ export function KeyboardShortcutsModal({ onClose }: Props) {
         </ModalHead>
 
         {SECTIONS.map((s) => (
-          <Section key={s.label}>
-            <SectionHead>{s.label}</SectionHead>
-            {s.rows.map((r) => (
+          <Section key={s.title}>
+            <SectionHead>{s.title}</SectionHead>
+            {s.shortcuts.map((r) => (
               <Row key={r.action}>
                 <Action>{r.action}</Action>
                 <Keys>

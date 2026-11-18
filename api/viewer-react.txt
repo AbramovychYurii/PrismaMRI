@@ -3,6 +3,7 @@ const ALL_RENDER_PRESETS
 function AnnotationActionButton
 interface AnnotationActionContext
 interface AnnotationStorage
+interface Capture3DOptions
 function createViewer
 const defaultFeatures
 const defaultLabels
@@ -34,12 +35,15 @@ interface ViewerLabelsInput
 type ViewerLayout
 interface ViewerLoader
 interface ViewerLoaderOptions
-type ViewerLoadingState
+interface ViewerLoadingState
 type ViewerOptions
 interface ViewerProps
 function ViewerProvider
 interface ViewerProviderProps
 interface ViewerSeriesContext
+interface ViewerShortcut
+interface ViewerShortcutGroup
+function viewerShortcuts
 interface ViewerSlots
 interface ViewerSnapshot
 type ViewerSnapshotListener

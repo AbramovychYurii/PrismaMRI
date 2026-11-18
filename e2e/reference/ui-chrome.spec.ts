@@ -13,6 +13,17 @@ const DICOM = examplePath('Yurii_Abramovych_Head_Neck_DICOM.zip');
 /** The WebGL view is the renderers' business (render.spec); only the DOM is compared. */
 const HIDE_3D = '[data-testid="stage-canvas"] { visibility: hidden !important; }';
 
+/**
+ * The findings pill plays a 1.4 s entrance whenever findings appear — after a
+ * reload too — and its ring, sparkle and count rest in another place before and
+ * after it, so a shot taken inside that window depends on timing. Waits for the
+ * pill and then out the window (AnnotationHud's ENTRANCE_DURATION_MS, plus a margin).
+ */
+async function pillAtRest(page: Page): Promise<void> {
+  await expect(page.getByRole('button', { name: /AI findings/ })).toBeVisible();
+  await page.waitForTimeout(1_600);
+}
+
 async function shot(page: Page, name: string, hover = false): Promise<void> {
   if (!hover) await page.mouse.move(1, 899);
   await settle(page, 400);
@@ -87,6 +98,7 @@ test('viewer chrome matches the reference', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.reload();
   await expect(page.getByTestId('stage-canvas')).toBeVisible({ timeout: 60_000 });
+  await pillAtRest(page);
   await shot(page, 'mobile-3d');
   await page.getByRole('tab', { name: 'Coronal', exact: true }).click();
   await shot(page, 'mobile-coronal');

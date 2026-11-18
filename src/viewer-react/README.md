@@ -24,7 +24,12 @@ field or a primitive, not a freshly built object.
 `setCursor`, `setWindowLevel`, `setRenderPreset`, `setSlabMm`, `setMeasurement`,
 `clearMeasurement`, `addAnnotation`, `replaceAnnotations`, `removeAnnotation`,
 `clearAnnotations`, `setActiveAnnotation`, `focusAnnotation`, `load`, `loadUrl`,
-`cancel`, `resolveSeries`, `switchSeries`, `restoreVolume`, `reset`.
+`cancel`, `resolveSeries`, `switchSeries`, `restoreVolume`, `setError`, `reset`.
+
+A load ends on its own, in the commit that shows the volume. A host that swaps
+screens on load and wants its old screen to stay in the loading state until the
+new one is up passes `createViewer({ holdLoading: true })` and calls
+`viewer.finishLoading()` once the viewer is on screen.
 
 A host that caches the open volume for reloads can keep a multi-series study's selector
 too: `onVolumeLoaded` passes the study as a second argument (`ViewerSeriesContext`: the
@@ -38,6 +43,14 @@ A controlled cursor is `cursorchange` plus `setCursor`:
 viewer.on('cursorchange', (cursor) => myStore.set(cursor));
 myStore.subscribe((cursor) => cursor && viewer.setCursor(cursor));
 ```
+
+## Surfaces
+
+`viewer.surfaces` (in React, `useViewerSurfaces()`) reads what the viewer draws:
+`canvas(plane)` is a slice panel's canvas, null while it is not on screen;
+`capture3D({ plane, maxEdge, quality })` is the 3-D view as a base64 JPEG, null
+while it is not on screen. With `plane`, the shot is taken from that plane's
+standard view and the user's camera is put back.
 
 ## Events
 

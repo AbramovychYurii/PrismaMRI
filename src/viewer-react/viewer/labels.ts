@@ -166,6 +166,38 @@ export interface ViewerLabels {
     /** Title of the OS share sheet; the item follows it: "Viewer — 3D view". */
     shareTitle: string;
   };
+  /**
+   * The words of `viewerShortcuts()`, the list of controls for a host's help
+   * screen: group titles, pointer gestures, and what each control does. Key
+   * names (Shift, Tab, PgUp …) are shown as they are on the key.
+   */
+  shortcuts: {
+    slices: string;
+    panels: string;
+    series: string;
+    view3d: string;
+    scroll: string;
+    click: string;
+    drag: string;
+    rightClick: string;
+    longPress: string;
+    navigateSlices: string;
+    stepSlice: string;
+    jumpSlices: string;
+    firstLastSlice: string;
+    activatePlane: string;
+    focusPlane: string;
+    measure: string;
+    measureMenu: string;
+    focusPanel: string;
+    moveCrosshair: string;
+    measureMenuKeys: string;
+    switchSeries: string;
+    focusSeries: string;
+    chooseSeries: string;
+    orbit: string;
+    zoom: string;
+  };
 }
 
 /** What a host passes: any part of the labels, down to a single string. */
@@ -190,6 +222,7 @@ export interface ViewerLabelsInput {
   mobile?: { tabBar?: string; tabs?: Partial<ViewerLabels['mobile']['tabs']> };
   rail?: Partial<ViewerLabels['rail']>;
   export?: Partial<ViewerLabels['export']>;
+  shortcuts?: Partial<ViewerLabels['shortcuts']>;
 }
 
 export const defaultLabels: ViewerLabels = {
@@ -342,6 +375,33 @@ export const defaultLabels: ViewerLabels = {
     filePrefix: 'viewer',
     shareTitle: 'Viewer',
   },
+  shortcuts: {
+    slices: 'Slices',
+    panels: '2D Panels',
+    series: 'Series',
+    view3d: '3D View',
+    scroll: 'Scroll',
+    click: 'Click',
+    drag: 'Drag',
+    rightClick: 'Right-click',
+    longPress: 'Long press',
+    navigateSlices: 'Navigate slices',
+    stepSlice: 'Step slice (active plane)',
+    jumpSlices: '±10 slices (scrubber focused)',
+    firstLastSlice: 'First / last slice',
+    activatePlane: 'Activate plane / move crosshair',
+    focusPlane: 'Focus coronal / sagittal / axial',
+    measure: 'Measure distance (fullscreen)',
+    measureMenu: 'Open measure menu',
+    focusPanel: 'Focus a panel (and its plane)',
+    moveCrosshair: 'Move crosshair (panel focused)',
+    measureMenuKeys: 'Open measure menu (panel focused)',
+    switchSeries: 'Previous / next series',
+    focusSeries: 'Focus the series selector',
+    chooseSeries: 'Choose a series (selector focused)',
+    orbit: 'Orbit',
+    zoom: 'Zoom',
+  },
 };
 
 export function resolveLabels(input: ViewerLabelsInput = {}): ViewerLabels {
@@ -381,6 +441,7 @@ export function resolveLabels(input: ViewerLabelsInput = {}): ViewerLabels {
     },
     rail: { ...d.rail, ...input.rail },
     export: { ...d.export, ...input.export },
+    shortcuts: { ...d.shortcuts, ...input.shortcuts },
   };
 }
 

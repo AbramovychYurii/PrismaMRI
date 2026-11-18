@@ -1,5 +1,5 @@
 import type { LoadedVolume } from '@prisma-mri/viewer-core';
-import { animalPhantom, crackPhantom, jawPhantom } from '@prisma-mri/viewer-core/analysis';
+import { animalPhantom, crackPhantom, jawPhantom } from '@prisma-mri/viewer-core/testing';
 import { createViewer } from '@prisma-mri/viewer-react';
 import { describe, expect, it } from 'vitest';
 import { ANALYSIS_HANDLERS } from './analysis-handlers';

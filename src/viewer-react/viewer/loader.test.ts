@@ -66,9 +66,31 @@ describe('createViewerLoader', () => {
 
     expect(seen).toEqual([3]);
     expect(store.getState().volume?.meta.dims).toEqual([2, 2, 3]);
-    // Left for the host to clear once its viewer screen is up.
-    expect(store.getState().loading.active).toBe(true);
     expect(store.getState().seriesList).toBeNull();
+  });
+
+  it('ends the load in the commit that shows the volume', async () => {
+    const { store, loader } = setup(async () => ({ kind: 'volume', result: result(3) }));
+    const seenActive: boolean[] = [];
+    loader.onVolumeLoaded(() => seenActive.push(store.getState().loading.active));
+
+    await loader.load(SOURCE);
+
+    expect(seenActive).toEqual([false]);
+    expect(store.getState().loading).toMatchObject({ active: false, stage: 'done' });
+  });
+
+  it('with holdLoading, leaves the load on for the host to end', async () => {
+    const store = createViewerStore();
+    const loader = createViewerLoader(store, {
+      runLoad: async () => ({ kind: 'volume', result: result(3) }),
+      holdLoading: true,
+    });
+
+    await loader.load(SOURCE);
+
+    expect(store.getState().volume).not.toBeNull();
+    expect(store.getState().loading.active).toBe(true);
   });
 
   it('waits for a series choice, then keeps the list for in-place switching', async () => {

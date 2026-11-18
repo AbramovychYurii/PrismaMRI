@@ -6,8 +6,12 @@ import { createViewer } from '@prisma-mri/viewer-react';
  * The PrismaMRI app's one viewer. UI state goes to sessionStorage — per tab,
  * matching the per-tab IDB volume cache — throttled so 60 Hz drags don't
  * stringify on every frame; findings go to localStorage per volume.
+ *
+ * `holdLoading`: a load swaps the import route for the viewer route, and the
+ * import screen keeps its cards dimmed until ViewerPage calls `finishLoading()`.
  */
 export const appViewer = createViewer({
+  holdLoading: true,
   persistence: {
     key: 'prisma-mri-ui-state',
     storage: createThrottledStorage(sessionStorage),

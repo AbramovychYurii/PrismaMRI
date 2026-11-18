@@ -1,6 +1,7 @@
 import type {
   ActiveMeasurement,
   Annotation,
+  ImportProgress,
   LoadResult,
   LoadedVolume,
   MeasurementPoint,
@@ -9,7 +10,8 @@ import type {
   SliceWindowLevel,
   VolumeCursor,
 } from '@prisma-mri/viewer-core';
-import type { ViewerSeriesContext, ViewerState, ViewerStore, ViewerStoreState } from './store';
+import { DONE_LOADING } from './loader';
+import type { ViewerSeriesContext, ViewerStore, ViewerStoreState } from './store';
 
 export type { ViewerSeriesContext };
 
@@ -21,7 +23,16 @@ export type { ViewerSeriesContext };
  * viewer's own business.
  */
 
-export type ViewerLoadingState = ViewerState['loading'];
+/**
+ * Where a load stands. Declared here, not taken from the store, so a change to
+ * the store cannot change it unnoticed — `snapshotOf` stops compiling instead.
+ */
+export interface ViewerLoadingState extends ImportProgress {
+  /** True from the start of a load until it lands (or the host ends it, with `holdLoading`). */
+  active: boolean;
+  /** 0–100. */
+  percent: number;
+}
 
 export type ViewerStatus =
   /** Nothing open and nothing loading. */
@@ -107,8 +118,8 @@ export interface ViewerApi {
     series?: ViewerSeriesContext,
   ) => void;
   /**
-   * Ends the loading state once the host has put the viewer on screen. A load
-   * leaves it on through the host's screen swap so nothing flashes back.
+   * Ends the loading state. Only needed with the `holdLoading` option, once the
+   * host has put the viewer on screen; otherwise a load ends on its own.
    */
   finishLoading: () => void;
   /** Shows an error message, or clears it with null. */
@@ -229,8 +240,7 @@ export function createViewerApi(
       act().restoreVolume(volume, prepared3D, histogram);
       if (series) act().setSeriesContext(series);
     },
-    finishLoading: () =>
-      act().setLoading({ active: false, percent: 100, stage: 'done', message: 'Ready' }),
+    finishLoading: () => act().setLoading(DONE_LOADING),
     setError: (message) => act().setError(message),
     reset: () => act().reset(),
   };
