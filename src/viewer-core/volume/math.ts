@@ -39,15 +39,6 @@ export function grayToRgba(gray: number, out: Uint8ClampedArray, o: number): voi
   out[o + 3] = 255;
 }
 
-export function mapIntensityToRgba(
-  value: number,
-  wl: SliceWindowLevel,
-  out: Uint8ClampedArray,
-  o: number,
-): void {
-  grayToRgba(mapIntensityToGray(value, wl), out, o);
-}
-
 /**
  * Resolve a sensible default window/level from a scalar range, or honor
  * explicit DICOM-supplied center/width when present.

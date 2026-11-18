@@ -1,7 +1,7 @@
 const PROGRESS_MIN_INTERVAL_MS = 80;
 
 /** HEAD request when allowed (same-origin); may be null cross-origin due to CORS. */
-export async function probeContentLength(url: string): Promise<number | null> {
+async function probeContentLength(url: string): Promise<number | null> {
   try {
     const response = await fetch(url, { method: 'HEAD' });
     if (!response.ok) return null;

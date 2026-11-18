@@ -7,7 +7,7 @@ import {
 } from '@prisma-mri/viewer-core';
 
 /** Scalar value at a voxel (post slope/intercept), or −Infinity when out of bounds. */
-export function getVoxelScalar(
+function getVoxelScalar(
   voxels: Float32Array | Int16Array,
   dims: readonly [number, number, number],
   x: number,

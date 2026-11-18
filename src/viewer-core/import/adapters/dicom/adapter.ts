@@ -123,7 +123,7 @@ const SYNTAX_NAMES: Record<string, string> = {
  * pixel data would otherwise be read as raw samples and produce a plausible-
  * looking volume of noise, with nothing to say it is wrong.
  */
-export function unreadableReason(t: DicomTags): string | null {
+function unreadableReason(t: DicomTags): string | null {
   if (t.pixelDataEncapsulated || !READABLE_SYNTAXES.has(t.transferSyntax)) {
     const name = SYNTAX_NAMES[t.transferSyntax] ?? 'a compressed encoding';
     const uid = t.transferSyntax ? ` (${t.transferSyntax})` : '';

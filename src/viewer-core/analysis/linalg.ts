@@ -59,7 +59,7 @@ export function eigenSym3(m: number[][]): Eigen3 {
 export const dot = (a: ArrayLike<number>, b: ArrayLike<number>): number =>
   a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 
-export const norm = (a: ArrayLike<number>): number => Math.hypot(a[0], a[1], a[2]);
+const norm = (a: ArrayLike<number>): number => Math.hypot(a[0], a[1], a[2]);
 
 export function angleBetweenDeg(a: ArrayLike<number>, b: ArrayLike<number>): number {
   const d = dot(a, b) / (norm(a) * norm(b) || 1);

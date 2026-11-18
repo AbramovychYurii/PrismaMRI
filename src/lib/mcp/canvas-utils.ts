@@ -40,7 +40,7 @@ function imageToCanvas(image: GrayImage): HTMLCanvasElement {
  * Downscale a canvas so its longest edge is at most MCP_MAX_EDGE, then encode
  * as JPEG. Keeps every image well under 1 MB after base64 encoding.
  */
-export function encodeForMcp(src: HTMLCanvasElement, quality = MCP_JPEG_QUALITY): string {
+function encodeForMcp(src: HTMLCanvasElement, quality = MCP_JPEG_QUALITY): string {
   const scale = Math.min(1, MCP_MAX_EDGE / Math.max(src.width, src.height));
   const { canvas, ctx } = createCanvas(
     Math.max(1, Math.round(src.width * scale)),

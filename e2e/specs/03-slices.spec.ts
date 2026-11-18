@@ -5,7 +5,7 @@
  * visibility, scrubber chevrons, expand/collapse, slab MIP buttons,
  * and the context-menu measurement flow.
  */
-import { expect, test } from '@playwright/test';
+import { type Page, expect, test } from '../helpers/test';
 import { loadVolume } from '../helpers/load-volume.js';
 
 test.describe('Slice panels', () => {
@@ -161,7 +161,7 @@ test.describe('Slice panels', () => {
   // Slab MIP now lives in the dock's Render Mode cell, not in the expanded
   // slice panel — controlled centrally so it applies to every panel.
 
-  async function openDock(page: import('@playwright/test').Page) {
+  async function openDock(page: Page) {
     // Mirror the working pattern from 04-dock.spec.ts.
     const dockToggle = page
       .locator('button')

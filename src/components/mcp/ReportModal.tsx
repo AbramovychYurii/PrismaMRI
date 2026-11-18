@@ -13,12 +13,8 @@ import { AuroraSparkles } from '@/components/ui/AuroraSparkles';
 import { downloadBlob } from '@/lib/download';
 import { waitForPaint } from '@/lib/mcp/canvas-utils';
 import { type Capture, annotateCanvas, captureRaw } from '@/lib/report/capture';
-import {
-  type Annotation,
-  type SlicePlane,
-  intensityUnit,
-  sliceNumber,
-} from '@prisma-mri/viewer-core';
+import { planeName, sliceNum } from '@/lib/report/finding';
+import { type Annotation, intensityUnit } from '@prisma-mri/viewer-core';
 import {
   defaultLabels,
   defaultTheme,
@@ -82,10 +78,6 @@ import {
   Shell,
   SpinIcon,
 } from './ReportModal.styles';
-
-const planeName = (plane: SlicePlane) => defaultLabels.planes[plane].name;
-
-const sliceNum = (a: Annotation) => sliceNumber(a.voxel, a.plane);
 
 /** Avoid allocating a fresh `style` object on every render of the disabled toggle. */
 const FORMAT_TOGGLE_DISABLED_STYLE: React.CSSProperties = { opacity: 0.4 };

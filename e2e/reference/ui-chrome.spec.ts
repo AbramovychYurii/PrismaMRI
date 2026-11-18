@@ -4,7 +4,7 @@
  * with the rest of the harness: `ref:capture` before a styling or layout
  * change, `ref:check` after. The WebGL view is left to render.spec.
  */
-import { type Page, expect, test } from '@playwright/test';
+import { type Page, expect, test } from '../helpers/test';
 import { examplePath, openFile, settle } from './helpers';
 
 const VOLUME = examplePath('maxillofacial_CBCT.nrrd');

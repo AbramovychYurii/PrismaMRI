@@ -445,7 +445,7 @@ export const FindingText = styled.div`
 `;
 
 /** Confidence accent color — same neutral blue across HUD and preview. */
-export const CONFIDENCE_COLOR_PREVIEW = '#60a5fa';
+const CONFIDENCE_COLOR_PREVIEW = '#60a5fa';
 
 export const FindingConfidenceRow = styled.div`
   display: flex;

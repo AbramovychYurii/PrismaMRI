@@ -7,7 +7,7 @@
  * top of it. 2-D captures read the slice canvases directly.
  */
 import { readFileSync } from 'node:fs';
-import { type Page, expect, test } from '@playwright/test';
+import { type Page, expect, test } from '../helpers/test';
 import { examplePath, openFile, settle } from './helpers';
 
 const VOLUME = examplePath('maxillofacial_CBCT.nrrd');

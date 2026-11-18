@@ -116,7 +116,7 @@ export function roundRoi(s: RoiStats) {
 }
 
 /** Trilinear sample at a fractional voxel position; outside the volume reads as the minimum. */
-export function sampleAt(volume: LoadedVolume, x: number, y: number, z: number): number {
+function sampleAt(volume: LoadedVolume, x: number, y: number, z: number): number {
   const { dims } = volume.meta;
   if (x < 0 || y < 0 || z < 0 || x > dims[0] - 1 || y > dims[1] - 1 || z > dims[2] - 1) {
     return volume.scalarMin;

@@ -4,7 +4,7 @@
  * Loads the test volume and exercises the 3-D ray-cast viewport:
  * canvas visibility, toolbar buttons, focus mode, rail toggle.
  */
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../helpers/test';
 import { loadVolume } from '../helpers/load-volume.js';
 
 test.describe('3D Stage', () => {

@@ -5,7 +5,7 @@
  * between 3D / coronal / sagittal / axial / controls, and touch-friendly
  * scrubber sizing.
  */
-import { expect, test } from '@playwright/test';
+import { type Page, expect, test } from '../helpers/test';
 import { loadVolume } from '../helpers/load-volume.js';
 
 // Simulate a mobile device using Chromium in mobile-emulation mode.
@@ -72,7 +72,7 @@ test.describe('Mobile layout', () => {
 
     // The bottom bar is a tablist; each tab is named in full ("Coronal"), while
     // it shows an abbreviation ("COR").
-    const tabBtn = (page: import('@playwright/test').Page, label: string) =>
+    const tabBtn = (page: Page, label: string) =>
       page.getByRole('tab', { name: label, exact: true });
 
     test('switching to Coronal tab shows the coronal slice panel', async ({ page }) => {

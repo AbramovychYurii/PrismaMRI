@@ -25,7 +25,7 @@ export function setPlaneColors(material: THREE.ShaderMaterial, planeColors: Plan
 }
 
 /** Data3DTexture: single-channel Uint8, linear filtering, tight packing. */
-export function buildTexture(prepared: PreparedVolumeFor3D): THREE.Data3DTexture {
+function buildTexture(prepared: PreparedVolumeFor3D): THREE.Data3DTexture {
   const [w, h, d] = prepared.dims;
   const tex = new THREE.Data3DTexture(prepared.data as Uint8Array<ArrayBuffer>, w, h, d);
   tex.format = THREE.RedFormat;
@@ -37,7 +37,7 @@ export function buildTexture(prepared: PreparedVolumeFor3D): THREE.Data3DTexture
   return tex;
 }
 
-export function buildMaterial(
+function buildMaterial(
   texture: THREE.Data3DTexture,
   colormap: THREE.DataTexture,
   colormapPre: THREE.DataTexture,

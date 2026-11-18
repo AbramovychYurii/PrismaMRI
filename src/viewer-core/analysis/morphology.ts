@@ -39,7 +39,7 @@ export function close(mask: Mask3, radius: Vec3): Mask3 {
   return erode(dilate(mask, radius), radius);
 }
 
-export function invert(mask: Mask3): Mask3 {
+function invert(mask: Mask3): Mask3 {
   const data = new Uint8Array(mask.data.length);
   let count = 0;
   for (let i = 0; i < data.length; i++) {
