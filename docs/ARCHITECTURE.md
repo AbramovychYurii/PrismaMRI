@@ -30,7 +30,7 @@ flowchart LR
 
 - **One server per surface.** Claude Desktop starts a separate server for chat and for Cowork and Code sessions. Each binds the first free port of `7389–7393` on `127.0.0.1`.
 - **The tab finds them.** It probes all five ports in parallel (300 ms timeout), keeps a socket to every server that answers, and looks again every 15 s for one that started later. A reply goes back on the socket the command came from.
-- **Optional relay, unused.** The server contains a client for a Cloudflare relay (`PRISMAMRI_SESSION`, `PRISMAMRI_RELAY_URL`). The app connects only to loopback and the generated `.dxt` sets no environment, so the relay is dormant.
+- **The skill travels with the server.** It is sent to Claude as MCP instructions, and the `.dxt` lists it for Claude Desktop. To also list it among Claude Code's own skills, start the server with `PRISMAMRI_INSTALL_SKILL=1`: it copies `SKILL.md` to `~/.claude/skills/prisma-mri-radiology/`. Nothing is written outside the server's own folder unless that variable is set.
 
 ## 2. Code layers
 

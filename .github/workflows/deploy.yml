@@ -35,11 +35,8 @@ jobs:
       - name: Lint and format check
         run: npm run lint
 
-      - name: Type check (app)
+      - name: Type check (app and MCP server)
         run: npm run typecheck
-
-      - name: Type check (MCP server)
-        run: npm ci --prefix mcp-server && npm run --prefix mcp-server typecheck
 
       # Fast and dependency-free — run before the browser download and the
       # build so a broken invariant fails in seconds, not minutes.
@@ -53,7 +50,6 @@ jobs:
         run: npm run build
         env:
           GITHUB_PAGES: 'false'
-          VITE_RELAY_URL: ${{ vars.VITE_RELAY_URL }}
 
       - name: Run E2E tests
         run: npm run test:e2e
@@ -84,7 +80,6 @@ jobs:
         env:
           GITHUB_PAGES: 'true'
           GITHUB_REPOSITORY_NAME: ${{ github.event.repository.name }}
-          VITE_RELAY_URL: ${{ vars.VITE_RELAY_URL }}
 
       - uses: actions/upload-pages-artifact@v3
         with:

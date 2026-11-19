@@ -108,10 +108,9 @@ Open the URL printed in the terminal (usually http://localhost:5173).
 
 ```bash
 npm run build      # production build (web + bundled DXT server)
-npm run package:dxt # build a standalone prismamri.dxt for Claude Desktop
 npm run preview    # preview production build
 npm run lint       # Biome check
-npm run typecheck
+npm run typecheck  # app and the MCP server (an npm workspace)
 npm run test:e2e   # Playwright end-to-end tests
 npm run ref:capture # write local pixel baselines for the renderers (before a change)
 npm run ref:check   # compare renders pixel-exact against them (after a change)

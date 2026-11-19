@@ -35,11 +35,8 @@ jobs:
       - name: Lint and format check
         run: npm run lint
 
-      - name: Type check (app)
+      - name: Type check (app and MCP server)
         run: npm run typecheck
-
-      - name: Type check (MCP server)
-        run: npm ci --prefix mcp-server && npm run --prefix mcp-server typecheck
 
       - name: Run unit tests
         run: npm test
@@ -68,7 +65,6 @@ jobs:
         run: npm run build
         env:
           GITHUB_PAGES: 'false'
-          VITE_RELAY_URL: ${{ vars.VITE_RELAY_URL }}
 
       - name: Run E2E tests
         run: npm run test:e2e

@@ -3,12 +3,11 @@
  *
  * Shows one of two panels depending on how the PWA is being used:
  *
- *  • RemoteModePanel — hosted web app, connects via Cloudflare relay.
- *    Shows Session ID, Relay URL, and a one-click .dxt download.
+ *  • RemoteModePanel — hosted web app.
+ *    Shows a one-click .dxt download and how to connect.
  *
  *  • LocalModePanel  — installed PWA or localhost dev server.
- *    Connects directly to the MCP server on 127.0.0.1; no relay,
- *    no Session ID needed.
+ *    Connects directly to the MCP server on 127.0.0.1.
  *
  * All visual styling lives in `SessionPanel.styles.ts`. The reference prompt
  * markdown lives in `lib/mcp/example-prompt.ts`. Shared MCP constants
@@ -165,7 +164,7 @@ function PromptSection() {
 //
 // Not connected  →  same for Web and PWA: download button + instructions.
 // Connected      →  differs by mode:
-//   Web (relay)  →  prompt example + disconnect
+//   Web          →  prompt example + disconnect
 //   PWA (local)  →  direct connection info + prompt example
 
 // Stable inline-style references (declared at module scope so they don't

@@ -153,7 +153,7 @@ describe('findings across series, as the agent sees them', () => {
     viewer.addAnnotation(finding('a'));
     await viewer.switchSeries('uid-t2');
 
-    const r = await run(viewer, 'remove_annotation', { id: 'a' });
+    const r = await run(viewer, 'remove_annotation', { annotationId: 'a' });
     expect(r.error).toMatch(/T1 SAG/);
     expect(r.error).toMatch(/switch_series/);
   });

@@ -299,7 +299,9 @@ const handleAddAnnotation: Handler = ({ msg, ok, fail, viewer }) => {
 };
 
 const handleRemoveAnnotation: Handler = ({ msg, ok, fail, viewer }) => {
-  const removeId = requireString(msg, 'id');
+  // Not `id`: that key is the request's own, and a command field of the same
+  // name would replace it, so the reply would never match the request.
+  const removeId = requireString(msg, 'annotationId');
   const state = viewer.getSnapshot();
   const elsewhere = state.otherSeriesAnnotations.find((a) => a.id === removeId);
   if (elsewhere) {

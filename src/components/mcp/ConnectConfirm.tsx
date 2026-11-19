@@ -181,7 +181,7 @@ export function ConnectConfirm({ onClose }: { onClose: () => void }) {
           </IconWrap>
           <div>
             <Title>AI Agent Connected</Title>
-            <Subtitle>PrismaMRI MCP Relay</Subtitle>
+            <Subtitle>PrismaMRI MCP</Subtitle>
           </div>
         </DialogHeader>
 
